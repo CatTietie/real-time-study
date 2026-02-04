@@ -549,21 +549,7 @@ export default function CommunityLanding() {
         </div>
 
         <div>
-          <Card 
-            title={
-              <span
-                style={{
-                  background: "linear-gradient(90deg, #1890ff, #52c41a)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  fontWeight: "bold",
-                  fontSize: "18px",
-                }}
-              >
-                帖子列表区
-              </span>
-            }
-          >
+          <Card>
             <List
               loading={loading}
               dataSource={data}

@@ -3,7 +3,7 @@ body {
   background-color: #f5f5f5; /* 浅灰色背景 */
 }
 
-/* 保持 antd 组件背景不变 */
+/* 保持 antd 组件背景不变，但排除按钮以保持正常样式 */
 .ant-card-body,
 .ant-card-head,
 .ant-menu,
@@ -14,7 +14,8 @@ body {
 .ant-table,
 .ant-list,
 .ant-form,
-.ant-input,
-.ant-btn {
+.ant-input {
   background-color: inherit !important;
 }
+
+/* 移除对按钮背景的强制继承，保持Ant Design默认样式 */
