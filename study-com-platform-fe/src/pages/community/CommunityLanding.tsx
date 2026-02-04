@@ -271,7 +271,7 @@ export default function CommunityLanding() {
             学习社区
           </Title>
           <Space>
-            <Button type="primary" onClick={() => navigate("/community")}>
+            <Button  onClick={() => navigate("/community")}>
               社区首页
             </Button>
             <Button onClick={() => navigate("/community/posts")}>
@@ -297,7 +297,6 @@ export default function CommunityLanding() {
                 : "返回学生入口"}
             </Button>
             <Button
-              type="primary"
               onClick={() => navigate("/community/publish")}
             >
               发布新帖
