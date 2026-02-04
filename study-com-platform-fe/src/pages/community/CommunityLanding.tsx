@@ -592,28 +592,25 @@ export default function CommunityLanding() {
                             marginBottom: "16px",
                             backgroundColor: "#fff",
                             boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-                            // 鼠标悬浮轻微上浮，增强交互感
-                            ":hover": {
-                              transform: "translateY(-2px)",
-                              boxShadow: "0 4px 12px rgba(0,0,0,0.08)"
-                            }
+                            cursor: "pointer"
                           }}
+                          onClick={() => navigate(`/community/posts/${item.id}`)}
                       >
                         <div
                             style={{
-                              display: "grid",
-                              gridTemplateColumns: cover ? "1fr 120px" : "1fr",
-                              gap: 16, // 增大间距，视觉更宽松
-                              alignItems: "flex-start", // 改为顶部对齐，避免内容垂直居中错乱
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 16,
+                              alignItems: "flex-start",
                             }}
                         >
                           <Space direction="vertical" style={{ width: "100%", gap: 12 }}>
-                            {/* 优化1：前置用户信息模块，作为帖子顶部 */}
+                            {/* 用户信息模块 */}
                             <Space wrap size="small">
-                              <Avatar size={20}>
+                              <Avatar size={40}>
                                 {(item.User?.nickname || item.User?.username || "U")[0]}
                               </Avatar>
-                              <Text type="secondary">
+                              <Text strong style={{ fontSize: 16, fontWeight: 'bold' }}>
                                 {item.User?.nickname || item.User?.username || "未知"}
                               </Text>
                               <Text type="secondary">·</Text>
@@ -634,25 +631,23 @@ export default function CommunityLanding() {
                               </Text>
                             </Space>
 
-                            {/* 优化2：分类标签单独成行，突出标题 */}
+                            {/* 分类标签 */}
                             {item.category && (
                                 <Tag color="blue" style={{ marginBottom: 4 }}>
                                   {item.category}
                                 </Tag>
                             )}
-                            <Link to={`/community/posts/${item.id}`}>
-                              <Text strong style={{ fontSize: 18, display: "block", cursor: "pointer" }}>
-                                {item.title}
-                              </Text>
-                            </Link>
+                            <Text strong style={{ fontSize: 18, display: "block" }}>
+                              {item.title}
+                            </Text>
 
-                            {/* 优化3：正文摘要保留，间距更合理 */}
+                            {/* 正文摘要 */}
                             <Paragraph ellipsis={{ rows: 2 }} style={{ marginBottom: 8, margin: 0 }}>
                               {summary}
                               {summary.length >= 120 ? "...【阅读更多】" : ""}
                             </Paragraph>
 
-                            {/* 优化4：标签模块保留，微调间距 */}
+                            {/* 标签模块 */}
                             {item.tags && (
                                 <Space wrap style={{ marginBottom: 8, gap: 8 }}>
                                   {(() => {
@@ -665,11 +660,12 @@ export default function CommunityLanding() {
                                       <Tag
                                           key={tag}
                                           style={{ cursor: "pointer" }}
-                                          onClick={() =>
-                                              navigate(
-                                                  `/community/posts?keyword=${encodeURIComponent(tag)}`,
-                                              )
-                                          }
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigate(
+                                                `/community/posts?keyword=${encodeURIComponent(tag)}`,
+                                            );
+                                          }}
                                       >
                                         #{tag}
                                       </Tag>
@@ -677,29 +673,29 @@ export default function CommunityLanding() {
                                 </Space>
                             )}
 
-                            {/* 优化5：互动区保留，移除多余分割线，视觉更简洁 */}
+                            {/* 图片显示在文字结束的下方，靠左排列 */}
+                            {cover && (
+                                <img
+                                    src={cover}
+                                    alt={item.title}
+                                    style={{
+                                      width: 120,
+                                      height: 90,
+                                      objectFit: "cover",
+                                      borderRadius: 8,
+                                      boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                                      alignSelf: "flex-start"
+                                    }}
+                                />
+                            )}
+
+                            {/* 互动区 */}
                             <Space size="middle">
                               <Text type="secondary">👍 {item.like_count || 0}</Text>
                               <Text type="secondary">💬 {item.comment_count || 0}</Text>
                               <Text type="secondary">⭐ {item.favoriteCount || 0}</Text>
                             </Space>
                           </Space>
-
-                          {/* 优化6：图片保留，样式微调，保持圆角一致 */}
-                          {cover && (
-                              <img
-                                  src={cover}
-                                  alt={item.title}
-                                  style={{
-                                    width: 120,
-                                    height: 90,
-                                    objectFit: "cover",
-                                    borderRadius: 8,
-                                    // 图片添加轻微阴影，更有质感
-                                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
-                                  }}
-                              />
-                          )}
                         </div>
                       </List.Item>
                   );
