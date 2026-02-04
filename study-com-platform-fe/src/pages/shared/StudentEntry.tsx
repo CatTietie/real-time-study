@@ -17,7 +17,7 @@ export default function StudentEntry() {
       description: "参与讨论，分享学习心得",
       icon: "👥",
       onClick: () => navigate("/community"),
-      color: "#1890ff"
+      color: "#e34d2c"
     },
     {
       title: "个人中心",

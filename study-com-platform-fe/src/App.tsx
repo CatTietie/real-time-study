@@ -34,6 +34,7 @@ import ComingSoon from "./pages/shared/ComingSoon";
 import StudentEntry from "./pages/shared/StudentEntry";
 import "./App.css";
 import "./styles/student.less";
+import "./styles/community.less";
 
 function App() {
   return (
