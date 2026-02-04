@@ -1,0 +1,80 @@
+                                /* 深色主题色彩系统 */
+:root {
+  /* 主色 - 深蓝色 */
+  --primary-color: rgb(33, 84, 138);
+  --primary-dark: rgb(26, 67, 110);
+  --primary-light: rgb(64, 128, 192);
+  
+  /* 中性色 */
+  --bg-black: rgb(0, 0, 0);
+  --bg-dark-gray: rgb(26, 26, 26);
+  --bg-card-dark: rgb(30, 30, 30);
+  --text-white: rgb(255, 255, 255);
+  --text-light-gray: rgb(153, 153, 153);
+  --text-dark-gray: rgb(51, 51, 51);
+  --border-dark: rgb(51, 51, 51);
+  
+  /* 阴影效果 */
+  --shadow-blue: rgba(33, 84, 138, 0.3);
+  --shadow-blue-strong: rgba(33, 84, 138, 0.5);
+}
+
+/* 深色主题全局样式 */
+.dark-theme {
+  background-color: var(--bg-black);
+  color: var(--text-white);
+  
+  /* Ant Design 组件深色适配 */
+  .ant-card {
+    background: var(--bg-card-dark);
+    border-color: var(--border-dark);
+    color: var(--text-white);
+  }
+  
+  .ant-btn {
+    transition: all 0.2s ease;
+  }
+  
+  .ant-input,
+  .ant-select-selector {
+    background: var(--bg-black);
+    border-color: var(--text-dark-gray);
+    color: var(--text-white);
+    
+    &:focus,
+    &:hover {
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 2px var(--shadow-blue);
+    }
+  }
+  
+  .ant-tag {
+    background: transparent;
+    border-color: var(--primary-color);
+    color: var(--text-white);
+    
+    &:hover {
+      background: var(--primary-color);
+      color: var(--text-white);
+    }
+  }
+  
+  /* 滚动条深色适配 */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: var(--bg-dark-gray);
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: var(--primary-color);
+    border-radius: 4px;
+    
+    &:hover {
+      background: var(--primary-light);
+    }
+  }
+}
