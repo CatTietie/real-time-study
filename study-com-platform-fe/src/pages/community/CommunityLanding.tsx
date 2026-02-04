@@ -628,10 +628,15 @@ export default function CommunityLanding() {
                             </Text>
                             <Text type="secondary">·</Text>
                             <Text type="secondary">
-                              {item.createdAt
-                                ? new Date(item.createdAt).toLocaleString()
+                              {item.created_at
+                                ? new Date(item.created_at).toLocaleString()
                                 : "-"}
                             </Text>
+                            {item.updated_at && (
+                                <Text type="secondary">
+                                  · 修改于：{new Date(item.updated_at).toLocaleString()}
+                                </Text>
+                            )}
                             <Text type="secondary">
                               · 阅读量：{item.view_count || 0}
                             </Text>
