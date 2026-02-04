@@ -1,0 +1,17 @@
+// 路由总入口
+import { Router } from "express";
+import adminRoutes from "./admin.routes";
+import userRoutes from "./user.routes";
+import postRoutes from "./post.routes";
+import dashboardRoutes from "./dashboard.routes";
+import communityRoutes from "./community.routes";
+
+const router = Router();
+
+router.use("/admin", adminRoutes);
+router.use("/user", userRoutes);
+router.use("/post", postRoutes);
+router.use("/dashboard", dashboardRoutes);
+router.use("/community", communityRoutes);
+
+export default router;

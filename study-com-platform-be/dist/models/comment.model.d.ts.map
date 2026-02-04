@@ -1,0 +1,1 @@
+{"version":3,"file":"comment.model.d.ts","sourceRoot":"","sources":["../../src/models/comment.model.ts"],"names":[],"mappings":"AACA,OAAO,EAAa,KAAK,EAAE,MAAM,WAAW,CAAC;AAG7C,qBAAa,OAAQ,SAAQ,KAAK;IACzB,EAAE,EAAG,MAAM,CAAC;IACZ,OAAO,EAAG,MAAM,CAAC;IACjB,OAAO,EAAG,MAAM,CAAC;IACjB,OAAO,EAAG,MAAM,CAAC;IACjB,MAAM,EAAG,MAAM,CAAC;IAChB,SAAS,EAAG,IAAI,CAAC;CACzB;AAwCD,eAAe,OAAO,CAAC"}

@@ -1,0 +1,120 @@
+### ========================================
+### 学习平台管理员认证系统 API 测试
+### ========================================
+
+# 环境配置
+@baseUrl = http://localhost:3000
+@apiPath = /api/admin
+
+### ========================================
+### 1️⃣ 管理员登录
+### ========================================
+
+POST {{baseUrl}}{{apiPath}}/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "admin123"
+}
+
+###
+
+### ========================================
+### 2️⃣ 获取管理员信息（需要 Token）
+### ========================================
+### 说明：将下面的 TOKEN_HERE 替换为步骤 1 返回的 token 值
+
+GET {{baseUrl}}{{apiPath}}/profile
+Authorization: Bearer TOKEN_HERE
+
+###
+
+### ========================================
+### 3️⃣ 修改管理员信息
+### ========================================
+### 说明：修改昵称和头像
+
+PUT {{baseUrl}}{{apiPath}}/editinfo
+Content-Type: application/json
+Authorization: Bearer TOKEN_HERE
+
+{
+  "nickname": "超级管理员",
+  "avatar": "https://example.com/avatar.jpg"
+}
+
+###
+
+### ========================================
+### 4️⃣ 管理员登出
+### ========================================
+
+POST {{baseUrl}}{{apiPath}}/logout
+Authorization: Bearer TOKEN_HERE
+
+###
+
+### ========================================
+### 5️⃣ 查询操作日志
+### ========================================
+
+GET {{baseUrl}}{{apiPath}}/logs?page=1&pageSize=20
+Authorization: Bearer TOKEN_HERE
+
+###
+
+### ========================================
+### 6️⃣ 获取操作日志统计
+### ========================================
+
+GET {{baseUrl}}{{apiPath}}/logs/stats
+Authorization: Bearer TOKEN_HERE
+
+###
+
+### ========================================
+### 错误测试场景
+### ========================================
+
+### 测试：登录失败（错误的密码）
+POST {{baseUrl}}{{apiPath}}/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "wrongpassword"
+}
+
+###
+
+### 测试：没有 Token 访问受保护的接口
+GET {{baseUrl}}{{apiPath}}/profile
+
+###
+
+### 测试：无效的 Token
+GET {{baseUrl}}{{apiPath}}/profile
+Authorization: Bearer invalid_token_here
+
+###
+
+### 测试：参数缺失
+POST {{baseUrl}}{{apiPath}}/login
+Content-Type: application/json
+
+{
+  "username": "admin"
+}
+
+###
+
+### 测试：修改信息时参数为空
+PUT {{baseUrl}}{{apiPath}}/editinfo
+Content-Type: application/json
+Authorization: Bearer TOKEN_HERE
+
+{
+}
+
+###
