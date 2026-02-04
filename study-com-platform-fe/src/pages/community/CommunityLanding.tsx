@@ -271,9 +271,6 @@ export default function CommunityLanding() {
             学习社区
           </Title>
           <Space>
-            <Button  onClick={() => navigate("/community")}>
-              社区首页
-            </Button>
             <Button onClick={() => navigate("/community/posts")}>
               我的帖子
             </Button>
