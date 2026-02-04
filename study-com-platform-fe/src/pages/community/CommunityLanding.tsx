@@ -576,128 +576,144 @@ export default function CommunityLanding() {
         <div>
           <Card>
             <List
-              loading={loading}
-              dataSource={data}
-              rowKey="id"
-              renderItem={(item) => {
-                const summary = stripText(item.content).slice(0, 120);
-                const cover = resolveImageUrl(item.images?.[0]);
-                return (
-                  <List.Item style={{ transition: "transform 0.2s ease" }}>
-                    <Card
-                      style={{
-                        width: "100%",
-                        transition: "box-shadow 0.2s ease",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: cover ? "1fr 120px" : "1fr",
-                          gap: 12,
-                          alignItems: "center",
-                        }}
+                loading={loading}
+                dataSource={data}
+                rowKey="id"
+                renderItem={(item) => {
+                  const summary = stripText(item.content).slice(0, 120);
+                  const cover = resolveImageUrl(item.images?.[0]);
+                  return (
+                      <List.Item
+                          style={{
+                            transition: "transform 0.2s ease",
+                            padding: "16px",
+                            border: "1px solid #f0f0f0",
+                            borderRadius: "8px",
+                            marginBottom: "16px",
+                            backgroundColor: "#fff",
+                            boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+                            // 鼠标悬浮轻微上浮，增强交互感
+                            ":hover": {
+                              transform: "translateY(-2px)",
+                              boxShadow: "0 4px 12px rgba(0,0,0,0.08)"
+                            }
+                          }}
                       >
-                        <Space direction="vertical" style={{ width: "100%" }}>
-                          <Space wrap>
+                        <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: cover ? "1fr 120px" : "1fr",
+                              gap: 16, // 增大间距，视觉更宽松
+                              alignItems: "flex-start", // 改为顶部对齐，避免内容垂直居中错乱
+                            }}
+                        >
+                          <Space direction="vertical" style={{ width: "100%", gap: 12 }}>
+                            {/* 优化1：前置用户信息模块，作为帖子顶部 */}
+                            <Space wrap size="small">
+                              <Avatar size={20}>
+                                {(item.User?.nickname || item.User?.username || "U")[0]}
+                              </Avatar>
+                              <Text type="secondary">
+                                {item.User?.nickname || item.User?.username || "未知"}
+                              </Text>
+                              <Text type="secondary">·</Text>
+                              <Text type="secondary">
+                                {item.created_at ? new Date(item.created_at).toLocaleString() : "-"}
+                              </Text>
+                              {item.updated_at && (
+                                  <>
+                                    <Text type="secondary">·</Text>
+                                    <Text type="secondary">
+                                      修改于：{new Date(item.updated_at).toLocaleString()}
+                                    </Text>
+                                  </>
+                              )}
+                              <Text type="secondary">·</Text>
+                              <Text type="secondary">
+                                阅读量：{item.view_count || 0}
+                              </Text>
+                            </Space>
+
+                            {/* 优化2：分类标签单独成行，突出标题 */}
                             {item.category && (
-                              <Tag color="blue">{item.category}</Tag>
+                                <Tag color="blue" style={{ marginBottom: 4 }}>
+                                  {item.category}
+                                </Tag>
                             )}
                             <Link to={`/community/posts/${item.id}`}>
-                              <Text strong style={{ fontSize: 16 }}>
+                              <Text strong style={{ fontSize: 18, display: "block", cursor: "pointer" }}>
                                 {item.title}
                               </Text>
                             </Link>
-                          </Space>
-                          <Paragraph ellipsis={{ rows: 2 }}>
-                            {summary}
-                            {summary.length >= 120 ? "...【阅读更多】" : ""}
-                          </Paragraph>
-                          <Space wrap size="small">
-                            <Avatar size={20}>
-                              {
-                                (item.User?.nickname ||
-                                  item.User?.username ||
-                                  "U")[0]
-                              }
-                            </Avatar>
-                            <Text type="secondary">
-                              {item.User?.nickname ||
-                                item.User?.username ||
-                                "未知"}
-                            </Text>
-                            <Text type="secondary">·</Text>
-                            <Text type="secondary">
-                              {item.created_at
-                                ? new Date(item.created_at).toLocaleString()
-                                : "-"}
-                            </Text>
-                            {item.updated_at && (
-                                <Text type="secondary">
-                                  · 修改于：{new Date(item.updated_at).toLocaleString()}
-                                </Text>
+
+                            {/* 优化3：正文摘要保留，间距更合理 */}
+                            <Paragraph ellipsis={{ rows: 2 }} style={{ marginBottom: 8, margin: 0 }}>
+                              {summary}
+                              {summary.length >= 120 ? "...【阅读更多】" : ""}
+                            </Paragraph>
+
+                            {/* 优化4：标签模块保留，微调间距 */}
+                            {item.tags && (
+                                <Space wrap style={{ marginBottom: 8, gap: 8 }}>
+                                  {(() => {
+                                    try {
+                                      return JSON.parse(item.tags);
+                                    } catch {
+                                      return [];
+                                    }
+                                  })().map((tag: string) => (
+                                      <Tag
+                                          key={tag}
+                                          style={{ cursor: "pointer" }}
+                                          onClick={() =>
+                                              navigate(
+                                                  `/community/posts?keyword=${encodeURIComponent(tag)}`,
+                                              )
+                                          }
+                                      >
+                                        #{tag}
+                                      </Tag>
+                                  ))}
+                                </Space>
                             )}
-                            <Text type="secondary">
-                              · 阅读量：{item.view_count || 0}
-                            </Text>
-                          </Space>
-                          {item.tags && (
-                            <Space wrap>
-                              {(() => {
-                                try {
-                                  return JSON.parse(item.tags);
-                                } catch {
-                                  return [];
-                                }
-                              })().map((tag: string) => (
-                                <Tag
-                                  key={tag}
-                                  style={{ cursor: "pointer" }}
-                                  onClick={() =>
-                                    navigate(
-                                      `/community/posts?keyword=${encodeURIComponent(tag)}`,
-                                    )
-                                  }
-                                >
-                                  #{tag}
-                                </Tag>
-                              ))}
+
+                            {/* 优化5：互动区保留，移除多余分割线，视觉更简洁 */}
+                            <Space size="middle">
+                              <Text type="secondary">👍 {item.like_count || 0}</Text>
+                              <Text type="secondary">💬 {item.comment_count || 0}</Text>
+                              <Text type="secondary">⭐ {item.favoriteCount || 0}</Text>
                             </Space>
-                          )}
-                          <Divider style={{ margin: "8px 0" }} />
-                          <Space>
-                            <Text>👍 {item.like_count || 0}</Text>
-                            <Text>💬 {item.comment_count || 0}</Text>
-                            <Text>⭐ {item.favoriteCount || 0}</Text>
                           </Space>
-                        </Space>
-                        {cover && (
-                          <img
-                            src={cover}
-                            alt={item.title}
-                            style={{
-                              width: 120,
-                              height: 90,
-                              objectFit: "cover",
-                              borderRadius: 8,
-                            }}
-                          />
-                        )}
-                      </div>
-                    </Card>
-                  </List.Item>
-                );
-              }}
+
+                          {/* 优化6：图片保留，样式微调，保持圆角一致 */}
+                          {cover && (
+                              <img
+                                  src={cover}
+                                  alt={item.title}
+                                  style={{
+                                    width: 120,
+                                    height: 90,
+                                    objectFit: "cover",
+                                    borderRadius: 8,
+                                    // 图片添加轻微阴影，更有质感
+                                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                                  }}
+                              />
+                          )}
+                        </div>
+                      </List.Item>
+                  );
+                }}
             />
             {data.length < total && (
-              <div style={{ textAlign: "center", marginTop: 16 }}>
-                <Button
-                  loading={loading}
-                  onClick={() => loadData(page + 1, true)}
-                >
-                  加载更多
-                </Button>
-              </div>
+                <div style={{ textAlign: "center", marginTop: 16 }}>
+                  <Button
+                      loading={loading}
+                      onClick={() => loadData(page + 1, true)}
+                  >
+                    加载更多
+                  </Button>
+                </div>
             )}
           </Card>
         </div>
