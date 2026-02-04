@@ -267,9 +267,48 @@ export default function CommunityLanding() {
           align="center"
           style={{ width: "100%", justifyContent: "space-between" }}
         >
-          <Title level={4} style={{ margin: 0 }}>
-            学习社区
-          </Title>
+          <Space align="center">
+            <svg
+              t="1770195626963"
+              className="icon"
+              viewBox="0 0 1264 1024"
+              version="1.1"
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              style={{ marginRight: 8 }}
+            >
+              <path
+                d="M856.786824 323.794824V0.030118h-462.607059v137.366588a293.586824 293.586824 0 0 1 192.752941 275.727059c0 126.674824-80.293647 234.526118-192.752941 275.57647V1002.315294h848.112941V323.794824h-385.505882z"
+                fill="#4C86C6"
+              />
+              <path
+                d="M293.436235 119.657412c-162.032941 0-293.406118 131.373176-293.406117 293.466353 0 144.564706 104.568471 264.613647 242.145882 288.88847v300.303059h102.520471v-300.272941a290.936471 290.936471 0 0 0 49.483294-13.312V137.396706a292.803765 292.803765 0 0 0-100.74353-17.739294"
+                fill="#31EC7C"
+              />
+              <path
+                d="M586.932706 413.123765a293.586824 293.586824 0 0 0-192.752941-275.727059v551.303529c112.459294-41.050353 192.752941-148.901647 192.752941-275.57647"
+                fill="#1565B2"
+              />
+              <path
+                d="M671.744 917.473882h107.911529V84.811294h-107.911529zM860.611765 917.473882h107.941647V408.606118h-107.941647zM1049.509647 917.473882h107.941647V408.606118h-107.941647z"
+                fill="#FFFFFF"
+              />
+            </svg>
+            <Title
+              level={3}
+              style={{
+                margin: 0,
+                background: "linear-gradient(90deg, #1890ff, #52c41a)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                fontWeight: "bold",
+                fontSize: "24px",
+              }}
+            >
+              学习社区
+            </Title>
+          </Space>
           <Space>
             <Button onClick={() => navigate("/community/posts")}>
               我的帖子
