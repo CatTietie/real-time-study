@@ -1,0 +1,26 @@
+# OS & Editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Build & deps
+node_modules/
+dist/
+build/
+.out/
+.cache/
+coverage/
+
+# Env & secrets
+.env*
+*.log
+
+# Backend (be)
+/study-com-platform-be/dist/
+/study-com-platform-be/tsconfig.tsbuildinfo
+
+# Frontend (fe)
+/study-com-platform-fe/dist/
+/study-com-platform-fe/.vite/
+/study-com-platform-fe/.eslintcache

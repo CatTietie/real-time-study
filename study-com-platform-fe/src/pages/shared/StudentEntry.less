@@ -1,0 +1,144 @@
+.student-entry-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 24px;
+  
+  // 欢迎区域样式
+  .welcome-section {
+    text-align: center;
+    margin-bottom: 32px;
+    padding: 40px 0;
+    
+    .welcome-content {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 16px;
+      padding: 32px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(10px);
+      max-width: 800px;
+      margin: 0 auto;
+      
+      .welcome-title {
+        margin-bottom: 12px !important;
+        color: #333;
+        font-weight: 600;
+      }
+      
+      .welcome-subtitle {
+        font-size: 18px;
+        color: #666;
+      }
+    }
+  }
+  
+  // 快捷操作区域
+  .quick-actions-section {
+    margin-bottom: 32px;
+    
+    .section-title {
+      color: white;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    
+    .action-card {
+      height: 100%;
+      border-radius: 12px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      
+      &:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+      }
+      
+      .action-content {
+        text-align: center;
+        padding: 16px 0;
+        
+        .action-icon {
+          width: 64px;
+          height: 64px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto 16px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+          
+          .icon-text {
+            font-size: 28px;
+          }
+        }
+        
+        .action-title {
+          margin-bottom: 8px !important;
+          color: #333;
+        }
+        
+        .action-description {
+          font-size: 14px;
+          line-height: 1.4;
+        }
+      }
+    }
+  }
+  
+  // 统计预览区域
+  .stats-preview-section {
+    .section-title {
+      margin-bottom: 24px;
+    }
+    
+    .ant-statistic {
+      text-align: center;
+      
+      .ant-statistic-title {
+        color: #666;
+        font-size: 14px;
+      }
+      
+      .ant-statistic-content {
+        color: #333;
+        font-weight: 600;
+      }
+    }
+  }
+}
+
+// 响应式设计
+@media (max-width: 768px) {
+  .student-entry-page {
+    padding: 16px;
+    
+    .welcome-section {
+      padding: 24px 0;
+      
+      .welcome-content {
+        padding: 24px 16px;
+        
+        .welcome-title {
+          font-size: 24px;
+        }
+        
+        .welcome-subtitle {
+          font-size: 16px;
+        }
+      }
+    }
+    
+    .quick-actions-section {
+      .action-card {
+        .action-content {
+          .action-icon {
+            width: 48px;
+            height: 48px;
+            
+            .icon-text {
+              font-size: 20px;
+            }
+          }
+        }
+      }
+    }
+  }
+}

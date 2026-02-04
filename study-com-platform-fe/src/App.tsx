@@ -1,6 +1,8 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import AdminLayout from "./components/admin/AdminLayout";
 import RequireAuth from "./components/admin/RequireAuth";
+import StudentLayout from "./components/student/StudentLayout";
+import RequireStudentAuth from "./components/student/RequireStudentAuth";
 import Login from "./pages/admin/Login";
 import Dashboard from "./pages/admin/Dashboard";
 import Users from "./pages/admin/Users";
@@ -18,6 +20,7 @@ import Leaderboard from "./pages/community/Leaderboard";
 import Favorites from "./pages/community/Favorites";
 import PointsCenter from "./pages/community/PointsCenter";
 import MyLikes from "./pages/community/MyLikes";
+import StudentDashboard from "./pages/student/Dashboard";
 import CommunityPosts from "./pages/admin/community/CommunityPosts";
 import CommunityComments from "./pages/admin/community/CommunityComments";
 import CommunityStats from "./pages/admin/community/CommunityStats";
@@ -30,6 +33,7 @@ import Register from "./pages/shared/Register";
 import ComingSoon from "./pages/shared/ComingSoon";
 import StudentEntry from "./pages/shared/StudentEntry";
 import "./App.css";
+import "./styles/student.less";
 
 function App() {
   return (
@@ -48,6 +52,25 @@ function App() {
         <Route path="/student/entry" element={<StudentEntry />} />
         <Route path="/register" element={<Register />} />
         <Route path="/student/coming-soon" element={<ComingSoon />} />
+        
+        {/* 学生端路由 */}
+        <Route
+          path="/student"
+          element={
+            <RequireStudentAuth>
+              <StudentLayout />
+            </RequireStudentAuth>
+          }
+        >
+          <Route index element={<Navigate to="/student/dashboard" replace />} />
+          <Route path="dashboard" element={<StudentDashboard />} />
+          <Route path="study-room" element={<ComingSoon />} />
+          <Route path="analytics" element={<ComingSoon />} />
+          <Route path="settings" element={<ComingSoon />} />
+          <Route path="profile" element={<ComingSoon />} />
+        </Route>
+        
+        {/* 管理端路由 */}
         <Route
           path="/admin"
           element={

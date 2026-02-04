@@ -1,0 +1,172 @@
+// 学生端全局样式变量
+@student-primary-color: #1890ff;
+@student-success-color: #52c41a;
+@student-warning-color: #faad14;
+@student-error-color: #ff4d4f;
+@student-info-color: #13c2c2;
+
+// 学生端卡片样式
+.student-card {
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  
+  &:hover {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px);
+  }
+}
+
+// 学生端按钮样式
+.student-btn-primary {
+  background: linear-gradient(135deg, @student-primary-color 0%, #40a9ff 100%);
+  border: none;
+  border-radius: 8px;
+  
+  &:hover {
+    background: linear-gradient(135deg, #40a9ff 0%, @student-primary-color 100%);
+  }
+}
+
+.student-btn-secondary {
+  border-color: @student-primary-color;
+  color: @student-primary-color;
+  border-radius: 8px;
+  
+  &:hover {
+    border-color: #40a9ff;
+    color: #40a9ff;
+  }
+}
+
+// 学生端表单样式
+.student-form {
+  .ant-form-item-label > label {
+    font-weight: 500;
+    color: #333;
+  }
+  
+  .ant-input,
+  .ant-select-selector,
+  .ant-picker {
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    
+    &:focus,
+    &:hover {
+      border-color: @student-primary-color;
+      box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+    }
+  }
+}
+
+// 学生端表格样式
+.student-table {
+  .ant-table-thead > tr > th {
+    background: #fafafa;
+    font-weight: 600;
+    color: #333;
+  }
+  
+  .ant-table-tbody > tr:hover > td {
+    background: #f0f8ff;
+  }
+}
+
+// 学生端进度条样式
+.student-progress {
+  .ant-progress-bg {
+    border-radius: 4px;
+  }
+  
+  &.progress-blue .ant-progress-bg {
+    background: linear-gradient(90deg, #1890ff, #40a9ff);
+  }
+  
+  &.progress-green .ant-progress-bg {
+    background: linear-gradient(90deg, #52c41a, #73d13d);
+  }
+  
+  &.progress-orange .ant-progress-bg {
+    background: linear-gradient(90deg, #faad14, #ffc53d);
+  }
+}
+
+// 学生端标签样式
+.student-tag {
+  &.tag-blue {
+    background: #e6f7ff;
+    border-color: #91d5ff;
+    color: #1890ff;
+  }
+  
+  &.tag-green {
+    background: #f6ffed;
+    border-color: #b7eb8f;
+    color: #52c41a;
+  }
+  
+  &.tag-orange {
+    background: #fff7e6;
+    border-color: #ffd591;
+    color: #faad14;
+  }
+}
+
+// 学生端模态框样式
+.student-modal {
+  .ant-modal-content {
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  
+  .ant-modal-header {
+    background: linear-gradient(135deg, #f0f8ff 0%, #e6f7ff 100%);
+    border-bottom: 1px solid #d9f0ff;
+  }
+}
+
+// 学生端通知样式
+.student-notification {
+  .ant-notification-notice {
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  
+  &.notification-success {
+    border-left: 4px solid @student-success-color;
+  }
+  
+  &.notification-warning {
+    border-left: 4px solid @student-warning-color;
+  }
+  
+  &.notification-error {
+    border-left: 4px solid @student-error-color;
+  }
+}
+
+// 响应式断点
+@media (max-width: 768px) {
+  .student-card {
+    margin-bottom: 16px;
+  }
+  
+  .student-form {
+    .ant-form-item {
+      margin-bottom: 16px;
+    }
+  }
+}
+
+@media (max-width: 576px) {
+  .student-card {
+    padding: 16px;
+  }
+  
+  .student-btn-primary,
+  .student-btn-secondary {
+    width: 100%;
+    margin-bottom: 8px;
+  }
+}
