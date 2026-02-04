@@ -1,3 +1,20 @@
 body {
   margin: 0;
+  background-color: #f5f5f5; /* 浅灰色背景 */
+}
+
+/* 保持 antd 组件背景不变 */
+.ant-card-body,
+.ant-card-head,
+.ant-menu,
+.ant-layout,
+.ant-layout-header,
+.ant-layout-sider,
+.ant-layout-content,
+.ant-table,
+.ant-list,
+.ant-form,
+.ant-input,
+.ant-btn {
+  background-color: inherit !important;
 }
