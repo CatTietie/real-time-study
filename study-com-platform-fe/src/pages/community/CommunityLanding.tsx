@@ -303,7 +303,7 @@ export default function CommunityLanding() {
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 fontWeight: "bold",
-                fontSize: "24px",
+                fontSize: "30px",
               }}
             >
               学习社区
@@ -394,7 +394,47 @@ export default function CommunityLanding() {
         }}
       >
         <div>
-          <Card title="社区分类导航" style={{ marginBottom: 16 }}>
+          <Card 
+            title={
+              <span
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  background: "linear-gradient(90deg, #1890ff, #52c41a)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  fontWeight: "bold",
+                  fontSize: "18px",
+                }}
+              >
+                <svg
+                  t="1770196569486"
+                  className="icon"
+                  viewBox="0 0 1024 1024"
+                  version="1.1"
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  style={{ marginRight: 8 }}
+                >
+                  <path
+                    d="M221.13 598m55.4 0l474.5 0q55.4 0 55.4 55.4l0 182.19q0 55.4-55.4 55.4l-474.5 0q-55.4 0-55.4-55.4l0-182.19q0-55.4 55.4-55.4Z"
+                    fill="#0F9FF7"
+                  ></path>
+                  <path
+                    d="M513.77 863.24c-5.04 0-9.63-2.91-11.77-7.48L311.5 449.87c-16.36-34.85-23.6-73.25-20.96-111.03 2.51-35.87 13.85-71.2 32.78-102.16 18.75-30.67 44.68-56.58 74.99-74.94 32.44-19.64 68.47-30.28 107.08-31.61 5.55-0.19 11.21-0.19 16.76 0 22.72 0.78 44.89 4.9 65.9 12.22 6.78 2.36 10.36 9.78 7.99 16.56-2.36 6.78-9.78 10.36-16.56 7.99-18.54-6.47-38.14-10.1-58.24-10.79-4.96-0.17-10.01-0.17-14.96 0-34.12 1.18-65.92 10.55-94.51 27.87-26.77 16.21-49.69 39.12-66.28 66.26-16.76 27.42-26.8 58.68-29.02 90.41-2.37 33.85 3.87 66.88 18.56 98.17l178.73 380.81 178.73-380.81c16.99-36.2 22.76-75.91 16.67-114.84-5.8-37.14-21.92-71.86-46.61-100.41-4.7-5.43-4.1-13.64 1.33-18.34 5.43-4.7 13.64-4.1 18.34 1.33 27.88 32.24 46.08 71.45 52.64 113.41 6.89 44.07 0.38 88.98-18.83 129.9l-190.5 405.89a13.01 13.01 0 0 1-11.77 7.48z"
+                    fill="#303030"
+                  ></path>
+                  <path
+                    d="M513.77 455c-45.77 0-83-37.23-83-83s37.23-83 83-83 83 37.23 83 83-37.23 83-83 83z m0-140c-31.43 0-57 25.57-57 57s25.57 57 57 57 57-25.57 57-57-25.57-57-57-57z"
+                    fill="#303030"
+                  ></path>
+                </svg>
+                社区分类导航
+              </span>
+            } 
+            style={{ marginBottom: 16 }}
+          >
             <Space direction="vertical" style={{ width: "100%" }}>
               <Button
                 type={!category ? "primary" : "default"}
@@ -422,7 +462,47 @@ export default function CommunityLanding() {
             </Space>
           </Card>
 
-          <Card title="热门标签" style={{ marginBottom: 16 }}>
+          <Card 
+            title={
+              <span
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  background: "linear-gradient(90deg, #1890ff, #52c41a)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  fontWeight: "bold",
+                  fontSize: "18px",
+                }}
+              >
+                <svg
+                  t="1770196690886"
+                  className="icon"
+                  viewBox="0 0 1024 1024"
+                  version="1.1"
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  style={{ marginRight: 8 }}
+                >
+                  <path
+                    d="M491.65 479.85m55.4 0l273.94 0q55.4 0 55.4 55.4l0 274.35q0 55.4-55.4 55.4l-273.94 0q-55.4 0-55.4-55.4l0-274.35q0-55.4 55.4-55.4Z"
+                    fill="#ED6663"
+                  ></path>
+                  <path
+                    d="M538.1 631.65c-3.33 0-6.65-1.27-9.19-3.81L173.28 272.22c-5.08-5.08-5.08-13.31 0-18.38l61.38-61.38c5.08-5.08 13.31-5.08 18.38 0 5.08 5.08 5.08 13.31 0 18.38l-52.19 52.19 337.24 337.24 43-42.99-271.15-271.15c-5.08-5.08-5.08-13.31 0-18.38 5.08-5.08 13.31-5.08 18.38 0l280.34 280.34a12.988 12.988 0 0 1 0 18.38l-61.38 61.38a12.964 12.964 0 0 1-9.19 3.81z"
+                    fill="#303030"
+                  ></path>
+                  <path
+                    d="M656.42 687.97c-1.83 0-3.68-0.39-5.42-1.18l-114.53-52.52c-6.53-2.99-9.39-10.71-6.4-17.24 2.99-6.53 10.71-9.39 17.24-6.4l82.37 37.77-38.19-81.84c-3.04-6.51-0.22-14.24 6.28-17.28 6.5-3.03 14.24-0.22 17.28 6.28l53.15 113.9a12.997 12.997 0 0 1-2.56 14.66 12.99 12.99 0 0 1-9.23 3.84zM181.84 275.4c-3.33 0-6.65-1.27-9.19-3.81l-18.67-18.67c-10.65-10.65-16.52-24.82-16.52-39.88s5.87-29.23 16.52-39.88c10.65-10.65 24.82-16.52 39.88-16.52s29.23 5.87 39.88 16.52l18.67 18.67c5.08 5.08 5.08 13.31 0 18.38-5.08 5.08-13.31 5.08-18.38 0l-18.67-18.67c-5.74-5.74-13.38-8.9-21.5-8.9s-15.76 3.16-21.5 8.9-8.9 13.38-8.9 21.5 3.16 15.76 8.9 21.5l18.67 18.67c5.08 5.08 5.08 13.31 0 18.38a12.964 12.964 0 0 1-9.19 3.81zM710.19 785.19H351.63c-7.18 0-13-5.82-13-13s5.82-13 13-13h358.56c7.18 0 13 5.82 13 13s-5.82 13-13 13z"
+                    fill="#303030"
+                  ></path>
+                </svg>
+                热门标签
+              </span>
+            } 
+            style={{ marginBottom: 16 }}
+          >
             <Space wrap>
               {hotTags.length ? (
                 hotTags.map(([tag, count]) => (
@@ -445,7 +525,21 @@ export default function CommunityLanding() {
             </Space>
           </Card>
 
-          <Card title="社区数据统计">
+          <Card 
+            title={
+              <span
+                style={{
+                  background: "linear-gradient(90deg, #1890ff, #52c41a)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  fontWeight: "bold",
+                  fontSize: "18px",
+                }}
+              >
+                社区数据统计
+              </span>
+            }
+          >
             <Space direction="vertical">
               <Text>总帖子数：{total}</Text>
               <Text>今日新增：{todayNew}</Text>
@@ -455,7 +549,21 @@ export default function CommunityLanding() {
         </div>
 
         <div>
-          <Card title="帖子列表区">
+          <Card 
+            title={
+              <span
+                style={{
+                  background: "linear-gradient(90deg, #1890ff, #52c41a)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  fontWeight: "bold",
+                  fontSize: "18px",
+                }}
+              >
+                帖子列表区
+              </span>
+            }
+          >
             <List
               loading={loading}
               dataSource={data}
@@ -580,7 +688,19 @@ export default function CommunityLanding() {
 
         <div>
           <Card
-            title="个人信息卡"
+            title={
+              <span
+                style={{
+                  background: "linear-gradient(90deg, #1890ff, #52c41a)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  fontWeight: "bold",
+                  fontSize: "18px",
+                }}
+              >
+                个人信息卡
+              </span>
+            }
             style={{ marginBottom: 16 }}
             loading={profileLoading}
           >
@@ -612,7 +732,22 @@ export default function CommunityLanding() {
             </Space>
           </Card>
 
-          <Card title="我的今日" style={{ marginBottom: 16 }}>
+          <Card 
+            title={
+              <span
+                style={{
+                  background: "linear-gradient(90deg, #1890ff, #52c41a)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  fontWeight: "bold",
+                  fontSize: "18px",
+                }}
+              >
+                我的今日
+              </span>
+            } 
+            style={{ marginBottom: 16 }}
+          >
             <Space direction="vertical">
               <Text>发帖：0/3篇</Text>
               <Text>评论：2/20条</Text>
@@ -620,7 +755,21 @@ export default function CommunityLanding() {
             </Space>
           </Card>
 
-          <Card title="今日热门">
+          <Card 
+            title={
+              <span
+                style={{
+                  background: "linear-gradient(90deg, #1890ff, #52c41a)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  fontWeight: "bold",
+                  fontSize: "18px",
+                }}
+              >
+                今日热门
+              </span>
+            }
+          >
             <Space direction="vertical">
               {hotPosts.length ? (
                 hotPosts.map((item) => (
