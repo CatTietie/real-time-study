@@ -309,6 +309,15 @@ export default function CommunityLanding() {
               学习社区
             </Title>
           </Space>
+          <Space align="center">
+            <Input.Search
+              placeholder="搜索标题/内容"
+              allowClear
+              onSearch={handleSearch}
+              onChange={(e) => setKeyword(e.target.value)}
+              style={{ width: 260 }}
+            />
+          </Space>
           <Space>
             <Button onClick={() => navigate("/community/posts")}>
               我的帖子
@@ -364,51 +373,6 @@ export default function CommunityLanding() {
                 }
             />
           </Space>
-        </Space>
-      </Card>
-
-      <Card style={{ marginBottom: 16 }}>
-        <Space wrap>
-          <Input.Search
-            placeholder="搜索标题/内容"
-            allowClear
-            onSearch={handleSearch}
-            onChange={(e) => setKeyword(e.target.value)}
-            style={{ width: 260 }}
-          />
-          <Select
-            placeholder="全部分类"
-            allowClear
-            style={{ width: 160 }}
-            options={CATEGORY_OPTIONS.map((item) => ({
-              label: item,
-              value: item,
-            }))}
-            value={category}
-            onChange={(value) => setCategory(value)}
-          />
-          <Select
-            value={order}
-            style={{ width: 160 }}
-            options={[
-              { label: "最新发布", value: "latest" },
-              { label: "热门", value: "hot" },
-            ]}
-            onChange={(value) => setOrder(value)}
-          />
-          <Button type="primary" onClick={handleSearch}>
-            搜索帖子
-          </Button>
-          <Button
-            onClick={() => {
-              setKeyword("");
-              setCategory(undefined);
-              setOrder("latest");
-              loadData(1);
-            }}
-          >
-            重置
-          </Button>
         </Space>
       </Card>
 
