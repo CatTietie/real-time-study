@@ -87,6 +87,8 @@ export default function PostDetail() {
   const [post, setPost] = useState<PostDetailData | null>(null);
   const [comments, setComments] = useState<CommentRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [hotPosts, setHotPosts] = useState<Array<{id: number; title: string; view_count: number}>>([]);
+  const [hotPostsLoading, setHotPostsLoading] = useState(false);
   const [favorited, setFavorited] = useState(false);
   const [favoriteId, setFavoriteId] = useState<number | null>(null);
   const [commentForm] = Form.useForm();
@@ -100,6 +102,44 @@ export default function PostDetail() {
     post?.User?.username && username === post.User.username,
   );
   const canShowDelete = isOwner || canDelete || role === "super_admin";
+  const loadHotPosts = async () => {
+    setHotPostsLoading(true);
+    try {
+      // 获取所有帖子数据
+      const response = await fetch(`${API_BASE}/community/posts?page=1&pageSize=100`);
+      const result = await response.json();
+
+      console.log('热榜API响应:', result); // 调试信息
+
+      if (result?.data) {
+        // 按阅读量排序，取前5名
+        const sortedPosts = result.data
+          .sort((a: any, b: any) => (b.view_count || 0) - (a.view_count || 0))
+          .slice(0, 5)
+          .map((post: any) => ({
+            id: post.id,
+            title: post.title,
+            view_count: post.view_count || 0
+          }));
+
+        setHotPosts(sortedPosts);
+        console.log('设置热榜数据:', sortedPosts); // 调试信息
+      }
+    } catch (err) {
+      console.error('加载热榜数据失败:', err);
+      // 如果获取失败，使用默认数据
+      setHotPosts([
+        { id: 1, title: '求一个不把应届生当cs的城市', view_count: 12000 },
+        { id: 2, title: '前端开发学习路线分享', view_count: 8500 },
+        { id: 3, title: 'Python数据分析实战项目', view_count: 6300 },
+        { id: 4, title: '算法面试高频题目整理', view_count: 4700 },
+        { id: 5, title: 'Git版本控制最佳实践', view_count: 3200 }
+      ]);
+    } finally {
+      setHotPostsLoading(false);
+    }
+  };
+
   const loadData = async () => {
     if (!id) return;
     setLoading(true);
@@ -129,6 +169,7 @@ export default function PostDetail() {
   };
   useEffect(() => {
     loadData();
+    loadHotPosts();
   }, [id]);
   const handleCreateComment = async (values: { content: string }) => {
     if (!token) {
@@ -379,25 +420,89 @@ export default function PostDetail() {
         }}
       >
         <div>
-          <Card title="推荐区">
-            <Text type="secondary">暂无推荐内容</Text>
+            <Card
+                title={
+                    <span style={{
+                        fontSize: '18px',
+                        fontWeight: 'bold',
+                        background: 'linear-gradient(90deg, #ff2e63, #ff8fab)',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        backgroundClip: 'text',
+                        textFillColor: 'transparent'
+                    }}>
+                      全站热榜
+                    </span>
+                }
+                style={{ marginBottom: 16 }}
+                loading={hotPostsLoading}
+            >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {hotPosts.map((post, index) => (
+                <div
+                  key={post.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '8px 0',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s',
+                  }}
+                  onClick={() => navigate(`/community/post/${post.id}`)}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  <div style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: '50%',
+                    backgroundColor: index < 3 ? '#ff6b9d' : '#d9d9d9',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 12,
+                    flexShrink: 0
+                  }}>
+                    <span style={{
+                      color: 'white',
+                      fontSize: 12,
+                      fontWeight: 'bold'
+                    }}>
+                      {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}
+                    </span>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text ellipsis style={{ fontSize: 14, maxWidth: '70%' }}>
+                      {post.title}
+                    </Text>
+                    <Text type="secondary" style={{ fontSize: 12, marginLeft: 8 }}>
+                      {post.view_count > 10000
+                        ? `${(post.view_count/10000).toFixed(1)}w`
+                        : post.view_count > 1000
+                          ? `${(post.view_count/1000).toFixed(1)}k`
+                          : post.view_count} 阅读
+                    </Text>
+                  </div>
+                </div>
+              ))}
+            </div>
           </Card>
         </div>
 
         <div>
           <Card loading={loading} style={{ backgroundColor: '#fff' }}>
             <Space direction="vertical" style={{ width: "100%" }} size={16}>
-              
+
               {/* 顶部作者信息栏（通栏布局） */}
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'flex-start', 
+              <div style={{
+                display: 'flex',
+                justifyContent: 'flex-start',
                 alignItems: 'flex-start',
                 width: '100%',
                 paddingBottom: 16,
                 borderBottom: '1px solid #f0f0f0'
               }}>
-                
+
                 {/* 左侧区域 */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <Avatar size={48} style={{ flexShrink: 0 }}>
@@ -420,25 +525,25 @@ export default function PostDetail() {
 
               {/* 帖子核心内容区（左对齐布局） */}
               <div style={{ textAlign: 'left' }}>
-                
+
                 {/* 第一行：主标题 */}
-                <Title level={3} style={{ 
-                  margin: '0 0 8px 0', 
+                <Title level={3} style={{
+                  margin: '0 0 8px 0',
                   fontWeight: 'bold',
                   textAlign: 'left'
                 }}>
                   {post?.title || "求一个不把应届生当cs的城市"}
                 </Title>
-                
+
                 {/* 第二行：补充文案 */}
-                <Paragraph style={{ 
-                  margin: '0 0 16px 0', 
+                <Paragraph style={{
+                  margin: '0 0 16px 0',
                   textAlign: 'left',
                   fontSize: 14
                 }}>
                   {post?.content || "我真有点想骂人了"}
                 </Paragraph>
-                
+
                 {/* 配图区域 */}
                 {post?.images && post.images.length > 0 && (
                   <div style={{ textAlign: 'left', marginBottom: 16 }}>
@@ -448,8 +553,8 @@ export default function PostDetail() {
                           <Image
                             key={src}
                             src={resolveImageUrl(src)}
-                            style={{ 
-                              width: '33%', 
+                            style={{
+                              width: '33%',
                               maxWidth: 300,
                               height: 'auto',
                               borderRadius: 8
@@ -463,8 +568,8 @@ export default function PostDetail() {
               </div>
 
               {/* 互动工具栏（水平排列） */}
-              <div style={{ 
-                display: 'flex', 
+              <div style={{
+                display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'flex-end',
                 gap: 24,
