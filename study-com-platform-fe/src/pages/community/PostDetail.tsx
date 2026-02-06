@@ -386,119 +386,129 @@ export default function PostDetail() {
 
         <div>
           <Card loading={loading}>
-            <Space direction="vertical" style={{ width: "100%" }} size="middle">
-              <Space wrap align="center">
-                {post?.category && <Tag color="blue">{post.category}</Tag>}
-                <Title level={3} style={{ margin: 0 }}>
-                  {post?.title || "-"}
-                </Title>
-              </Space>
+            <Space direction="vertical" style={{ width: "100%" }} size="large">
+              {/* 帖子标头区域 */}
+              <div>
+                <Space wrap align="center" style={{ marginBottom: 16 }}>
+                  {post?.category && <Tag color="blue">{post.category}</Tag>}
+                  <Title level={3} style={{ margin: 0 }}>
+                    {post?.title || "-"}
+                  </Title>
+                </Space>
 
-              <Space wrap align="center">
-                <Avatar size={40}>
-                  {(post?.User?.nickname || post?.User?.username || "U")[0]}
-                </Avatar>
-                <Text>
-                  {post?.User?.nickname || post?.User?.username || "未知"}
-                </Text>
-                <Text type="secondary">· 发布时间：</Text>
-                <Text type="secondary">
-                  {post?.createdAt
-                    ? new Date(post.createdAt).toLocaleString()
-                    : "-"}
-                </Text>
-                <Text type="secondary">· 最后编辑：</Text>
-                <Text type="secondary">
-                  {post?.last_edited_at || post?.updatedAt
-                    ? new Date(
-                        (post?.last_edited_at || post?.updatedAt) as string,
-                      ).toLocaleString()
-                    : "-"}
-                </Text>
-              </Space>
+                <Space wrap align="center" style={{ marginBottom: 12 }}>
+                  <Avatar size={40}>
+                    {(post?.User?.nickname || post?.User?.username || "U")[0]}
+                  </Avatar>
+                  <Text>
+                    {post?.User?.nickname || post?.User?.username || "未知"}
+                  </Text>
+                  <Text type="secondary">· 发布时间：</Text>
+                  <Text type="secondary">
+                    {post?.createdAt
+                      ? new Date(post.createdAt).toLocaleString()
+                      : "-"}
+                  </Text>
+                  <Text type="secondary">· 最后编辑：</Text>
+                  <Text type="secondary">
+                    {post?.last_edited_at || post?.updatedAt
+                      ? new Date(
+                          (post?.last_edited_at || post?.updatedAt) as string,
+                        ).toLocaleString()
+                      : "-"}
+                  </Text>
+                </Space>
 
-              <Space wrap>
-                <Text type="secondary">阅读数：{post?.view_count ?? 0}</Text>
-                <Text type="secondary">分类：{post?.category || "-"}</Text>
-                <Text type="secondary">
-                  标签：
-                  {post?.tags
-                    ? (() => {
-                        try {
-                          return JSON.parse(post.tags)
-                            .map((tag: string) => `#${tag}`)
-                            .join(" ");
-                        } catch {
-                          return "-";
-                        }
-                      })()
-                    : "-"}
-                </Text>
-              </Space>
-            </Space>
-          </Card>
-
-          <Card style={{ marginTop: 16 }} title="帖子内容">
-            <Paragraph style={{ whiteSpace: "pre-wrap" }}>
-              {post?.content || "暂无内容"}
-            </Paragraph>
-            {post?.images && post.images.length > 0 && (
-              <div style={{ marginTop: 16 }}>
-                <Image.PreviewGroup>
-                  <Space wrap>
-                    {post.images.map((src) => (
-                      <Image
-                        key={src}
-                        src={resolveImageUrl(src)}
-                        style={{ maxWidth: "100%", height: "auto" }}
-                      />
-                    ))}
-                  </Space>
-                </Image.PreviewGroup>
+                <Space wrap>
+                  <Text type="secondary">阅读数：{post?.view_count ?? 0}</Text>
+                  <Text type="secondary">分类：{post?.category || "-"}</Text>
+                  <Text type="secondary">
+                    标签：
+                    {post?.tags
+                      ? (() => {
+                          try {
+                            return JSON.parse(post.tags)
+                              .map((tag: string) => `#${tag}`)
+                              .join(" ");
+                          } catch {
+                            return "-";
+                          }
+                        })()
+                      : "-"}
+                  </Text>
+                </Space>
               </div>
-            )}
-          </Card>
 
-          <Card style={{ marginTop: 16 }} title="互动工具栏">
-            <Space wrap>
-              <Button
-                onClick={handleTogglePostLike}
-                disabled={isOwner}
-                style={{
-                  transform: likeAnimating ? "scale(1.06)" : "scale(1)",
-                  transition: "transform 0.15s ease",
-                }}
-              >
-                👍 点赞({post?.like_count || 0})
-              </Button>
-              <Button>
-                💬 评论({post?.comment_count || comments.length || 0})
-              </Button>
-              <Button onClick={handleToggleFavorite}>
-                ⭐ {favorited ? "已收藏" : "收藏"}({post?.favoriteCount || 0})
-              </Button>
-              <Button onClick={() => setReportVisible(true)}>举报</Button>
-              {canShowDelete ? (
-                <Button danger onClick={handleDeletePost}>
-                  删除
-                </Button>
-              ) : null}
-            </Space>
-            {post?.likeUsers && post.likeUsers.length > 0 && (
-              <div style={{ marginTop: 12 }}>
-                <Avatar.Group max={{ count: 5 }}>
-                  {post.likeUsers.map((user) => (
-                    <Avatar
-                      key={user.id}
-                      src={user.avatar}
-                      alt={user.nickname || user.username}
-                    >
-                      {(user.nickname || user.username || "U").slice(0, 1)}
-                    </Avatar>
-                  ))}
-                </Avatar.Group>
+              {/* 帖子内容区域 */}
+              <div>
+                <Title level={4} style={{ margin: "0 0 16px 0" }}>帖子内容</Title>
+                <Paragraph style={{ whiteSpace: "pre-wrap", marginBottom: 0 }}>
+                  {post?.content || "暂无内容"}
+                </Paragraph>
+                {post?.images && post.images.length > 0 && (
+                  <div style={{ marginTop: 16 }}>
+                    <Image.PreviewGroup>
+                      <Space wrap>
+                        {post.images.map((src) => (
+                          <Image
+                            key={src}
+                            src={resolveImageUrl(src)}
+                            style={{ maxWidth: "100%", height: "auto" }}
+                          />
+                        ))}
+                      </Space>
+                    </Image.PreviewGroup>
+                  </div>
+                )}
               </div>
-            )}
+
+              {/* 互动工具栏区域 */}
+              <div>
+                <Title level={4} style={{ margin: "0 0 16px 0" }}>互动工具栏</Title>
+                <Space wrap>
+                  <Button
+                    onClick={handleTogglePostLike}
+                    disabled={isOwner}
+                    style={{
+                      transform: likeAnimating ? "scale(1.06)" : "scale(1)",
+                      transition: "transform 0.15s ease",
+                    }}
+                  >
+                    👍 点赞({post?.like_count || 0})
+                  </Button>
+                  <Button>
+                    💬 评论({post?.comment_count || comments.length || 0})
+                  </Button>
+                  <Button onClick={handleToggleFavorite}>
+                    ⭐ {favorited ? "已收藏" : "收藏"}({post?.favoriteCount || 0})
+                  </Button>
+                  <Button onClick={() => setReportVisible(true)}>举报</Button>
+                  {canShowDelete ? (
+                    <Button danger onClick={handleDeletePost}>
+                      删除
+                    </Button>
+                  ) : null}
+                </Space>
+                {post?.likeUsers && post.likeUsers.length > 0 && (
+                  <div style={{ marginTop: 16 }}>
+                    <Text type="secondary" style={{ display: "block", marginBottom: 8 }}>
+                      点赞用户：
+                    </Text>
+                    <Avatar.Group max={{ count: 5 }}>
+                      {post.likeUsers.map((user) => (
+                        <Avatar
+                          key={user.id}
+                          src={user.avatar}
+                          alt={user.nickname || user.username}
+                        >
+                          {(user.nickname || user.username || "U").slice(0, 1)}
+                        </Avatar>
+                      ))}
+                    </Avatar.Group>
+                  </div>
+                )}
+              </div>
+            </Space>
           </Card>
         </div>
 
