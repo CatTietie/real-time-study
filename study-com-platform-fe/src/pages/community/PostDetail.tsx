@@ -385,75 +385,75 @@ export default function PostDetail() {
         </div>
 
         <div>
-          <Card loading={loading}>
-            <Space direction="vertical" style={{ width: "100%" }} size="large">
-              {/* 帖子标头区域 */}
-              <div>
-                <Space wrap align="center" style={{ marginBottom: 16 }}>
-                  {post?.category && <Tag color="blue">{post.category}</Tag>}
-                  <Title level={3} style={{ margin: 0 }}>
-                    {post?.title || "-"}
-                  </Title>
-                </Space>
-
-                <Space wrap align="center" style={{ marginBottom: 12 }}>
-                  <Avatar size={40}>
+          <Card loading={loading} style={{ backgroundColor: '#fff' }}>
+            <Space direction="vertical" style={{ width: "100%" }} size={16}>
+              
+              {/* 顶部作者信息栏（通栏布局） */}
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'flex-start', 
+                alignItems: 'flex-start',
+                width: '100%',
+                paddingBottom: 16,
+                borderBottom: '1px solid #f0f0f0'
+              }}>
+                
+                {/* 左侧区域 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <Avatar size={48} style={{ flexShrink: 0 }}>
                     {(post?.User?.nickname || post?.User?.username || "U")[0]}
                   </Avatar>
-                  <Text>
-                    {post?.User?.nickname || post?.User?.username || "未知"}
-                  </Text>
-                  <Text type="secondary">· 发布时间：</Text>
-                  <Text type="secondary">
-                    {post?.createdAt
-                      ? new Date(post.createdAt).toLocaleString()
-                      : "-"}
-                  </Text>
-                  <Text type="secondary">· 最后编辑：</Text>
-                  <Text type="secondary">
-                    {post?.last_edited_at || post?.updatedAt
-                      ? new Date(
-                          (post?.last_edited_at || post?.updatedAt) as string,
-                        ).toLocaleString()
-                      : "-"}
-                  </Text>
-                </Space>
-
-                <Space wrap>
-                  <Text type="secondary">阅读数：{post?.view_count ?? 0}</Text>
-                  <Text type="secondary">分类：{post?.category || "-"}</Text>
-                  <Text type="secondary">
-                    标签：
-                    {post?.tags
-                      ? (() => {
-                          try {
-                            return JSON.parse(post.tags)
-                              .map((tag: string) => `#${tag}`)
-                              .join(" ");
-                          } catch {
-                            return "-";
-                          }
-                        })()
-                      : "-"}
-                  </Text>
-                </Space>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <Text strong style={{ fontSize: 16 }}>
+                        {post?.User?.nickname || post?.User?.username || "未知用户"}
+                      </Text>
+                      {post?.category && <Tag color="blue">{post.category}</Tag>}
+                    </div>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      {post?.createdAt ? new Date(post.createdAt).toLocaleString() : "-"}
+                      {' · Lv.1'}
+                    </Text>
+                  </div>
+                </div>
               </div>
 
-              {/* 帖子内容区域 */}
-              <div>
-                <Title level={4} style={{ margin: "0 0 16px 0" }}>帖子内容</Title>
-                <Paragraph style={{ whiteSpace: "pre-wrap", marginBottom: 0 }}>
-                  {post?.content || "暂无内容"}
+              {/* 帖子核心内容区（左对齐布局） */}
+              <div style={{ textAlign: 'left' }}>
+                
+                {/* 第一行：主标题 */}
+                <Title level={3} style={{ 
+                  margin: '0 0 8px 0', 
+                  fontWeight: 'bold',
+                  textAlign: 'left'
+                }}>
+                  {post?.title || "求一个不把应届生当cs的城市"}
+                </Title>
+                
+                {/* 第二行：补充文案 */}
+                <Paragraph style={{ 
+                  margin: '0 0 16px 0', 
+                  textAlign: 'left',
+                  fontSize: 14
+                }}>
+                  {post?.content || "我真有点想骂人了"}
                 </Paragraph>
+                
+                {/* 配图区域 */}
                 {post?.images && post.images.length > 0 && (
-                  <div style={{ marginTop: 16 }}>
+                  <div style={{ textAlign: 'left', marginBottom: 16 }}>
                     <Image.PreviewGroup>
-                      <Space wrap>
+                      <Space>
                         {post.images.map((src) => (
                           <Image
                             key={src}
                             src={resolveImageUrl(src)}
-                            style={{ maxWidth: "100%", height: "auto" }}
+                            style={{ 
+                              width: '33%', 
+                              maxWidth: 300,
+                              height: 'auto',
+                              borderRadius: 8
+                            }}
                           />
                         ))}
                       </Space>
@@ -462,52 +462,35 @@ export default function PostDetail() {
                 )}
               </div>
 
-              {/* 互动工具栏区域 */}
-              <div>
-                <Title level={4} style={{ margin: "0 0 16px 0" }}>互动工具栏</Title>
-                <Space wrap>
-                  <Button
-                    onClick={handleTogglePostLike}
-                    disabled={isOwner}
-                    style={{
-                      transform: likeAnimating ? "scale(1.06)" : "scale(1)",
-                      transition: "transform 0.15s ease",
-                    }}
-                  >
-                    👍 点赞({post?.like_count || 0})
-                  </Button>
-                  <Button>
-                    💬 评论({post?.comment_count || comments.length || 0})
-                  </Button>
-                  <Button onClick={handleToggleFavorite}>
-                    ⭐ {favorited ? "已收藏" : "收藏"}({post?.favoriteCount || 0})
-                  </Button>
-                  <Button onClick={() => setReportVisible(true)}>举报</Button>
-                  {canShowDelete ? (
-                    <Button danger onClick={handleDeletePost}>
-                      删除
-                    </Button>
-                  ) : null}
-                </Space>
-                {post?.likeUsers && post.likeUsers.length > 0 && (
-                  <div style={{ marginTop: 16 }}>
-                    <Text type="secondary" style={{ display: "block", marginBottom: 8 }}>
-                      点赞用户：
-                    </Text>
-                    <Avatar.Group max={{ count: 5 }}>
-                      {post.likeUsers.map((user) => (
-                        <Avatar
-                          key={user.id}
-                          src={user.avatar}
-                          alt={user.nickname || user.username}
-                        >
-                          {(user.nickname || user.username || "U").slice(0, 1)}
-                        </Avatar>
-                      ))}
-                    </Avatar.Group>
-                  </div>
-                )}
+              {/* 互动工具栏（水平排列） */}
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between',
+                alignItems: 'flex-end',
+                gap: 24,
+                paddingTop: 16,
+                borderTop: '1px solid #f0f0f0'
+              }}>
+                <div style={{ display: 'flex', gap: 24 }}>
+                  <Space size="small">
+                    <span style={{ fontSize: 16 }}>💬</span>
+                    <Text>{post?.comment_count || 39}</Text>
+                  </Space>
+                  <Space size="small">
+                    <span style={{ fontSize: 16 }}>👍</span>
+                    <Text>{post?.like_count || 6}</Text>
+                  </Space>
+                  <Space size="small">
+                    <span style={{ fontSize: 16 }}>⭐</span>
+                    <Text>{post?.favoriteCount || 3}</Text>
+                  </Space>
+                </div>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  浏览 {post?.view_count ? (post.view_count > 10000 ? `${(post.view_count/10000).toFixed(1)}w` : post.view_count) : '1.2w'}
+                </Text>
               </div>
+
+
             </Space>
           </Card>
         </div>
