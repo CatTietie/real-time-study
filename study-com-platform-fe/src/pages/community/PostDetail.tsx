@@ -411,7 +411,7 @@ export default function PostDetail() {
                       {post?.category && <Tag color="blue">{post.category}</Tag>}
                     </div>
                     <Text type="secondary" style={{ fontSize: 12 }}>
-                      {post?.createdAt ? new Date(post.createdAt).toLocaleString() : "-"}
+                      {post?.created_at ? new Date(post.created_at).toLocaleString() : "-"}
                       {' · Lv.1'}
                     </Text>
                   </div>
