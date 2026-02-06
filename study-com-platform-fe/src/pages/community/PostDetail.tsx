@@ -456,7 +456,8 @@ export default function PostDetail() {
                     width: 24,
                     height: 24,
                     borderRadius: '50%',
-                    backgroundColor: index < 3 ? '#ff6b9d' : '#d9d9d9',
+                    backgroundColor: 'white',
+                    border: `2px solid ${index < 3 ? '#ff6b9d' : '#d9d9d9'}`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -464,11 +465,11 @@ export default function PostDetail() {
                     flexShrink: 0
                   }}>
                     <span style={{
-                      color: 'white',
+                      color: index < 3 ? '#ff6b9d' : '#d9d9d9',
                       fontSize: 12,
                       fontWeight: 'bold'
                     }}>
-                      {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}
+                      {index === 0 ? '1' : index === 1 ? '2' : index === 2 ? '3' : index + 1}
                     </span>
                   </div>
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
