@@ -260,6 +260,37 @@ export default function CommunityLanding() {
       .replace(/\s+/g, " ")
       .trim();
 
+  // 处理点赞逻辑
+  const handleLikeClick = (postId: number, currentLikeCount?: number) => {
+    const newLikeCount = currentLikeCount ? currentLikeCount + 1 : 1;
+    setData(prev =>
+      prev.map(post =>
+        post.id === postId
+          ? { ...post, like_count: newLikeCount }
+          : post
+      )
+    );
+    // TODO: 调用API更新数据库中的点赞数
+  };
+
+  // 处理评论点击逻辑
+  const handleCommentClick = (postId: number) => {
+    navigate(`/community/posts/${postId}`);
+  };
+
+  // 处理收藏逻辑
+  const handleFavoriteClick = (postId: number, currentFavoriteCount?: number) => {
+    const newFavoriteCount = currentFavoriteCount ? currentFavoriteCount + 1 : 1;
+    setData(prev =>
+      prev.map(post =>
+        post.id === postId
+          ? { ...post, favoriteCount: newFavoriteCount }
+          : post
+      )
+    );
+    // TODO: 调用API更新数据库中的收藏数
+  };
+
   return (
     <div style={{ padding: 24 }}>
       <Card style={{ marginBottom: 16 }}>
@@ -609,11 +640,31 @@ export default function CommunityLanding() {
                             )}
 
                             {/* 互动区 */}
-                            <Space size="middle">
-                              <Text type="secondary">👍 {item.like_count || 0}</Text>
-                              <Text type="secondary">💬 {item.comment_count || 0}</Text>
-                              <Text type="secondary">⭐ {item.favoriteCount || 0}</Text>
-                            </Space>
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <Space size="middle">
+                                <Button
+                                  type="text"
+                                  icon={<span>👍</span>}
+                                  onClick={() => handleLikeClick(item.id, item.like_count)}
+                                >
+                                  {item.like_count || 0}
+                                </Button>
+                                <Button
+                                  type="text"
+                                  icon={<span>💬</span>}
+                                  onClick={() => handleCommentClick(item.id)}
+                                >
+                                  {item.comment_count || 0}
+                                </Button>
+                                <Button
+                                  type="text"
+                                  icon={<span>⭐</span>}
+                                  onClick={() => handleFavoriteClick(item.id, item.favoriteCount)}
+                                >
+                                  {item.favoriteCount || 0}
+                                </Button>
+                              </Space>
+                            </div>
                           </Space>
                         </div>
                       </List.Item>
