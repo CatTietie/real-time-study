@@ -282,9 +282,9 @@ export default function CommunityLanding() {
       if (result?.data) {
         // 按阅读量排序，取前5名
         const sortedPosts = result.data
-          .sort((a: any, b: any) => (b.view_count || 0) - (a.view_count || 0))
+          .sort((a: PostRow, b: PostRow) => (b.view_count || 0) - (a.view_count || 0))
           .slice(0, 5)
-          .map((post: any) => ({
+          .map((post: PostRow) => ({
             id: post.id,
             title: post.title,
             view_count: post.view_count || 0
@@ -857,31 +857,27 @@ export default function CommunityLanding() {
 
         <div>
           <Card
-            title={
-              <span
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  background: "linear-gradient(90deg, #1890ff, #52c41a)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  fontWeight: "bold",
-                  fontSize: "18px",
-                }}
-              >
+            style={{ marginBottom: 16 }}
+            loading={profileLoading}
+          >
+            {/* 标题栏模块 */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '4px 0',
+              marginBottom: 8
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <svg
-                  r="1770203232493"
-                  className="icon"
+                  width="18"
+                  height="18"
                   viewBox="0 0 1024 1024"
-                  version="1.1"
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  style={{ marginRight: 8 }}
+                  style={{ color: '#1890ff' }}
                 >
                   <path
                     d="M64 543.51h896v152.51H64z"
-                    fill="#0F9FF7"
+                    fill="currentColor"
                   ></path>
                   <path
                     d="M946.09 776.3c-7.18 0-13-5.82-13-13V247H168.57v503.3h378c7.18 0 13 5.82 13 13s-5.82 13-13 13h-391c-7.18 0-13-5.82-13-13V234c0-7.18 5.82-13 13-13h790.52c7.18 0 13 5.82 13 13v529.3c0 7.18-5.82 13-13 13z"
@@ -892,91 +888,463 @@ export default function CommunityLanding() {
                     fill="#303030"
                   ></path>
                 </svg>
-                个人信息卡
-              </span>
-            }
-            style={{ marginBottom: 16 }}
-            loading={profileLoading}
-          >
-            <Space direction="vertical" style={{ width: "100%" }}>
-              <Avatar size={64} src={resolveImageUrl(profile?.avatar)}>
-                {(profile?.nickname || profile?.username || username || "U")[0]}
-              </Avatar>
-              <Text>
-                {profile?.nickname || profile?.username || username || "未登录"}
-              </Text>
-              <Text type="secondary">当前等级：Lv.{profile?.level ?? 1}</Text>
-              <Text type="secondary">总积分：{profile?.points ?? 0}</Text>
-              <Text type="secondary">
-                社区排名：{profile?.rank ? `#${profile.rank}` : "-"}
-              </Text>
-              <Button
-                onClick={() =>
-                  navigate(
-                    role === "admin" || role === "super_admin"
-                      ? "/admin/dashboard"
-                      : "/student/entry",
-                  )
-                }
+                <span style={{
+                  fontSize: 16,
+                  fontWeight: 600,
+                  color: '#333'
+                }}>
+                  个人信息卡
+                </span>
+              </div>
+              <div></div>
+            </div>
+            <div style={{
+              height: 1,
+              backgroundColor: '#f0f0f0',
+              marginTop: 8
+            }}></div>
+            
+            {/* 头像与基础信息区 */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              margin: '16px 0'
+            }}>
+              <div style={{
+                width: 50,
+                height: 50,
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #1890ff, #52c41a)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 18,
+                fontWeight: 700,
+                color: '#1890ff',
+                transition: 'transform 0.2s ease',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
               >
-                {role === "admin" || role === "super_admin"
-                  ? "返回管理端"
-                  : "返回学生入口"}
-              </Button>
-            </Space>
+                {(profile?.nickname || profile?.username || username || "U")[0]}
+              </div>
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4
+              }}>
+                <span style={{
+                  fontSize: 15,
+                  fontWeight: 600,
+                  color: '#333'
+                }}>
+                  {profile?.nickname || profile?.username || username || "未登录"}
+                </span>
+                <Tag 
+                  color="#1890ff" 
+                  style={{
+                    fontSize: 12,
+                    transition: 'background-color 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#40a9ff'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1890ff'}
+                >
+                  Lv.{profile?.level ?? 1}
+                </Tag>
+              </div>
+            </div>
+            
+            {/* 数据聚合区 */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 8,
+              margin: '16px 0'
+            }}>
+              {/* 总积分 */}
+              <div style={{
+                background: '#f5f5f5',
+                padding: '8px 6px',
+                borderRadius: 6,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 2,
+                transition: 'background-color 0.2s ease'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#eee'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+              >
+                <svg width="14" height="14" viewBox="0 0 1024 1024" style={{ color: '#666' }}>
+                  <path d="M832 256H192c-17.7 0-32 14.3-32 32v448c0 17.7 14.3 32 32 32h640c17.7 0 32-14.3 32-32V288c0-17.7-14.3-32-32-32z" fill="currentColor"/>
+                  <path d="M800 224H224c-17.7 0-32-14.3-32-32s14.3-32 32-32h576c17.7 0 32 14.3 32 32s-14.3 32-32 32z" fill="currentColor"/>
+                </svg>
+                <span style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: '#333'
+                }}>
+                  {profile?.points ?? 0}
+                </span>
+                <span style={{
+                  fontSize: 12,
+                  color: '#999'
+                }}>
+                  总积分
+                </span>
+              </div>
+              
+              {/* 社区排名 */}
+              <div style={{
+                background: '#f5f5f5',
+                padding: '8px 6px',
+                borderRadius: 6,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 2,
+                transition: 'background-color 0.2s ease'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#eee'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+              >
+                <svg width="14" height="14" viewBox="0 0 1024 1024" style={{ color: '#666' }}>
+                  <path d="M880 112H144c-17.7 0-32 14.3-32 32v736c0 17.7 14.3 32 32 32h736c17.7 0 32-14.3 32-32V144c0-17.7-14.3-32-32-32z" fill="currentColor"/>
+                  <path d="M512 256c-88.4 0-160 71.6-160 160s71.6 160 160 160 160-71.6 160-160-71.6-160-160-160z" fill="currentColor"/>
+                </svg>
+                <span style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: '#333'
+                }}>
+                  {profile?.rank ? `#${profile.rank}` : "-"}
+                </span>
+                <span style={{
+                  fontSize: 12,
+                  color: '#999'
+                }}>
+                  社区排名
+                </span>
+              </div>
+              
+              {/* 今日发帖 */}
+              <div style={{
+                background: '#f5f5f5',
+                padding: '8px 6px',
+                borderRadius: 6,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 2,
+                transition: 'background-color 0.2s ease'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#eee'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+              >
+                <svg width="14" height="14" viewBox="0 0 1024 1024" style={{ color: '#666' }}>
+                  <path d="M880 112H144c-17.7 0-32 14.3-32 32v736c0 17.7 14.3 32 32 32h736c17.7 0 32-14.3 32-32V144c0-17.7-14.3-32-32-32z" fill="currentColor"/>
+                  <path d="M256 320h512v64H256v-64z" fill="currentColor"/>
+                  <path d="M256 448h512v64H256v-64z" fill="currentColor"/>
+                  <path d="M256 576h320v64H256v-64z" fill="currentColor"/>
+                </svg>
+                <span style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: '#333'
+                }}>
+                  {todayNew}
+                </span>
+                <span style={{
+                  fontSize: 12,
+                  color: '#999'
+                }}>
+                  今日发帖
+                </span>
+              </div>
+              
+              {/* 今日评论 */}
+              <div style={{
+                background: '#f5f5f5',
+                padding: '8px 6px',
+                borderRadius: 6,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 2,
+                transition: 'background-color 0.2s ease'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#eee'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+              >
+                <svg width="14" height="14" viewBox="0 0 1024 1024" style={{ color: '#666' }}>
+                  <path d="M880 112H144c-17.7 0-32 14.3-32 32v736c0 17.7 14.3 32 32 32h736c17.7 0 32-14.3 32-32V144c0-17.7-14.3-32-32-32z" fill="currentColor"/>
+                  <path d="M256 320h512v64H256v-64z" fill="currentColor"/>
+                  <path d="M256 448h320v64H256v-64z" fill="currentColor"/>
+                </svg>
+                <span style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: '#333'
+                }}>
+                  2
+                </span>
+                <span style={{
+                  fontSize: 12,
+                  color: '#999'
+                }}>
+                  今日评论
+                </span>
+              </div>
+            </div>
+            
+            {/* 功能按钮 */}
+            <Button
+              block
+              style={{
+                transition: 'background-color 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                if (role === "admin" || role === "super_admin") {
+                  e.currentTarget.style.backgroundColor = '#40a9ff';
+                } else {
+                  e.currentTarget.style.backgroundColor = '#52c41a';
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '';
+              }}
+              onClick={() =>
+                navigate(
+                  role === "admin" || role === "super_admin"
+                    ? "/admin/dashboard"
+                    : "/student/entry",
+                )
+              }
+            >
+              {role === "admin" || role === "super_admin"
+                ? "返回管理端"
+                : "返回学生入口"}
+            </Button>
           </Card>
 
-          <Card 
-            title={
-              <span
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  background: "linear-gradient(90deg, #1890ff, #52c41a)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  fontWeight: "bold",
-                  fontSize: "18px",
+          {/* 模块整体容器 */}
+          <div style={{
+            border: '1px solid #f0f0f0',
+            borderRadius: '8px',
+            padding: '0 0 8px 0',
+            backgroundColor: '#fff',
+            marginBottom: '16px'
+          }}>
+            {/* 标题栏模块 */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+              backgroundColor: '#fffbe6',
+              padding: '6px 12px',
+              borderRadius: '6px 6px 0 0'
+            }}>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 1024 1024"
+                style={{ 
+                  color: '#faad14',
+                  marginRight: '8px'
                 }}
               >
-                <svg
-                  d="1770203635001"
-                  className="icon"
-                  viewBox="0 0 1024 1024"
-                  version="1.1"
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  style={{ marginRight: 8 }}
-                >
-                  <path
-                    d="M699 480.28c0-114.98-93.1-208.22-208.03-208.43-114.9-0.22-208.84 93.53-208.84 208.43 0 45.96 14.88 88.44 40.08 122.9 24.39 33.34 37.49 73.59 37.49 114.9v0.92h261.73v-0.92c0-41.61 13.58-81.93 38-115.61C684.32 568.14 699 525.93 699 480.28z"
-                    fill="#F4B840"
-                  ></path>
-                  <path
-                    d="M685.71 726.86H357.43c-7.18 0-13-5.82-13-13v-1.16c0-49.45-15.39-96.63-44.51-136.44-34.53-47.21-52.78-103.17-52.78-161.82 0-73.18 28.67-142.09 80.74-194.06C379.82 168.54 448.6 140 521.58 140h0.53c73.19 0.14 141.98 28.75 193.7 80.55 51.72 51.81 80.21 120.67 80.21 193.88 0 58.24-18.02 113.88-52.11 160.89-29.56 40.77-45.19 88.28-45.19 137.38v1.15c0 7.18-5.82 13-13 13z m-315.55-26h302.82c2.32-50.38 19.44-98.83 49.87-140.79 30.85-42.55 47.16-92.91 47.16-145.63 0-66.28-25.79-128.61-72.61-175.51-46.82-46.9-109.09-72.8-175.35-72.92h-0.48c-66.05 0-128.3 25.83-175.33 72.78-47.14 47.05-73.1 109.44-73.1 175.66 0 53.1 16.52 103.75 47.77 146.47 30.07 41.11 46.98 89.27 49.26 139.95z"
-                    fill="#303030"
-                  ></path>
-                  <path
-                    d="M685.71 884.39H357.43c-7.18 0-13-5.82-13-13V713.86c0-7.18 5.82-13 13-13s13 5.82 13 13v144.53h302.28V713.86c0-7.18 5.82-13 13-13s13 5.82 13 13v157.53c0 7.18-5.82 13-13 13z"
-                    fill="#303030"
-                  ></path>
-                  <path
-                    d="M485.25 709.54c-7.18 0-13-5.82-13-13V506.76h-56.83c-7.18 0-13-5.82-13-13v-72.62c0-7.18 5.82-13 13-13h106.14c7.18 0 13 5.82 13 13s-5.82 13-13 13h-93.14v46.62h56.83c7.18 0 13 5.82 13 13v202.78c0 7.18-5.82 13-13 13zM557.88 709.54c-7.18 0-13-5.82-13-13V493.76c0-7.18 5.82-13 13-13h56.83v-59.62c0-7.18 5.82-13 13-13s13 5.82 13 13v72.62c0 7.18-5.82 13-13 13h-56.83v189.78c0 7.18-5.82 13-13 13z"
-                    fill="#303030"
-                  ></path>
-                </svg>
+                <path
+                  d="M699 480.28c0-114.98-93.1-208.22-208.03-208.43-114.9-0.22-208.84 93.53-208.84 208.43 0 45.96 14.88 88.44 40.08 122.9 24.39 33.34 37.49 73.59 37.49 114.9v0.92h261.73v-0.92c0-41.61 13.58-81.93 38-115.61C684.32 568.14 699 525.93 699 480.28z"
+                  fill="currentColor"
+                ></path>
+                <path
+                  d="M685.71 726.86H357.43c-7.18 0-13-5.82-13-13v-1.16c0-49.45-15.39-96.63-44.51-136.44-34.53-47.21-52.78-103.17-52.78-161.82 0-73.18 28.67-142.09 80.74-194.06C379.82 168.54 448.6 140 521.58 140h0.53c73.19 0.14 141.98 28.75 193.7 80.55 51.72 51.81 80.21 120.67 80.21 193.88 0 58.24-18.02 113.88-52.11 160.89-29.56 40.77-45.19 88.28-45.19 137.38v1.15c0 7.18-5.82 13-13 13z m-315.55-26h302.82c2.32-50.38 19.44-98.83 49.87-140.79 30.85-42.55 47.16-92.91 47.16-145.63 0-66.28-25.79-128.61-72.61-175.51-46.82-46.9-109.09-72.8-175.35-72.92h-0.48c-66.05 0-128.3 25.83-175.33 72.78-47.14 47.05-73.1 109.44-73.1 175.66 0 53.1 16.52 103.75 47.77 146.47 30.07 41.11 46.98 89.27 49.26 139.95z"
+                  fill="#303030"
+                ></path>
+                <path
+                  d="M685.71 884.39H357.43c-7.18 0-13-5.82-13-13V713.86c0-7.18 5.82-13 13-13s13 5.82 13 13v144.53h302.28V713.86c0-7.18 5.82-13 13-13s13 5.82 13 13v157.53c0 7.18-5.82 13-13 13z"
+                  fill="#303030"
+                ></path>
+                <path
+                  d="M485.25 709.54c-7.18 0-13-5.82-13-13V506.76h-56.83c-7.18 0-13-5.82-13-13v-72.62c0-7.18 5.82-13 13-13h106.14c7.18 0 13 5.82 13 13s-5.82 13-13 13h-93.14v46.62h56.83c7.18 0 13 5.82 13 13v202.78c0 7.18-5.82 13-13 13zM557.88 709.54c-7.18 0-13-5.82-13-13V493.76c0-7.18 5.82-13 13-13h56.83v-59.62c0-7.18 5.82-13 13-13s13 5.82 13 13v72.62c0 7.18-5.82 13-13 13h-56.83v189.78c0 7.18-5.82 13-13 13z"
+                  fill="#303030"
+                ></path>
+              </svg>
+              <span style={{
+                fontSize: '14px',
+                fontWeight: 500,
+                color: '#333'
+              }}>
                 我的今日
               </span>
-            } 
-            style={{ marginBottom: 16 }}
-          >
-            <Space direction="vertical">
-              <Text>发帖：0/3篇</Text>
-              <Text>评论：2/20条</Text>
-              <Text>获赞：+5</Text>
-            </Space>
-          </Card>
+            </div>
+            
+            {/* 数据项区域 */}
+            <div style={{ padding: '8px 12px' }}>
+              {/* 发帖项 */}
+              <div 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '8px 12px',
+                  backgroundColor: '#f9f9f9',
+                  borderRadius: '4px',
+                  marginBottom: '8px',
+                  transition: 'background 0.2s ease',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f2f2f2';
+                  const valueElement = e.currentTarget.querySelector('.data-value');
+                  if (valueElement) {
+                    (valueElement as HTMLElement).style.color = '#1890ff';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f9f9f9';
+                  const valueElement = e.currentTarget.querySelector('.data-value');
+                  if (valueElement) {
+                    (valueElement as HTMLElement).style.color = '#333';
+                  }
+                }}
+              >
+                <span style={{
+                  fontSize: '16px',
+                  color: '#1890ff',
+                  marginRight: '10px'
+                }}>️</span>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}>
+                  <span style={{
+                    fontSize: '12px',
+                    color: '#999'
+                  }}>
+                    发帖
+                  </span>
+                  <span className="data-value" style={{
+                    fontSize: '15px',
+                    fontWeight: 600,
+                    color: '#333',
+                    marginTop: '2px',
+                    transition: 'color 0.2s ease'
+                  }}>
+                    0/3篇
+                  </span>
+                </div>
+              </div>
+              
+              {/* 评论项 */}
+              <div 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '8px 12px',
+                  backgroundColor: '#f9f9f9',
+                  borderRadius: '4px',
+                  marginBottom: '8px',
+                  transition: 'background 0.2s ease',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f2f2f2';
+                  const valueElement = e.currentTarget.querySelector('.data-value');
+                  if (valueElement) {
+                    (valueElement as HTMLElement).style.color = '#1890ff';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f9f9f9';
+                  const valueElement = e.currentTarget.querySelector('.data-value');
+                  if (valueElement) {
+                    (valueElement as HTMLElement).style.color = '#333';
+                  }
+                }}
+              >
+                <span style={{
+                  fontSize: '16px',
+                  color: '#2fc25b',
+                  marginRight: '10px'
+                }}></span>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}>
+                  <span style={{
+                    fontSize: '12px',
+                    color: '#999'
+                  }}>
+                    评论
+                  </span>
+                  <span className="data-value" style={{
+                    fontSize: '15px',
+                    fontWeight: 600,
+                    color: '#333',
+                    marginTop: '2px',
+                    transition: 'color 0.2s ease'
+                  }}>
+                    2/20条
+                  </span>
+                </div>
+              </div>
+              
+              {/* 获赞项 */}
+              <div 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '8px 12px',
+                  backgroundColor: '#f9f9f9',
+                  borderRadius: '4px',
+                  transition: 'background 0.2s ease',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f2f2f2';
+                  const valueElement = e.currentTarget.querySelector('.data-value');
+                  if (valueElement) {
+                    (valueElement as HTMLElement).style.color = '#1890ff';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f9f9f9';
+                  const valueElement = e.currentTarget.querySelector('.data-value');
+                  if (valueElement) {
+                    (valueElement as HTMLElement).style.color = '#333';
+                  }
+                }}
+              >
+                <span style={{
+                  fontSize: '16px',
+                  color: '#faad14',
+                  marginRight: '10px'
+                }}></span>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}>
+                  <span style={{
+                    fontSize: '12px',
+                    color: '#999'
+                  }}>
+                    获赞
+                  </span>
+                  <span className="data-value" style={{
+                    fontSize: '15px',
+                    fontWeight: 600,
+                    color: '#333',
+                    marginTop: '2px',
+                    transition: 'color 0.2s ease'
+                  }}>
+                    +5
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
 
         </div>
       </div>
