@@ -261,13 +261,13 @@ export default function CommunityLanding() {
             console.log('没有token，跳过加载');
             return;
         }
-        
+
         setStatsLoading(true);
         try {
             console.log('开始请求今日统计数据...');
             const res = await fetchUserTodayStats();
             console.log('今日统计数据响应:', res);
-            
+
             if (res?.success && res?.data) {
                 setTodayStats({
                     posts: res.data.todayPosts || 0,
@@ -388,7 +388,7 @@ export default function CommunityLanding() {
                             ? {...post, favoriteCount: newFavoriteCount}
                             : post
                     )
-                );                                                                    
+                );
                 message.success("已取消收藏");
             } else {
                 // 添加收藏
@@ -1157,223 +1157,195 @@ export default function CommunityLanding() {
                         </Button>
                     </Card>
 
-                    {/* 模块整体容器 */}
+                    {/* 轻卡片容器 */}
                     <div style={{
                         border: '1px solid #f0f0f0',
                         borderRadius: '8px',
-                        padding: '0 0 8px 0',
-                        backgroundColor: '#fff',
+                        padding: '12px 16px',
+                        backgroundColor: '#fff9e6',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
                         marginBottom: '16px'
                     }}>
                         {/* 标题栏模块 */}
                         <div style={{
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
+                            justifyContent: 'space-between',
                             width: '100%',
-                            backgroundColor: '#fffbe6',
-                            padding: '6px 12px',
-                            borderRadius: '6px 6px 0 0'
+                            marginBottom: '8px'
                         }}>
-                            <svg
-                                width="16"
-                                height="16"
-                                viewBox="0 0 1024 1024"
-                                style={{
-                                    color: '#faad14',
-                                    marginRight: '8px'
-                                }}
-                            >
-                                <path
-                                    d="M699 480.28c0-114.98-93.1-208.22-208.03-208.43-114.9-0.22-208.84 93.53-208.84 208.43 0 45.96 14.88 88.44 40.08 122.9 24.39 33.34 37.49 73.59 37.49 114.9v0.92h261.73v-0.92c0-41.61 13.58-81.93 38-115.61C684.32 568.14 699 525.93 699 480.28z"
-                                    fill="currentColor"
-                                ></path>
-                                <path
-                                    d="M685.71 726.86H357.43c-7.18 0-13-5.82-13-13v-1.16c0-49.45-15.39-96.63-44.51-136.44-34.53-47.21-52.78-103.17-52.78-161.82 0-73.18 28.67-142.09 80.74-194.06C379.82 168.54 448.6 140 521.58 140h0.53c73.19 0.14 141.98 28.75 193.7 80.55 51.72 51.81 80.21 120.67 80.21 193.88 0 58.24-18.02 113.88-52.11 160.89-29.56 40.77-45.19 88.28-45.19 137.38v1.15c0 7.18-5.82 13-13 13z m-315.55-26h302.82c2.32-50.38 19.44-98.83 49.87-140.79 30.85-42.55 47.16-92.91 47.16-145.63 0-66.28-25.79-128.61-72.61-175.51-46.82-46.9-109.09-72.8-175.35-72.92h-0.48c-66.05 0-128.3 25.83-175.33 72.78-47.14 47.05-73.1 109.44-73.1 175.66 0 53.1 16.52 103.75 47.77 146.47 30.07 41.11 46.98 89.27 49.26 139.95z"
-                                    fill="#303030"
-                                ></path>
-                                <path
-                                    d="M685.71 884.39H357.43c-7.18 0-13-5.82-13-13V713.86c0-7.18 5.82-13 13-13s13 5.82 13 13v144.53h302.28V713.86c0-7.18 5.82-13 13-13s13 5.82 13 13v157.53c0 7.18-5.82 13-13 13z"
-                                    fill="#303030"
-                                ></path>
-                                <path
-                                    d="M485.25 709.54c-7.18 0-13-5.82-13-13V506.76h-56.83c-7.18 0-13-5.82-13-13v-72.62c0-7.18 5.82-13 13-13h106.14c7.18 0 13 5.82 13 13s-5.82 13-13 13h-93.14v46.62h56.83c7.18 0 13 5.82 13 13v202.78c0 7.18-5.82 13-13 13zM557.88 709.54c-7.18 0-13-5.82-13-13V493.76c0-7.18 5.82-13 13-13h56.83v-59.62c0-7.18 5.82-13 13-13s13 5.82 13 13v72.62c0 7.18-5.82 13-13 13h-56.83v189.78c0 7.18-5.82 13-13 13z"
-                                    fill="#303030"
-                                ></path>
-                            </svg>
-                            <span style={{
-                                display: "flex",
-                                alignItems: "center",
-                                background: "linear-gradient(90deg, #1890ff, #52c41a)",
-                                WebkitBackgroundClip: "text",
-                                WebkitTextFillColor: "transparent",
-                                fontWeight: "bold",
-                                fontSize: "18px",
-                            }}>
-                今日目标
-              </span>
-                        </div>
-
-                        {/* 数据项区域 */}
-                        <div style={{padding: '8px 12px'}}>
-                            {/* 发帖项 */}
-                            <div
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    padding: '8px 12px',
-                                    backgroundColor: '#f9f9f9',
-                                    borderRadius: '4px',
-                                    marginBottom: '8px',
-                                    transition: 'background 0.2s ease',
-                                    cursor: 'pointer'
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#f2f2f2';
-                                    const valueElement = e.currentTarget.querySelector('.data-value');
-                                    if (valueElement) {
-                                        (valueElement as HTMLElement).style.color = '#1890ff';
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#f9f9f9';
-                                    const valueElement = e.currentTarget.querySelector('.data-value');
-                                    if (valueElement) {
-                                        (valueElement as HTMLElement).style.color = '#333';
-                                    }
-                                }}
-                            >
-                <span style={{
-                    fontSize: '16px',
-                    color: '#1890ff',
-                    marginRight: '10px'
-                }}>️</span>
-                                <div style={{
-                                    display: 'flex',
-                                    flexDirection: 'column'
+                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                                <svg
+                                    width="18"
+                                    height="18"
+                                    viewBox="0 0 1024 1024"
+                                    style={{
+                                        color: '#faad14',
+                                        marginRight: '8px'
+                                    }}
+                                >
+                                    <path
+                                        d="M699 480.28c0-114.98-93.1-208.22-208.03-208.43-114.9-0.22-208.84 93.53-208.84 208.43 0 45.96 14.88 88.44 40.08 122.9 24.39 33.34 37.49 73.59 37.49 114.9v0.92h261.73v-0.92c0-41.61 13.58-81.93 38-115.61C684.32 568.14 699 525.93 699 480.28z"
+                                        fill="currentColor"
+                                    ></path>
+                                    <path
+                                        d="M685.71 726.86H357.43c-7.18 0-13-5.82-13-13v-1.16c0-49.45-15.39-96.63-44.51-136.44-34.53-47.21-52.78-103.17-52.78-161.82 0-73.18 28.67-142.09 80.74-194.06C379.82 168.54 448.6 140 521.58 140h0.53c73.19 0.14 141.98 28.75 193.7 80.55 51.72 51.81 80.21 120.67 80.21 193.88 0 58.24-18.02 113.88-52.11 160.89-29.56 40.77-45.19 88.28-45.19 137.38v1.15c0 7.18-5.82 13-13 13z m-315.55-26h302.82c2.32-50.38 19.44-98.83 49.87-140.79 30.85-42.55 47.16-92.91 47.16-145.63 0-66.28-25.79-128.61-72.61-175.51-46.82-46.9-109.09-72.8-175.35-72.92h-0.48c-66.05 0-128.3 25.83-175.33 72.78-47.14 47.05-73.1 109.44-73.1 175.66 0 53.1 16.52 103.75 47.77 146.47 30.07 41.11 46.98 89.27 49.26 139.95z"
+                                        fill="#303030"
+                                    ></path>
+                                    <path
+                                        d="M685.71 884.39H357.43c-7.18 0-13-5.82-13-13V713.86c0-7.18 5.82-13 13-13s13 5.82 13 13v144.53h302.28V713.86c0-7.18 5.82-13 13-13s13 5.82 13 13v157.53c0 7.18-5.82 13-13 13z"
+                                        fill="#303030"
+                                    ></path>
+                                    <path
+                                        d="M485.25 709.54c-7.18 0-13-5.82-13-13V506.76h-56.83c-7.18 0-13-5.82-13-13v-72.62c0-7.18 5.82-13 13-13h106.14c7.18 0 13 5.82 13 13s-5.82 13-13 13h-93.14v46.62h56.83c7.18 0 13 5.82 13 13v202.78c0 7.18-5.82 13-13 13zM557.88 709.54c-7.18 0-13-5.82-13-13V493.76c0-7.18 5.82-13 13-13h56.83v-59.62c0-7.18 5.82-13 13-13s13 5.82 13 13v72.62c0 7.18-5.82 13-13 13h-56.83v189.78c0 7.18-5.82 13-13 13z"
+                                        fill="#303030"
+                                    ></path>
+                                </svg>
+                                <span style={{
+                                    fontSize: '15px',
+                                    fontWeight: 600,
+                                    color: '#333'
                                 }}>
-                  <span style={{
-                      fontSize: '12px',
-                      color: '#999'
-                  }}>
-                    发帖
-                  </span>
-                                    <span className="data-value" style={{
-                                        fontSize: '15px',
-                                        fontWeight: 600,
-                                        color: '#333',
-                                        marginTop: '2px',
-                                        transition: 'color 0.2s ease'
+                                    今日目标
+                                </span>
+                            </div>
+                        </div>
+                        <div style={{
+                            height: '1px',
+                            backgroundColor: '#f0f0f0',
+                            width: '100%'
+                        }}></div>
+
+                        {/* 目标项模块 */}
+                        <div style={{ marginTop: '10px' }}>
+                            {/* 发帖项 */}
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                marginBottom: '10px'
+                            }}>
+                                <span style={{
+                                    fontSize: '16px',
+                                    color: '#1890ff',
+                                    marginRight: '10px'
+                                }}>📝</span>
+                                <div style={{
+                                    flex: 1,
+                                    display: 'flex',
+                                    alignItems: 'center'
+                                }}>
+                                    <div style={{
+                                        height: '8px',
+                                        width: '100%',
+                                        backgroundColor: '#e6f7ff',
+                                        borderRadius: '4px',
+                                        overflow: 'hidden',
+                                        position: 'relative'
                                     }}>
-                    {statsLoading ? '加载中...' : `${todayStats.posts}/3篇`}
-                  </span>
+                                        <div style={{
+                                            height: '100%',
+                                            width: `${Math.min(100, (todayStats.posts / 3) * 100)}%`,
+                                            background: 'linear-gradient(90deg, #1890ff 0%, #69c0ff 100%)',
+                                            borderRadius: '4px',
+                                            transition: 'all 0.2s ease'
+                                        }}></div>
+                                    </div>
+                                    <span style={{
+                                        fontSize: '13px',
+                                        fontWeight: 600,
+                                        color: '#1890ff',
+                                        marginLeft: '8px',
+                                        whiteSpace: 'nowrap'
+                                    }}>
+                                        {statsLoading ? '加载中...' : `${todayStats.posts}/3篇`}
+                                    </span>
                                 </div>
                             </div>
 
                             {/* 评论项 */}
-                            <div
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    padding: '8px 12px',
-                                    backgroundColor: '#f9f9f9',
-                                    borderRadius: '4px',
-                                    marginBottom: '8px',
-                                    transition: 'background 0.2s ease',
-                                    cursor: 'pointer'
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#f2f2f2';
-                                    const valueElement = e.currentTarget.querySelector('.data-value');
-                                    if (valueElement) {
-                                        (valueElement as HTMLElement).style.color = '#1890ff';
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#f9f9f9';
-                                    const valueElement = e.currentTarget.querySelector('.data-value');
-                                    if (valueElement) {
-                                        (valueElement as HTMLElement).style.color = '#333';
-                                    }
-                                }}
-                            >
-                <span style={{
-                    fontSize: '16px',
-                    color: '#2fc25b',
-                    marginRight: '10px'
-                }}></span>
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                marginBottom: '10px'
+                            }}>
+                                <span style={{
+                                    fontSize: '16px',
+                                    color: '#2fc25b',
+                                    marginRight: '10px'
+                                }}>💬</span>
                                 <div style={{
+                                    flex: 1,
                                     display: 'flex',
-                                    flexDirection: 'column'
+                                    alignItems: 'center'
                                 }}>
-                  <span style={{
-                      fontSize: '12px',
-                      color: '#999'
-                  }}>
-                    评论
-                  </span>
-                                    <span className="data-value" style={{
-                                        fontSize: '15px',
-                                        fontWeight: 600,
-                                        color: '#333',
-                                        marginTop: '2px',
-                                        transition: 'color 0.2s ease'
+                                    <div style={{
+                                        height: '8px',
+                                        width: '100%',
+                                        backgroundColor: '#f6ffed',
+                                        borderRadius: '4px',
+                                        overflow: 'hidden',
+                                        position: 'relative'
                                     }}>
-                    {todayStats.comments}/20条
-                  </span>
+                                        <div style={{
+                                            height: '100%',
+                                            width: `${Math.min(100, (todayStats.comments / 20) * 100)}%`,
+                                            background: 'linear-gradient(90deg, #2fc25b 0%, #52c41a 100%)',
+                                            borderRadius: '4px',
+                                            transition: 'all 0.2s ease'
+                                        }}></div>
+                                    </div>
+                                    <span style={{
+                                        fontSize: '13px',
+                                        fontWeight: 600,
+                                        color: '#2fc25b',
+                                        marginLeft: '8px',
+                                        whiteSpace: 'nowrap'
+                                    }}>
+                                        {todayStats.comments}/20条
+                                    </span>
                                 </div>
                             </div>
 
                             {/* 获赞项 */}
-                            <div
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    padding: '8px 12px',
-                                    backgroundColor: '#f9f9f9',
-                                    borderRadius: '4px',
-                                    transition: 'background 0.2s ease',
-                                    cursor: 'pointer'
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#f2f2f2';
-                                    const valueElement = e.currentTarget.querySelector('.data-value');
-                                    if (valueElement) {
-                                        (valueElement as HTMLElement).style.color = '#1890ff';
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#f9f9f9';
-                                    const valueElement = e.currentTarget.querySelector('.data-value');
-                                    if (valueElement) {
-                                        (valueElement as HTMLElement).style.color = '#333';
-                                    }
-                                }}
-                            >
-                <span style={{
-                    fontSize: '16px',
-                    color: '#faad14',
-                    marginRight: '10px'
-                }}></span>
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center'
+                            }}>
+                                <span style={{
+                                    fontSize: '16px',
+                                    color: '#faad14',
+                                    marginRight: '10px'
+                                }}>❤️</span>
                                 <div style={{
+                                    flex: 1,
                                     display: 'flex',
-                                    flexDirection: 'column'
+                                    alignItems: 'center'
                                 }}>
-                  <span style={{
-                      fontSize: '12px',
-                      color: '#999'
-                  }}>
-                    获赞
-                  </span>
-                                    <span className="data-value" style={{
-                                        fontSize: '15px',
-                                        fontWeight: 600,
-                                        color: '#333',
-                                        marginTop: '2px',
-                                        transition: 'color 0.2s ease'
+                                    <div style={{
+                                        height: '8px',
+                                        width: '100%',
+                                        backgroundColor: '#fffbe6',
+                                        borderRadius: '4px',
+                                        overflow: 'hidden',
+                                        position: 'relative'
                                     }}>
-                    {statsLoading ? '加载中...' : `+${todayStats.likes}`}
-                  </span>
+                                        <div style={{
+                                            height: '100%',
+                                            width: '0%',
+                                            background: 'linear-gradient(90deg, #faad14 0%, #ffc53d 100%)',
+                                            borderRadius: '4px',
+                                            transition: 'all 0.2s ease'
+                                        }}></div>
+                                    </div>
+                                    <span style={{
+                                        fontSize: '13px',
+                                        fontWeight: 600,
+                                        color: '#faad14',
+                                        marginLeft: '8px',
+                                        whiteSpace: 'nowrap'
+                                    }}>
+                                        {statsLoading ? '加载中...' : `+${todayStats.likes}`}
+                                    </span>
                                 </div>
                             </div>
                         </div>
