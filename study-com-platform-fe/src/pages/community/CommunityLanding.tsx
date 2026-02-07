@@ -14,6 +14,7 @@ import {useNavigate} from "react-router-dom";
 import {
     fetchCommunityPosts,
     fetchCommunityProfileSummary,
+    fetchUserTodayStats,
     recordCommunityVisit,
     togglePostLike,
     createFavorite,
@@ -95,7 +96,7 @@ export default function CommunityLanding() {
         comments: 0,
         likes: 0
     });
-    // const [statsLoading, setStatsLoading] = useState(false); // 已移除今日统计状态
+    const [statsLoading, setStatsLoading] = useState(false); // 恢复今日统计状态
     const fetchingMoreRef = useRef(false);
     const searchTimerRef = useRef<number | null>(null);
 
@@ -277,18 +278,24 @@ export default function CommunityLanding() {
             console.log('开始请求今日统计数据...');
             const res = await fetchUserTodayStats();
             console.log('今日统计数据响应:', res);
-            setTodayStats({
-                posts: res.data.todayPosts || 0,
-                comments: res.data.todayComments || 0,
-                likes: res.data.todayLikes || 0
-            });
-            console.log('更新后的今日统计数据:', {
-                posts: res.data.todayPosts || 0,
-                comments: res.data.todayComments || 0,
-                likes: res.data.todayLikes || 0
-            });
+            
+            if (res?.success && res?.data) {
+                setTodayStats({
+                    posts: res.data.todayPosts || 0,
+                    comments: res.data.todayComments || 0,
+                    likes: res.data.todayLikes || 0
+                });
+                console.log('更新后的今日统计数据:', {
+                    posts: res.data.todayPosts || 0,
+                    comments: res.data.todayComments || 0,
+                    likes: res.data.todayLikes || 0
+                });
+            } else {
+                console.warn('今日统计数据格式不正确:', res);
+            }
         } catch (err) {
             console.error('加载今日统计失败:', err);
+            message.error(err instanceof Error ? err.message : "加载今日统计失败");
         } finally {
             setStatsLoading(false);
         }
@@ -392,7 +399,7 @@ export default function CommunityLanding() {
                             ? {...post, favoriteCount: newFavoriteCount}
                             : post
                     )
-                );
+                );                                                                    
                 message.success("已取消收藏");
             } else {
                 // 添加收藏
@@ -1269,7 +1276,7 @@ export default function CommunityLanding() {
                                         marginTop: '2px',
                                         transition: 'color 0.2s ease'
                                     }}>
-                    {todayStats.posts}/3篇
+                    {statsLoading ? '加载中...' : `${todayStats.posts}/3篇`}
                   </span>
                                 </div>
                             </div>
@@ -1376,7 +1383,7 @@ export default function CommunityLanding() {
                                         marginTop: '2px',
                                         transition: 'color 0.2s ease'
                                     }}>
-                    +{todayStats.likes}
+                    {statsLoading ? '加载中...' : `+${todayStats.likes}`}
                   </span>
                                 </div>
                             </div>
