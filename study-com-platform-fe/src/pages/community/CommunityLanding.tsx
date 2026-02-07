@@ -82,6 +82,8 @@ export default function CommunityLanding() {
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [onlineCount, setOnlineCount] = useState<number | null>(null);
+  const [hotPosts, setHotPosts] = useState<Array<{id: number; title: string; view_count: number}>>([]);
+  const [hotPostsLoading, setHotPostsLoading] = useState(false);
   const fetchingMoreRef = useRef(false);
   const searchTimerRef = useRef<number | null>(null);
 
@@ -116,7 +118,13 @@ export default function CommunityLanding() {
 
   useEffect(() => {
     loadData(1);
+    loadHotPosts();
   }, [loadData]);
+
+  // 监听热榜数据变化
+  useEffect(() => {
+    console.log('热榜数据发生变化:', hotPosts);
+  }, [hotPosts]);
 
   useEffect(() => {
     const onScroll = () => {
@@ -261,6 +269,44 @@ export default function CommunityLanding() {
       .replace(/<[^>]+>/g, "")
       .replace(/\s+/g, " ")
       .trim();
+
+  const loadHotPosts = async () => {
+    setHotPostsLoading(true);
+    try {
+      // 获取所有帖子数据
+      const response = await fetch(`${API_BASE}/community/posts?page=1&pageSize=100`);
+      const result = await response.json();
+
+      console.log('热榜API响应:', result); // 调试信息
+
+      if (result?.data) {
+        // 按阅读量排序，取前5名
+        const sortedPosts = result.data
+          .sort((a: any, b: any) => (b.view_count || 0) - (a.view_count || 0))
+          .slice(0, 5)
+          .map((post: any) => ({
+            id: post.id,
+            title: post.title,
+            view_count: post.view_count || 0
+          }));
+
+        setHotPosts(sortedPosts);
+        console.log('设置热榜数据:', sortedPosts); // 调试信息
+      }
+    } catch (err) {
+      console.error('加载热榜数据失败:', err);
+      // 如果获取失败，使用默认数据
+      setHotPosts([
+        { id: 1, title: '求一个不把应届生当cs的城市', view_count: 12000 },
+        { id: 2, title: '前端开发学习路线分享', view_count: 8500 },
+        { id: 3, title: 'Python数据分析实战项目', view_count: 6300 },
+        { id: 4, title: '算法面试高频题目整理', view_count: 4700 },
+        { id: 5, title: 'Git版本控制最佳实践', view_count: 3200 }
+      ]);
+    } finally {
+      setHotPostsLoading(false);
+    }
+  };
 
   // 处理点赞逻辑
   const handleLikeClick = async (postId: number, currentLikeCount?: number) => {
@@ -530,51 +576,121 @@ export default function CommunityLanding() {
             </Space>
           </Card>
 
-          <Card 
+          <Card
             title={
-              <span
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  background: "linear-gradient(90deg, #1890ff, #52c41a)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  fontWeight: "bold",
-                  fontSize: "18px",
-                }}
-              >
-                <svg
-                  d="1770203299976"
-                  className="icon"
-                  viewBox="0 0 1024 1024"
-                  version="1.1"
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  style={{ marginRight: 8 }}
-                >
-                  <path
-                    d="M285 270h604v419H285z"
-                    fill="#FEC200"
-                  ></path>
-                  <path
-                    d="M808.72 763h-604c-7.18 0-13-5.82-13-13V331c0-7.18 5.82-13 13-13h604c7.18 0 13 5.82 13 13v419c0 7.18-5.82 13-13 13z m-591-26h578V344h-578v393z"
-                    fill="#303030"
-                  ></path>
-                  <path
-                    d="M357.66 340.69c-3.33 0-6.65-1.27-9.19-3.81-5.08-5.08-5.08-13.31 0-18.38l151.49-151.49c5.08-5.08 13.31-5.08 18.38 0l146.62 146.62c5.08 5.08 5.08 13.31 0 18.38s-13.31 5.08-18.38 0L509.15 194.58l-142.3 142.3a12.964 12.964 0 0 1-9.19 3.81zM412.57 665.1c-13.87 0-27.96-1.91-41.95-5.92-31.67-9.08-58.98-27.66-78.97-53.73-19.59-25.56-30.48-55.99-31.49-88.03-0.23-7.18 5.41-13.18 12.58-13.4 7.18-0.22 13.18 5.41 13.4 12.58 0.84 26.56 9.88 51.81 26.13 73.03 16.57 21.62 39.22 37.03 65.49 44.56 67.05 19.21 137.24-19.71 156.45-86.76 19.21-67.05-19.71-137.24-86.76-156.45-32.48-9.31-66.65-5.41-96.19 10.98-6.28 3.48-14.19 1.22-17.67-5.06-3.48-6.28-1.21-14.19 5.06-17.67 35.62-19.75 76.81-24.46 115.97-13.24 80.84 23.16 127.76 107.77 104.59 188.61-19.16 66.85-80.34 110.51-146.66 110.51z m0.02-61.82a90.48 90.48 0 0 1-24.94-3.52c-48.07-13.77-75.97-64.09-62.2-112.16 13.77-48.07 64.09-75.97 112.16-62.2 48.07 13.77 75.97 64.09 62.2 112.16-11.39 39.76-47.78 65.72-87.21 65.72z m0.06-155.39c-28.13 0-54.08 18.52-62.21 46.88-9.82 34.29 10.08 70.18 44.37 80a64.49 64.49 0 0 0 17.79 2.51c28.13 0 54.08-18.52 62.21-46.88 9.82-34.29-10.08-70.18-44.37-80a64.49 64.49 0 0 0-17.79-2.51z"
-                    fill="#303030"
-                  ></path>
-                </svg>
-                社区数据统计
-              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: '16px' }}>🔥</span>
+                  <span style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    background: 'linear-gradient(90deg, #ff2e63, #ff8fab)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                    textFillColor: 'transparent'
+                  }}>
+                    全站热榜
+                  </span>
+                </div>
+                <div style={{
+                  width: '80px',
+                  height: '2px',
+                  background: 'linear-gradient(90deg, #ff6b9d, #ff8fa3)',
+                  marginTop: '4px',
+                  borderRadius: '1px'
+                }}></div>
+              </div>
             }
+            style={{ marginBottom: 16 }}
+            loading={hotPostsLoading}
           >
-            <Space direction="vertical">
-              <Text>总帖子数：{total}</Text>
-              <Text>今日新增：{todayNew}</Text>
-              <Text>在线用户：{onlineCount ?? "-"}</Text>
-            </Space>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {hotPosts.map((post, index) => (
+                <div
+                  key={post.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '8px 12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    borderRadius: '6px',
+                    border: '1px solid #f0f0f0',
+                    backgroundColor: '#fff',
+                    marginBottom: '8px'
+                  }}
+                  onClick={() => navigate(`/community/post/${post.id}`)}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f8f8f8';
+                    e.currentTarget.style.boxShadow = '0 3px 6px rgba(0,0,0,0.08)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#fff';
+                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
+                  <div style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 12,
+                    flexShrink: 0,
+                    ...(index === 0 ? {
+                      background: 'linear-gradient(135deg, #FF6B81, #FF8FA3)',
+                      boxShadow: '0 2px 4px rgba(255, 107, 129, 0.3)'
+                    } : index === 1 ? {
+                      background: 'linear-gradient(135deg, #B59DFE, #C9B6FF)',
+                      boxShadow: '0 2px 4px rgba(181, 157, 254, 0.3)'
+                    } : index === 2 ? {
+                      background: 'linear-gradient(135deg, #69B1FF, #8CC5FF)',
+                      boxShadow: '0 2px 4px rgba(105, 177, 255, 0.3)'
+                    } : {
+                      background: '#f0f0f0',
+                      border: '1px solid #d9d9d9'
+                    })
+                  }}>
+                    <span style={{
+                      color: index < 3 ? '#fff' : '#999',
+                      fontSize: 12,
+                      fontWeight: 'bold'
+                    }}>
+                      {index === 0 ? '1' : index === 1 ? '2' : index === 2 ? '3' : index + 1}
+                    </span>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text 
+                      ellipsis 
+                      style={{ 
+                        fontSize: 14, 
+                        fontWeight: 500,
+                        maxWidth: '70%',
+                        transition: 'color 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = '#1890ff'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = 'inherit'}
+                    >
+                      {post.title}
+                    </Text>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ fontSize: '12px', color: '#999' }}>👁️</span>
+                      <Text style={{ fontSize: 12, color: '#999' }}>
+                        {post.view_count > 10000
+                          ? `${(post.view_count/10000).toFixed(1)}w`
+                          : post.view_count > 1000
+                            ? `${(post.view_count/1000).toFixed(1)}k`
+                            : post.view_count}
+                      </Text>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </Card>
         </div>
 
