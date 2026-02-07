@@ -19,6 +19,7 @@ import {
     createFavorite,
     deleteFavorite,
     fetchFavoriteStatus,
+    fetchUserTodayStats,
 } from "../../services/communityPublic";
 import {useAppSelector} from "../../app/hooks";
 import type {RootState} from "../../app/store";
@@ -84,6 +85,14 @@ export default function CommunityLanding() {
     const [onlineCount, setOnlineCount] = useState<number | null>(null);
     const [hotPosts, setHotPosts] = useState<Array<{ id: number; title: string; view_count: number }>>([]);
     const [hotPostsLoading, setHotPostsLoading] = useState(false);
+
+    // 今日统计数据
+    const [todayStats, setTodayStats] = useState({
+        posts: 0,
+        comments: 0,
+        likes: 0
+    });
+    const [statsLoading, setStatsLoading] = useState(false);
     const fetchingMoreRef = useRef(false);
     const searchTimerRef = useRef<number | null>(null);
 
@@ -117,9 +126,11 @@ export default function CommunityLanding() {
     );
 
     useEffect(() => {
+        console.log('主useEffect触发, token:', token);
         loadData(1);
         loadHotPosts();
-    }, [loadData]);
+        loadTodayStats();
+    }, [loadData, token]);
 
     // 监听热榜数据变化
     useEffect(() => {
@@ -233,26 +244,6 @@ export default function CommunityLanding() {
         };
     }, [token, username]);
 
-    // const hotTags = useMemo(() => {
-    //   const counts: Record<string, number> = {};
-    //   data.forEach((item) => {
-    //     if (!item.tags) return;
-    //     try {
-    //       const tags = JSON.parse(item.tags) as string[];
-    //       tags.forEach((tag) => {
-    //         counts[tag] = (counts[tag] || 0) + 1;
-    //       });
-    //     } catch {
-    //       return;
-    //     }
-    //   });
-    //   return Object.entries(counts)
-    //     .sort((a, b) => b[1] - a[1])
-    //     .slice(0, 6);
-    // }, [data]);
-
-    // const hotPosts = useMemo(() => data.slice(0, 3), [data]);
-
     const todayNew = useMemo(() => {
         const today = new Date();
         const key = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
@@ -269,6 +260,36 @@ export default function CommunityLanding() {
             .replace(/<[^>]+>/g, "")
             .replace(/\s+/g, " ")
             .trim();
+
+    // 加载今日统计数据
+    const loadTodayStats = useCallback(async () => {
+        console.log('调用 loadTodayStats, token:', token);
+        if (!token) {
+            console.log('没有token，跳过加载');
+            return;
+        }
+        
+        setStatsLoading(true);
+        try {
+            console.log('开始请求今日统计数据...');
+            const res = await fetchUserTodayStats();
+            console.log('今日统计数据响应:', res);
+            setTodayStats({
+                posts: res.data.todayPosts || 0,
+                comments: res.data.todayComments || 0,
+                likes: res.data.todayLikes || 0
+            });
+            console.log('更新后的今日统计数据:', {
+                posts: res.data.todayPosts || 0,
+                comments: res.data.todayComments || 0,
+                likes: res.data.todayLikes || 0
+            });
+        } catch (err) {
+            console.error('加载今日统计失败:', err);
+        } finally {
+            setStatsLoading(false);
+        }
+    }, [token]);
 
     const loadHotPosts = async () => {
         setHotPostsLoading(true);
@@ -447,24 +468,11 @@ export default function CommunityLanding() {
                             allowClear
                             onSearch={handleSearch}
                             onChange={(e) => setKeyword(e.target.value)}
-                            style={{width: 260}}
+                            style={{width: 360}}
                         />
                         <Button onClick={() => navigate("/community/posts")}>我的帖子</Button>
                         <Button onClick={() => navigate("/community/favorites")}>我的收藏</Button>
                         <Button onClick={() => navigate("/community/leaderboard")}>排行榜</Button>
-                        <Button
-                            onClick={() =>
-                                navigate(
-                                    role === "admin" || role === "super_admin"
-                                        ? "/admin/dashboard"
-                                        : "/student/entry"
-                                )
-                            }
-                        >
-                            {role === "admin" || role === "super_admin"
-                                ? "返回管理端"
-                                : "返回学生入口"}
-                        </Button>
                         <Button
                             type="primary"
                             onClick={() => navigate("/community/publish")}
@@ -1258,7 +1266,7 @@ export default function CommunityLanding() {
                                         marginTop: '2px',
                                         transition: 'color 0.2s ease'
                                     }}>
-                    0/3篇
+                    {todayStats.posts}/3篇
                   </span>
                                 </div>
                             </div>
@@ -1312,7 +1320,7 @@ export default function CommunityLanding() {
                                         marginTop: '2px',
                                         transition: 'color 0.2s ease'
                                     }}>
-                    2/20条
+                    {todayStats.comments}/20条
                   </span>
                                 </div>
                             </div>
@@ -1365,7 +1373,7 @@ export default function CommunityLanding() {
                                         marginTop: '2px',
                                         transition: 'color 0.2s ease'
                                     }}>
-                    +5
+                    +{todayStats.likes}
                   </span>
                                 </div>
                             </div>

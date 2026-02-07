@@ -31,6 +31,7 @@ import {
   getCommunityProfileSummary,
   getCommunityTagSuggestions,
   streamCommunityEvents,
+  getUserTodayStats,
 } from "../controllers/community-public.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { conditionalPostImages } from "../middlewares/upload.middleware";
@@ -85,5 +86,8 @@ router.get("/points/logs", authMiddleware, getPointsLogs);
 
 // 个人信息汇总
 router.get("/profile/summary", authMiddleware, getCommunityProfileSummary);
+
+// 用户今日统计
+router.get("/user/today-stats", authMiddleware, getUserTodayStats);
 
 export default router;

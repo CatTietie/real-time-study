@@ -1743,3 +1743,76 @@ export const getPointsLogs = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message });
   }
 };
+
+export const getUserTodayStats = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const userId = req.user.id;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // 获取今日发帖数
+    const todayPosts = await Post.count({
+      where: {
+        user_id: userId,
+        created_at: {
+          [Op.gte]: today,
+          [Op.lt]: tomorrow
+        }
+      }
+    });
+
+    // 获取今日评论数
+    const todayComments = await Comment.count({
+      where: {
+        user_id: userId,
+        created_at: {
+          [Op.gte]: today,
+          [Op.lt]: tomorrow
+        }
+      }
+    });
+
+    // 获取今日获赞数（帖子点赞）
+    const todayPostLikes = await Post.sum('like_count', {
+      where: {
+        user_id: userId,
+        created_at: {
+          [Op.gte]: today,
+          [Op.lt]: tomorrow
+        }
+      }
+    }) || 0;
+
+    // 获取今日获赞数（评论点赞）
+    const todayCommentLikes = await Comment.sum('like_count', {
+      where: {
+        user_id: userId,
+        created_at: {
+          [Op.gte]: today,
+          [Op.lt]: tomorrow
+        }
+      }
+    }) || 0;
+
+    const totalTodayLikes = todayPostLikes + todayCommentLikes;
+
+    res.json({
+      success: true,
+      message: "获取成功",
+      data: {
+        todayPosts,
+        todayComments,
+        todayLikes: totalTodayLikes
+      }
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "获取失败";
+    res.status(500).json({ success: false, message });
+  }
+};
