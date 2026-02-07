@@ -3,6 +3,71 @@ body {
   background-color: #f5f5f5; /* 浅灰色背景 */
 }
 
+/* 自定义滚动条样式 */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Firefox 滚动条样式 */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #c1c1c1 #f1f1f1;
+}
+
+/* 响应式设计 - 移动端适配 */
+@media (max-width: 768px) {
+  .custom-scrollbar {
+    height: calc(100vh - 80px) !important;
+  }
+  
+  .community-grid {
+    grid-template-columns: 1fr !important;
+    height: auto !important;
+    gap: 12px !important;
+  }
+  
+  .custom-scrollbar {
+    height: auto !important;
+    overflow-y: visible !important;
+  }
+}
+
+@media (max-width: 1200px) and (min-width: 769px) {
+  .community-grid {
+    grid-template-columns: 1fr 280px !important;
+    height: calc(100vh - 120px) !important;
+  }
+  
+  .community-grid > div:first-child {
+    grid-column: 1 / -1;
+    height: auto !important;
+    overflow-y: visible !important;
+    margin-bottom: 16px;
+  }
+  
+  .community-grid > div:nth-child(2),
+  .community-grid > div:nth-child(3) {
+    height: calc(100vh - 120px) !important;
+    overflow-y: auto !important;
+  }
+}
+
 /* 保持 antd 组件背景不变，但排除按钮以保持正常样式 */
 .ant-card-body,
 .ant-card-head,

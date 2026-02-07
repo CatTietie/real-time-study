@@ -508,13 +508,21 @@ export default function CommunityLanding() {
             </Card>
 
             <div
+                className="community-grid"
                 style={{
                     display: "grid",
                     gridTemplateColumns: "260px 1fr 280px",
                     gap: 16,
+                    height: "calc(100vh - 120px)",
                 }}
             >
-                <div>
+                <div style={{
+                    height: "100%",
+                    overflowY: "auto",
+                    padding: "0 8px 16px 0",
+                }}
+                className="custom-scrollbar"
+                >
                     <Card
                         title={
                             <span
@@ -707,7 +715,13 @@ export default function CommunityLanding() {
                     </Card>
                 </div>
 
-                <div>
+                <div style={{
+                    height: "100%",
+                    overflowY: "auto",
+                    padding: "0 8px",
+                }}
+                className="custom-scrollbar"
+                >
                     <Card>
                         <List
                             loading={loading}
@@ -868,7 +882,13 @@ export default function CommunityLanding() {
                     </Card>
                 </div>
 
-                <div>
+                <div style={{
+                    height: "100%",
+                    overflowY: "auto",
+                    padding: "0 0 16px 8px",
+                }}
+                className="custom-scrollbar"
+                >
                     <Card
                         style={{marginBottom: 16}}
                         loading={profileLoading}
