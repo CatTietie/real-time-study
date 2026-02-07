@@ -519,9 +519,9 @@ export default function CommunityLanding() {
                 <div style={{
                     height: "100%",
                     overflowY: "auto",
-                    padding: "0 8px 16px 0",
+                    padding: "0 0 16px 0",
                 }}
-                className="custom-scrollbar"
+                className="hide-scrollbar"
                 >
                     <Card
                         title={
@@ -718,9 +718,10 @@ export default function CommunityLanding() {
                 <div style={{
                     height: "100%",
                     overflowY: "auto",
-                    padding: "0 8px",
+                    padding: "0 0",
+                    scrollbarWidth: "none",
+                    msOverflowStyle: "none",
                 }}
-                className="custom-scrollbar"
                 >
                     <Card>
                         <List
@@ -885,9 +886,9 @@ export default function CommunityLanding() {
                 <div style={{
                     height: "100%",
                     overflowY: "auto",
-                    padding: "0 0 16px 8px",
+                    padding: "0 0 16px 0",
                 }}
-                className="custom-scrollbar"
+                className="hide-scrollbar"
                 >
                     <Card
                         style={{marginBottom: 16}}
