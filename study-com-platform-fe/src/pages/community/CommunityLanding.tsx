@@ -627,7 +627,7 @@ export default function CommunityLanding() {
                                         backgroundColor: '#fff',
                                         marginBottom: '8px'
                                     }}
-                                    onClick={() => navigate(`/community/post/${post.id}`)}
+                                    onClick={() => navigate(`/community/posts/${post.id}`)}
                                     onMouseEnter={(e) => {
                                         e.currentTarget.style.backgroundColor = '#f8f8f8';
                                         e.currentTarget.style.boxShadow = '0 3px 6px rgba(0,0,0,0.08)';
@@ -910,8 +910,8 @@ export default function CommunityLanding() {
                                     fontWeight: "bold",
                                     fontSize: "18px",
                                 }}>
-                  个人信息卡
-                </span>
+        个人信息卡
+      </span>
                             </div>
                             <div></div>
                         </div>
@@ -951,13 +951,13 @@ export default function CommunityLanding() {
                                 flexDirection: 'column',
                                 gap: 4
                             }}>
-                <span style={{
-                    fontSize: 15,
-                    fontWeight: 600,
-                    color: '#333'
-                }}>
-                  {profile?.nickname || profile?.username || username || "未登录"}
-                </span>
+      <span style={{
+          fontSize: 15,
+          fontWeight: 600,
+          color: '#333'
+      }}>
+        {profile?.nickname || profile?.username || username || "未登录"}
+      </span>
                                 <Tag
                                     color="#1890ff"
                                     style={{
@@ -977,184 +977,228 @@ export default function CommunityLanding() {
                             display: 'grid',
                             gridTemplateColumns: '1fr 1fr',
                             gap: 8,
-                            margin: '16px 0'
+                            margin: '12px 0'
                         }}>
                             {/* 总积分 */}
                             <div style={{
-                                background: '#f5f5f5',
-                                padding: '8px 6px',
-                                borderRadius: 6,
+                                background: '#fff3e0',
+                                padding: '12px 8px',
+                                borderRadius: 8,
+                                border: '1px solid #ffe0b2',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
-                                gap: 2,
-                                transition: 'background-color 0.2s ease'
+                                gap: 4,
+                                transition: 'all 0.2s ease',
+                                boxShadow: '0 2px 4px rgba(250, 173, 20, 0.1)'
                             }}
-                                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#eee'}
-                                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                                 onMouseEnter={(e) => {
+                                     e.currentTarget.style.backgroundColor = '#ffe0b2';
+                                     e.currentTarget.style.boxShadow = '0 2px 8px rgba(250, 173, 20, 0.2)';
+                                     e.currentTarget.querySelector('svg').style.color = '#d48806';
+                                     e.currentTarget.querySelector('span:first-of-type').style.color = '#d48806';
+                                 }}
+                                 onMouseLeave={(e) => {
+                                     e.currentTarget.style.backgroundColor = '#fff3e0';
+                                     e.currentTarget.style.boxShadow = '0 2px 4px rgba(250, 173, 20, 0.1)';
+                                     e.currentTarget.querySelector('svg').style.color = '#faad14';
+                                     e.currentTarget.querySelector('span:first-of-type').style.color = '#faad14';
+                                 }}
                             >
-                                <svg width="14" height="14" viewBox="0 0 1024 1024" style={{color: '#666'}}>
-                                    <path
-                                        d="M832 256H192c-17.7 0-32 14.3-32 32v448c0 17.7 14.3 32 32 32h640c17.7 0 32-14.3 32-32V288c0-17.7-14.3-32-32-32z"
-                                        fill="currentColor"/>
-                                    <path
-                                        d="M800 224H224c-17.7 0-32-14.3-32-32s14.3-32 32-32h576c17.7 0 32 14.3 32 32s-14.3 32-32 32z"
-                                        fill="currentColor"/>
+                                <svg width="16" height="16" viewBox="0 0 1024 1024" style={{color: '#faad14'}}>
+                                    <path d="M832 256H192c-17.7 0-32 14.3-32 32v448c0 17.7 14.3 32 32 32h640c17.7 0 32-14.3 32-32V288c0-17.7-14.3-32-32-32z" fill="currentColor"/>
+                                    <path d="M800 224H224c-17.7 0-32-14.3-32-32s14.3-32 224-32h576c17.7 0 32 14.3 32 32s-14.3 32-32 32z" fill="currentColor"/>
                                 </svg>
                                 <span style={{
-                                    fontSize: 14,
-                                    fontWeight: 600,
-                                    color: '#333'
+                                    fontSize: 16,
+                                    fontWeight: 700,
+                                    color: '#faad14'
                                 }}>
-                  {profile?.points ?? 0}
-                </span>
+        {profile?.points ?? 0}
+      </span>
                                 <span style={{
                                     fontSize: 12,
-                                    color: '#999'
+                                    color: '#8c6e41'
                                 }}>
-                  总积分
-                </span>
+        总积分
+      </span>
                             </div>
 
                             {/* 社区排名 */}
                             <div style={{
-                                background: '#f5f5f5',
-                                padding: '8px 6px',
-                                borderRadius: 6,
+                                background: '#fff2e8',
+                                padding: '12px 8px',
+                                borderRadius: 8,
+                                border: '1px solid #ffccc0',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
-                                gap: 2,
-                                transition: 'background-color 0.2s ease'
+                                gap: 4,
+                                transition: 'all 0.2s ease',
+                                boxShadow: '0 2px 4px rgba(255, 122, 69, 0.1)'
                             }}
-                                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#eee'}
-                                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                                 onMouseEnter={(e) => {
+                                     e.currentTarget.style.backgroundColor = '#ffccc0';
+                                     e.currentTarget.style.boxShadow = '0 2px 8px rgba(255, 122, 69, 0.2)';
+                                     e.currentTarget.querySelector('svg').style.color = '#d46b39';
+                                     e.currentTarget.querySelector('span:first-of-type').style.color = '#d46b39';
+                                 }}
+                                 onMouseLeave={(e) => {
+                                     e.currentTarget.style.backgroundColor = '#fff2e8';
+                                     e.currentTarget.style.boxShadow = '0 2px 4px rgba(255, 122, 69, 0.1)';
+                                     e.currentTarget.querySelector('svg').style.color = '#ff7a45';
+                                     e.currentTarget.querySelector('span:first-of-type').style.color = '#ff7a45';
+                                 }}
                             >
-                                <svg width="14" height="14" viewBox="0 0 1024 1024" style={{color: '#666'}}>
-                                    <path
-                                        d="M880 112H144c-17.7 0-32 14.3-32 32v736c0 17.7 14.3 32 32 32h736c17.7 0 32-14.3 32-32V144c0-17.7-14.3-32-32-32z"
-                                        fill="currentColor"/>
-                                    <path
-                                        d="M512 256c-88.4 0-160 71.6-160 160s71.6 160 160 160 160-71.6 160-160-71.6-160-160-160z"
-                                        fill="currentColor"/>
+                                <svg width="16" height="16" viewBox="0 0 1024 1024" style={{color: '#ff7a45'}}>
+                                    <path d="M880 112H144c-17.7 0-32 14.3-32 32v736c0 17.7 14.3 32 32 32h736c17.7 0 32-14.3 32-32V144c0-17.7-14.3-32-32-32z" fill="currentColor"/>
+                                    <path d="M512 256c-88.4 0-160 71.6-160 160s71.6 160 160 160 160-71.6 160-160-71.6-160-160-160z" fill="currentColor"/>
                                 </svg>
                                 <span style={{
-                                    fontSize: 14,
-                                    fontWeight: 600,
-                                    color: '#333'
+                                    fontSize: 16,
+                                    fontWeight: 700,
+                                    color: '#ff7a45'
                                 }}>
-                  {profile?.rank ? `#${profile.rank}` : "-"}
-                </span>
+        {profile?.rank ? `#${profile.rank}` : "-"}
+      </span>
                                 <span style={{
                                     fontSize: 12,
-                                    color: '#999'
+                                    color: '#9e5b3a'
                                 }}>
-                  社区排名
-                </span>
+        社区排名
+      </span>
                             </div>
 
                             {/* 今日发帖 */}
                             <div style={{
-                                background: '#f5f5f5',
-                                padding: '8px 6px',
-                                borderRadius: 6,
+                                background: '#e6f7ff',
+                                padding: '12px 8px',
+                                borderRadius: 8,
+                                border: '1px solid #b3e5fc',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
-                                gap: 2,
-                                transition: 'background-color 0.2s ease'
+                                gap: 4,
+                                transition: 'all 0.2s ease',
+                                boxShadow: '0 2px 4px rgba(24, 144, 255, 0.1)'
                             }}
-                                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#eee'}
-                                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                                 onMouseEnter={(e) => {
+                                     e.currentTarget.style.backgroundColor = '#b3e5fc';
+                                     e.currentTarget.style.boxShadow = '0 2px 8px rgba(24, 144, 255, 0.2)';
+                                     e.currentTarget.querySelector('svg').style.color = '#096dd9';
+                                     e.currentTarget.querySelector('span:first-of-type').style.color = '#096dd9';
+                                 }}
+                                 onMouseLeave={(e) => {
+                                     e.currentTarget.style.backgroundColor = '#e6f7ff';
+                                     e.currentTarget.style.boxShadow = '0 2px 4px rgba(24, 144, 255, 0.1)';
+                                     e.currentTarget.querySelector('svg').style.color = '#1890ff';
+                                     e.currentTarget.querySelector('span:first-of-type').style.color = '#1890ff';
+                                 }}
                             >
-                                <svg width="14" height="14" viewBox="0 0 1024 1024" style={{color: '#666'}}>
-                                    <path
-                                        d="M880 112H144c-17.7 0-32 14.3-32 32v736c0 17.7 14.3 32 32 32h736c17.7 0 32-14.3 32-32V144c0-17.7-14.3-32-32-32z"
-                                        fill="currentColor"/>
+                                <svg width="16" height="16" viewBox="0 0 1024 1024" style={{color: '#1890ff'}}>
+                                    <path d="M880 112H144c-17.7 0-32 14.3-32 32v736c0 17.7 14.3 32 32 32h736c17.7 0 32-14.3 32-32V144c0-17.7-14.3-32-32-32z" fill="currentColor"/>
                                     <path d="M256 320h512v64H256v-64z" fill="currentColor"/>
                                     <path d="M256 448h512v64H256v-64z" fill="currentColor"/>
                                     <path d="M256 576h320v64H256v-64z" fill="currentColor"/>
                                 </svg>
                                 <span style={{
-                                    fontSize: 14,
-                                    fontWeight: 600,
-                                    color: '#333'
+                                    fontSize: 16,
+                                    fontWeight: 700,
+                                    color: '#1890ff'
                                 }}>
-                  {statsLoading ? '...' : todayStats.posts}
-                </span>
+        {statsLoading ? '...' : todayStats.posts}
+      </span>
                                 <span style={{
                                     fontSize: 12,
-                                    color: '#999'
+                                    color: '#4080a0'
                                 }}>
-                  今日发帖
-                </span>
+        今日发帖
+      </span>
                             </div>
 
                             {/* 今日评论 */}
                             <div style={{
-                                background: '#f5f5f5',
-                                padding: '8px 6px',
-                                borderRadius: 6,
+                                background: '#f6ffed',
+                                padding: '12px 8px',
+                                borderRadius: 8,
+                                border: '1px solid #b7eb8f',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
-                                gap: 2,
-                                transition: 'background-color 0.2s ease'
+                                gap: 4,
+                                transition: 'all 0.2s ease',
+                                boxShadow: '0 2px 4px rgba(47, 194, 91, 0.1)'
                             }}
-                                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#eee'}
-                                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                                 onMouseEnter={(e) => {
+                                     e.currentTarget.style.backgroundColor = '#b7eb8f';
+                                     e.currentTarget.style.boxShadow = '0 2px 8px rgba(47, 194, 91, 0.2)';
+                                     e.currentTarget.querySelector('svg').style.color = '#239b49';
+                                     e.currentTarget.querySelector('span:first-of-type').style.color = '#239b49';
+                                 }}
+                                 onMouseLeave={(e) => {
+                                     e.currentTarget.style.backgroundColor = '#f6ffed';
+                                     e.currentTarget.style.boxShadow = '0 2px 4px rgba(47, 194, 91, 0.1)';
+                                     e.currentTarget.querySelector('svg').style.color = '#2fc25b';
+                                     e.currentTarget.querySelector('span:first-of-type').style.color = '#2fc25b';
+                                 }}
                             >
-                                <svg width="14" height="14" viewBox="0 0 1024 1024" style={{color: '#666'}}>
-                                    <path
-                                        d="M880 112H144c-17.7 0-32 14.3-32 32v736c0 17.7 14.3 32 32 32h736c17.7 0 32-14.3 32-32V144c0-17.7-14.3-32-32-32z"
-                                        fill="currentColor"/>
+                                <svg width="16" height="16" viewBox="0 0 1024 1024" style={{color: '#2fc25b'}}>
+                                    <path d="M880 112H144c-17.7 0-32 14.3-32 32v736c0 17.7 14.3 32 32 32h736c17.7 0 32-14.3 32-32V144c0-17.7-14.3-32-32-32z" fill="currentColor"/>
                                     <path d="M256 320h512v64H256v-64z" fill="currentColor"/>
                                     <path d="M256 448h320v64H256v-64z" fill="currentColor"/>
                                 </svg>
                                 <span style={{
-                                    fontSize: 14,
-                                    fontWeight: 600,
-                                    color: '#333'
+                                    fontSize: 16,
+                                    fontWeight: 700,
+                                    color: '#2fc25b'
                                 }}>
-                  {statsLoading ? '...' : todayStats.comments}
-                </span>
+        {statsLoading ? '...' : todayStats.comments}
+      </span>
                                 <span style={{
                                     fontSize: 12,
-                                    color: '#999'
+                                    color: '#3f8652'
                                 }}>
-                  今日评论
-                </span>
+        今日评论
+      </span>
                             </div>
                         </div>
 
-                        {/* 功能按钮 */}
-                        <Button
-                            block
-                            style={{
-                                transition: 'background-color 0.2s ease'
-                            }}
-                            onMouseEnter={(e) => {
-                                if (role === "admin" || role === "super_admin") {
-                                    e.currentTarget.style.backgroundColor = '#40a9ff';
-                                } else {
-                                    e.currentTarget.style.backgroundColor = '#52c41a';
-                                }
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = '';
-                            }}
-                            onClick={() =>
-                                navigate(
-                                    role === "admin" || role === "super_admin"
-                                        ? "/admin/dashboard"
-                                        : "/student/entry",
-                                )
-                            }
-                        >
-                            {role === "admin" || role === "super_admin"
-                                ? "返回管理端"
-                                : "返回学生入口"}
-                        </Button>
+                        {/* 按钮容器：核心修改部分，实现左右排列 */}
+                        <div style={{
+                            display: 'flex', // 关键：设置flex实现左右排列
+                            gap: 12, // 按钮之间的间距
+                            marginTop: 16, // 与上方数据区的分隔
+                            width: '100%'
+                        }}>
+                            <Button
+                                onClick={() => navigate("/student/entry")}
+                                style={{
+                                    flex: 1, // 让按钮均分宽度
+                                    borderRadius: 8, // 统一圆角
+                                    backgroundColor: '#1890ff',
+                                    color: '#fff',
+                                    transition: 'background-color 0.2s ease'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#40a9ff'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1890ff'}
+                            >
+                                返回学生入口
+                            </Button>
+                            <Button
+                                onClick={() => navigate("/admin/login")}
+                                style={{
+                                    flex: 1, // 让按钮均分宽度
+                                    borderRadius: 8, // 统一圆角
+                                    backgroundColor: '#52c41a',
+                                    color: '#fff',
+                                    transition: 'background-color 0.2s ease'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#73d13d'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#52c41a'}
+                            >
+                                返回登录入口
+                            </Button>
+                        </div>
                     </Card>
 
                     {/* 轻卡片容器 */}

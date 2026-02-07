@@ -510,7 +510,7 @@ export default function PostDetail() {
                     backgroundColor: '#fff',
                     marginBottom: '8px'
                   }}
-                  onClick={() => navigate(`/community/post/${post.id}`)}
+                  onClick={() => navigate(`/community/posts/${post.id}`)}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = '#f8f8f8';
                     e.currentTarget.style.boxShadow = '0 3px 6px rgba(0,0,0,0.08)';
