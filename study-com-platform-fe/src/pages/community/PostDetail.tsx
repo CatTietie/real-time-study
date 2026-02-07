@@ -624,18 +624,48 @@ export default function PostDetail() {
                 borderTop: '1px solid #f0f0f0'
               }}>
                 <div style={{ display: 'flex', gap: 24 }}>
-                  <Space size="small">
-                    <span style={{ fontSize: 16 }}>💬</span>
-                    <Text>{post?.comment_count || 39}</Text>
-                  </Space>
-                  <Space size="small">
-                    <span style={{ fontSize: 16 }}>👍</span>
-                    <Text>{post?.like_count || 6}</Text>
-                  </Space>
-                  <Space size="small">
-                    <span style={{ fontSize: 16 }}>⭐</span>
-                    <Text>{post?.favoriteCount || 3}</Text>
-                  </Space>
+                  {/* 点赞按钮 */}
+                  <Button
+                    type="text"
+                    icon={<span>👍</span>}
+                    onClick={handleTogglePostLike}
+                    style={{
+                      transition: 'all 0.3s ease',
+                      transform: likeAnimating ? 'scale(1.2)' : 'scale(1)',
+                      color: likeAnimating ? '#1890ff' : 'inherit'
+                    }}
+                  >
+                    {post?.like_count || 0}
+                  </Button>
+                  
+                  {/* 评论按钮 */}
+                  <Button
+                    type="text"
+                    icon={<span>💬</span>}
+                    onClick={() => {
+                      // 滚动到评论区域
+                      const commentSection = document.getElementById('comment-section');
+                      if (commentSection) {
+                        commentSection.scrollIntoView({ behavior: 'smooth' });
+                        commentInputRef.current?.focus();
+                      }
+                    }}
+                  >
+                    {post?.comment_count || 0}
+                  </Button>
+                  
+                  {/* 收藏按钮 */}
+                  <Button
+                    type="text"
+                    icon={<span>⭐</span>}
+                    onClick={handleToggleFavorite}
+                    style={{
+                      color: favorited ? '#faad14' : 'inherit',
+                      transition: 'color 0.3s ease'
+                    }}
+                  >
+                    {post?.favoriteCount || 0}
+                  </Button>
                 </div>
                 <Text type="secondary" style={{ fontSize: 12 }}>
                   浏览 {post?.view_count ? (post.view_count > 10000 ? `${(post.view_count/10000).toFixed(1)}w` : post.view_count) : '1.2w'}
@@ -648,7 +678,7 @@ export default function PostDetail() {
         </div>
 
         <div>
-          <Card title="评论输入" style={{ marginBottom: 16 }}>
+          <Card title="评论输入" style={{ marginBottom: 16 }} id="comment-section">
             <Space align="start" style={{ width: "100%" }}>
               <Avatar size={32}>{(username || "U").slice(0, 1)}</Avatar>
               <Form
