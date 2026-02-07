@@ -468,50 +468,85 @@ export default function PostDetail() {
         <div>
             <Card
                 title={
-                    <span style={{
-                        fontSize: '18px',
-                        fontWeight: 'bold',
-                        background: 'linear-gradient(90deg, #ff2e63, #ff8fab)',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text',
-                        textFillColor: 'transparent'
-                    }}>
-                      全站热榜
-                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: '16px' }}>🔥</span>
+                            <span style={{
+                                fontSize: '18px',
+                                fontWeight: 700,
+                                background: 'linear-gradient(90deg, #ff2e63, #ff8fab)',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                backgroundClip: 'text',
+                                textFillColor: 'transparent'
+                            }}>
+                              全站热榜
+                            </span>
+                        </div>
+                        <div style={{
+                            width: '80px',
+                            height: '2px',
+                            background: 'linear-gradient(90deg, #ff6b9d, #ff8fa3)',
+                            marginTop: '4px',
+                            borderRadius: '1px'
+                        }}></div>
+                    </div>
                 }
                 style={{ marginBottom: 16 }}
                 loading={hotPostsLoading}
             >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {hotPosts.map((post, index) => (
                 <div
                   key={post.id}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    padding: '8px 0',
+                    padding: '8px 12px',
                     cursor: 'pointer',
-                    transition: 'background-color 0.2s',
+                    transition: 'all 0.3s ease',
+                    borderRadius: '6px',
+                    border: '1px solid #f0f0f0',
+                    backgroundColor: '#fff',
+                    marginBottom: '8px'
                   }}
                   onClick={() => navigate(`/community/post/${post.id}`)}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f8f8f8';
+                    e.currentTarget.style.boxShadow = '0 3px 6px rgba(0,0,0,0.08)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#fff';
+                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
                 >
                   <div style={{
                     width: 24,
                     height: 24,
                     borderRadius: '50%',
-                    backgroundColor: 'white',
-                    border: `2px solid ${index < 3 ? '#ff6b9d' : '#d9d9d9'}`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     marginRight: 12,
-                    flexShrink: 0
+                    flexShrink: 0,
+                    ...(index === 0 ? {
+                      background: 'linear-gradient(135deg, #FF6B81, #FF8FA3)',
+                      boxShadow: '0 2px 4px rgba(255, 107, 129, 0.3)'
+                    } : index === 1 ? {
+                      background: 'linear-gradient(135deg, #B59DFE, #C9B6FF)',
+                      boxShadow: '0 2px 4px rgba(181, 157, 254, 0.3)'
+                    } : index === 2 ? {
+                      background: 'linear-gradient(135deg, #69B1FF, #8CC5FF)',
+                      boxShadow: '0 2px 4px rgba(105, 177, 255, 0.3)'
+                    } : {
+                      background: '#f0f0f0',
+                      border: '1px solid #d9d9d9'
+                    })
                   }}>
                     <span style={{
-                      color: index < 3 ? '#ff6b9d' : '#d9d9d9',
+                      color: index < 3 ? '#fff' : '#999',
                       fontSize: 12,
                       fontWeight: 'bold'
                     }}>
@@ -519,16 +554,29 @@ export default function PostDetail() {
                     </span>
                   </div>
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text ellipsis style={{ fontSize: 14, maxWidth: '70%' }}>
+                    <Text 
+                      ellipsis 
+                      style={{ 
+                        fontSize: 14, 
+                        fontWeight: 500,
+                        maxWidth: '70%',
+                        transition: 'color 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = '#1890ff'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = 'inherit'}
+                    >
                       {post.title}
                     </Text>
-                    <Text type="secondary" style={{ fontSize: 12, marginLeft: 8 }}>
-                      {post.view_count > 10000
-                        ? `${(post.view_count/10000).toFixed(1)}w`
-                        : post.view_count > 1000
-                          ? `${(post.view_count/1000).toFixed(1)}k`
-                          : post.view_count} 阅读
-                    </Text>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ fontSize: '12px', color: '#999' }}>👁️</span>
+                      <Text style={{ fontSize: 12, color: '#999' }}>
+                        {post.view_count > 10000
+                          ? `${(post.view_count/10000).toFixed(1)}w`
+                          : post.view_count > 1000
+                            ? `${(post.view_count/1000).toFixed(1)}k`
+                            : post.view_count}
+                      </Text>
+                    </div>
                   </div>
                 </div>
               ))}
