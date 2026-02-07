@@ -214,7 +214,4 @@ export const fetchFavoriteStatus = async (postId: number) => {
   return response.data;
 };
 
-export const fetchUserTodayStats = async () => {
-  const response = await api.get("/community/user/today-stats");
-  return response.data;
-};
+

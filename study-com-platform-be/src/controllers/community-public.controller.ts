@@ -1695,6 +1695,41 @@ export const getCommunityProfileSummary = async (
       where: { status: 1, points: { [Op.gt]: user.points } },
     });
 
+    // 添加今日统计数据查询
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const [todayPosts, todayComments, todayPostLikes, todayCommentLikes] = await Promise.all([
+      Post.count({
+        where: {
+          user_id: req.user.id,
+          created_at: { [Op.gte]: today, [Op.lt]: tomorrow }
+        }
+      }),
+      Comment.count({
+        where: {
+          user_id: req.user.id,
+          created_at: { [Op.gte]: today, [Op.lt]: tomorrow }
+        }
+      }),
+      Post.sum('like_count', {
+        where: {
+          user_id: req.user.id,
+          created_at: { [Op.gte]: today, [Op.lt]: tomorrow }
+        }
+      }),
+      Comment.sum('like_count', {
+        where: {
+          user_id: req.user.id,
+          created_at: { [Op.gte]: today, [Op.lt]: tomorrow }
+        }
+      })
+    ]);
+
+    const totalTodayLikes = (todayPostLikes || 0) + (todayCommentLikes || 0);
+
     res.json({
       success: true,
       message: "获取成功",
@@ -1706,6 +1741,10 @@ export const getCommunityProfileSummary = async (
         points: user.points,
         level: calculateLevel(user.points),
         rank: higherCount + 1,
+        // 新增字段
+        todayPosts: todayPosts || 0,
+        todayComments: todayComments || 0,
+        todayLikes: totalTodayLikes
       },
     });
   } catch (error) {

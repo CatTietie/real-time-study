@@ -19,7 +19,6 @@ import {
     createFavorite,
     deleteFavorite,
     fetchFavoriteStatus,
-    fetchUserTodayStats,
 } from "../../services/communityPublic";
 import {useAppSelector} from "../../app/hooks";
 import type {RootState} from "../../app/store";
@@ -65,6 +64,10 @@ type ProfileSummary = {
     points: number;
     level: number;
     rank: number;
+    // 新增字段
+    todayPosts?: number;
+    todayComments?: number;
+    todayLikes?: number;
 };
 
 export default function CommunityLanding() {
@@ -82,7 +85,7 @@ export default function CommunityLanding() {
     const [order, /* setOrder */] = useState<"latest" | "hot">("latest");
     const [profile, setProfile] = useState<ProfileSummary | null>(null);
     const [profileLoading, setProfileLoading] = useState(false);
-    const [onlineCount, setOnlineCount] = useState<number | null>(null);
+    // const [onlineCount, setOnlineCount] = useState<number | null>(null); // 暂时注释，后续可能需要
     const [hotPosts, setHotPosts] = useState<Array<{ id: number; title: string; view_count: number }>>([]);
     const [hotPostsLoading, setHotPostsLoading] = useState(false);
 
@@ -92,7 +95,7 @@ export default function CommunityLanding() {
         comments: 0,
         likes: 0
     });
-    const [statsLoading, setStatsLoading] = useState(false);
+    // const [statsLoading, setStatsLoading] = useState(false); // 已移除今日统计状态
     const fetchingMoreRef = useRef(false);
     const searchTimerRef = useRef<number | null>(null);
 
