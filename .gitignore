@@ -12,8 +12,7 @@ build/
 .cache/
 coverage/
 
-# Env & secrets
-.env*
+# Logs
 *.log
 
 # Backend (be)
@@ -24,3 +23,6 @@ coverage/
 /study-com-platform-fe/dist/
 /study-com-platform-fe/.vite/
 /study-com-platform-fe/.eslintcache
+
+# 保留环境配置文件（移除 .env* 的忽略）
+# 注意：敏感信息应该通过环境变量或密钥管理，而不是硬编码在代码中

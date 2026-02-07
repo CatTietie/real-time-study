@@ -26,9 +26,19 @@ app.use(loggerMiddleware);
 // 路由
 app.use("/api", routes);
 
+// 测试路由
+app.get("/", (req, res) => {
+  res.json({ message: "Study Platform API Server" });
+});
+
 // 健康检查
 app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// API测试路由
+app.get("/api/test", (req, res) => {
+  res.json({ message: "API is working!", timestamp: new Date().toISOString() });
 });
 
 // 错误处理中间件

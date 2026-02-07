@@ -11,15 +11,18 @@ const PORT = process.env.PORT || 3000;
 
 const startServer = async () => {
   try {
+    console.log(`🚀 Starting server on port ${PORT}...`);
     // 连接数据库
     await connectDB();
 
     // 启动服务器
     app.listen(PORT, () => {
-      log(`Server is running on port ${PORT}`);
+      console.log(`✅ Server is running on http://localhost:${PORT}`);
+      console.log(`📊 Health check: http://localhost:${PORT}/health`);
+      console.log(`🧪 API test: http://localhost:${PORT}/api/test`);
     });
   } catch (error) {
-    log("Failed to start server", error);
+    console.error("❌ Failed to start server:", error);
     process.exit(1);
   }
 };

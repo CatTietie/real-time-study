@@ -57,9 +57,10 @@ export const connectDB = async () => {
 
     // 可选：初始化仪表盘演示数据
     if (process.env.SEED_DASHBOARD === "true") {
+      console.log("Seeding dashboard data...");
       const result = await seedDashboardData();
       console.log(
-        `Dashboard seed completed: users=${result.users}, posts=${result.posts}, reports=${result.reports}, adminLogs=${result.adminLogs}`,
+        `✅ Dashboard seed completed: users=${result.users}, posts=${result.posts}, reports=${result.reports}, adminLogs=${result.adminLogs}`,
       );
     }
 

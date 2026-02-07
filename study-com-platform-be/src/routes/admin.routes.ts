@@ -17,6 +17,11 @@ const router = Router();
 // 登录相关（不需要认证）
 router.post("/login", adminController.login);
 
+// 测试路由
+router.get("/test", (req, res) => {
+  res.json({ message: "Admin routes working!" });
+});
+
 // 需要认证的路由
 router.post("/logout", authMiddleware, adminMiddleware, adminController.logout);
 router.get(
