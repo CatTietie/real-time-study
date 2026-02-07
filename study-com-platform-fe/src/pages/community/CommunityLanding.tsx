@@ -9,7 +9,7 @@ import {
     Typography,
     message,
 } from "antd";
-import {useCallback, useEffect, useMemo, useRef, useState} from "react";
+import {useCallback, useEffect, useRef, useState} from "react";
 import {useNavigate} from "react-router-dom";
 import {
     fetchCommunityPosts,
@@ -247,17 +247,6 @@ export default function CommunityLanding() {
             eventSource.close();
         };
     }, [token, username]);
-
-    const todayNew = useMemo(() => {
-        const today = new Date();
-        const key = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
-        return data.filter((item) => {
-            if (!item.createdAt) return false;
-            const d = new Date(item.createdAt);
-            const itemKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-            return itemKey === key;
-        }).length;
-    }, [data]);
 
     const stripText = (value?: string) =>
         (value || "")
@@ -1091,7 +1080,7 @@ export default function CommunityLanding() {
                                     fontWeight: 600,
                                     color: '#333'
                                 }}>
-                  {todayNew}
+                  {statsLoading ? '...' : todayStats.posts}
                 </span>
                                 <span style={{
                                     fontSize: 12,
@@ -1127,7 +1116,7 @@ export default function CommunityLanding() {
                                     fontWeight: 600,
                                     color: '#333'
                                 }}>
-                  2
+                  {statsLoading ? '...' : todayStats.comments}
                 </span>
                                 <span style={{
                                     fontSize: 12,
@@ -1221,7 +1210,7 @@ export default function CommunityLanding() {
                                 fontWeight: "bold",
                                 fontSize: "18px",
                             }}>
-                我的今日
+                今日目标
               </span>
                         </div>
 
