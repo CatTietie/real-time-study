@@ -203,8 +203,23 @@ export default function PostDetail() {
     if (!id) return;
     try {
       setLikeAnimating(true);
-      await togglePostLike(Number(id));
-      loadData();
+      // 调用API更新数据库
+      const response = await togglePostLike(Number(id));
+      
+      // 更新本地状态
+      if (post) {
+        const newLikeCount = response.data?.likeCount || (post.like_count || 0) + (response.data?.liked ? 1 : -1);
+        setPost({
+          ...post,
+          like_count: newLikeCount,
+          likeUsers: response.data?.likeUsers || post.likeUsers
+        });
+      }
+      
+      message.success(response.message || (response.data?.liked ? "点赞成功" : "取消点赞"));
+      
+      // 重新加载数据以确保同步
+      await loadData();
     } catch (err) {
       message.error(err instanceof Error ? err.message : "操作失败");
     } finally {
@@ -228,18 +243,35 @@ export default function PostDetail() {
     if (!id) return;
     try {
       if (favorited && favoriteId) {
+        // 调用API取消收藏
         await deleteFavorite(favoriteId);
         setFavorited(false);
         setFavoriteId(null);
+        // 更新本地状态
+        if (post) {
+          setPost({
+            ...post,
+            favoriteCount: Math.max(0, (post.favoriteCount || 0) - 1)
+          });
+        }
         message.success("已取消收藏");
-        await loadData();
       } else {
+        // 调用API添加收藏
         const res = await createFavorite({ postId: Number(id) });
         setFavorited(true);
         setFavoriteId(res?.data?.id || null);
+        // 更新本地状态
+        if (post) {
+          setPost({
+            ...post,
+            favoriteCount: (post.favoriteCount || 0) + 1
+          });
+        }
         message.success("收藏成功");
-        await loadData();
       }
+      
+      // 重新加载数据以确保同步
+      await loadData();
     } catch (err) {
       message.error(err instanceof Error ? err.message : "操作失败");
     }
@@ -251,8 +283,22 @@ export default function PostDetail() {
       return;
     }
     try {
-      await toggleCommentLike(commentId);
-      loadData();
+      // 调用API更新数据库
+      const response = await toggleCommentLike(commentId);
+      
+      // 更新本地评论状态
+      setComments(prevComments => 
+        prevComments.map(comment => 
+          comment.id === commentId 
+            ? { ...comment, like_count: response.data?.likeCount || (comment.like_count || 0) + (response.data?.liked ? 1 : -1) }
+            : comment
+        )
+      );
+      
+      message.success(response.message || (response.data?.liked ? "点赞成功" : "取消点赞"));
+      
+      // 重新加载数据以确保同步
+      await loadData();
     } catch (err) {
       message.error(err instanceof Error ? err.message : "操作失败");
     }

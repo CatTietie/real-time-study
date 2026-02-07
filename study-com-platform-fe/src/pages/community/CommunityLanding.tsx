@@ -2,21 +2,23 @@ import {
   Avatar,
   Button,
   Card,
-  Divider,
   Input,
   List,
-  Select,
   Space,
   Tag,
   Typography,
   message,
 } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   fetchCommunityPosts,
   fetchCommunityProfileSummary,
   recordCommunityVisit,
+  togglePostLike,
+  createFavorite,
+  deleteFavorite,
+  fetchFavoriteStatus,
 } from "../../services/communityPublic";
 import { useAppSelector } from "../../app/hooks";
 import type { RootState } from "../../app/store";
@@ -76,7 +78,7 @@ export default function CommunityLanding() {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
   const [total, setTotal] = useState(0);
-  const [order, setOrder] = useState<"latest" | "hot">("latest");
+  const [order, /* setOrder */] = useState<"latest" | "hot">("latest");
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [onlineCount, setOnlineCount] = useState<number | null>(null);
@@ -223,25 +225,25 @@ export default function CommunityLanding() {
     };
   }, [token, username]);
 
-  const hotTags = useMemo(() => {
-    const counts: Record<string, number> = {};
-    data.forEach((item) => {
-      if (!item.tags) return;
-      try {
-        const tags = JSON.parse(item.tags) as string[];
-        tags.forEach((tag) => {
-          counts[tag] = (counts[tag] || 0) + 1;
-        });
-      } catch {
-        return;
-      }
-    });
-    return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6);
-  }, [data]);
+  // const hotTags = useMemo(() => {
+  //   const counts: Record<string, number> = {};
+  //   data.forEach((item) => {
+  //     if (!item.tags) return;
+  //     try {
+  //       const tags = JSON.parse(item.tags) as string[];
+  //       tags.forEach((tag) => {
+  //         counts[tag] = (counts[tag] || 0) + 1;
+  //       });
+  //     } catch {
+  //       return;
+  //     }
+  //   });
+  //   return Object.entries(counts)
+  //     .sort((a, b) => b[1] - a[1])
+  //     .slice(0, 6);
+  // }, [data]);
 
-  const hotPosts = useMemo(() => data.slice(0, 3), [data]);
+  // const hotPosts = useMemo(() => data.slice(0, 3), [data]);
 
   const todayNew = useMemo(() => {
     const today = new Date();
@@ -261,16 +263,34 @@ export default function CommunityLanding() {
       .trim();
 
   // 处理点赞逻辑
-  const handleLikeClick = (postId: number, currentLikeCount?: number) => {
-    const newLikeCount = currentLikeCount ? currentLikeCount + 1 : 1;
-    setData(prev =>
-      prev.map(post =>
-        post.id === postId
-          ? { ...post, like_count: newLikeCount }
-          : post
-      )
-    );
-    // TODO: 调用API更新数据库中的点赞数
+  const handleLikeClick = async (postId: number, currentLikeCount?: number) => {
+    if (!token) {
+      message.warning("请先登录再点赞");
+      navigate("/admin/login");
+      return;
+    }
+    
+    try {
+      // 调用API更新数据库
+      const response = await togglePostLike(postId);
+      
+      // 更新本地状态
+      const newLikeCount = response.data?.likeCount || (currentLikeCount || 0) + (response.data?.liked ? 1 : -1);
+      setData(prev =>
+        prev.map(post =>
+          post.id === postId
+            ? { ...post, like_count: newLikeCount }
+            : post
+        )
+      );
+      
+      message.success(response.message || (response.data?.liked ? "点赞成功" : "取消点赞"));
+      
+      // 重新加载数据以确保同步
+      await loadData(page);
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : "点赞失败");
+    }
   };
 
   // 处理评论点击逻辑
@@ -279,16 +299,51 @@ export default function CommunityLanding() {
   };
 
   // 处理收藏逻辑
-  const handleFavoriteClick = (postId: number, currentFavoriteCount?: number) => {
-    const newFavoriteCount = currentFavoriteCount ? currentFavoriteCount + 1 : 1;
-    setData(prev =>
-      prev.map(post =>
-        post.id === postId
-          ? { ...post, favoriteCount: newFavoriteCount }
-          : post
-      )
-    );
-    // TODO: 调用API更新数据库中的收藏数
+  const handleFavoriteClick = async (postId: number, currentFavoriteCount?: number) => {
+    if (!token) {
+      message.warning("请先登录再收藏");
+      navigate("/admin/login");
+      return;
+    }
+    
+    try {
+      // 先检查是否已收藏
+      const statusRes = await fetchFavoriteStatus(postId);
+      const isFavorited = Boolean(statusRes?.data?.favorited);
+      
+      if (isFavorited && statusRes?.data?.favoriteId) {
+        // 取消收藏
+        await deleteFavorite(statusRes.data.favoriteId);
+        // 更新本地状态
+        const newFavoriteCount = Math.max(0, (currentFavoriteCount || 0) - 1);
+        setData(prev =>
+          prev.map(post =>
+            post.id === postId
+              ? { ...post, favoriteCount: newFavoriteCount }
+              : post
+          )
+        );
+        message.success("已取消收藏");
+      } else {
+        // 添加收藏
+        await createFavorite({ postId });
+        // 更新本地状态
+        const newFavoriteCount = (currentFavoriteCount || 0) + 1;
+        setData(prev =>
+          prev.map(post =>
+            post.id === postId
+              ? { ...post, favoriteCount: newFavoriteCount }
+              : post
+          )
+        );
+        message.success("收藏成功");
+      }
+      
+      // 重新加载数据以确保同步
+      await loadData(page);
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : "收藏操作失败");
+    }
   };
 
   return (
