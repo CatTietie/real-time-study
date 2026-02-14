@@ -79,12 +79,17 @@ const canDeletePost = async (user: { id: number; role: string }) => {
 
 export const getCommunityPosts = async (req: Request, res: Response) => {
   try {
-    const { page = 1, pageSize = 10, category, keyword, order } = req.query;
+    const { page = 1, pageSize = 10, category, keyword, order, userId } = req.query;
 
     const where: any = {
       status: 1,
       publish_status: 1,
     };
+
+    // 如果提供了userId参数，则只返回该用户的帖子
+    if (userId) {
+      where.user_id = Number(userId);
+    }
 
     if (category) {
       where.category = category;

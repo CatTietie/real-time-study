@@ -10,6 +10,7 @@ import {
 } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useAppSelector } from "../../app/hooks";
 import { fetchCommunityPosts } from "../../services/communityPublic";
 import CommunityFooter from "../../components/community/CommunityFooter";
 import { HomeOutlined } from "@ant-design/icons";
@@ -34,6 +35,7 @@ type PostRow = {
 export default function PostsList() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const authState = useAppSelector((state) => state.auth);
   const [data, setData] = useState<PostRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -44,16 +46,24 @@ export default function PostsList() {
     async (pageNo = page) => {
       setLoading(true);
       try {
+        console.log('Auth state:', authState);
+        console.log('Current user ID:', authState.userId);
         const keyword = searchParams.get("keyword")?.trim() || undefined;
         const category = searchParams.get("category") || undefined;
-        // 只获取当前登录用户的帖子
-        const res = await fetchCommunityPosts({
+        const params: Record<string, string | number | undefined> = {
           page: pageNo,
           pageSize,
           keyword,
-          category,
-          // 添加用户过滤逻辑（需要后端支持）
-        });
+          category
+        };
+        
+        // 只有当用户已登录且有ID时才添加userId参数
+        if (authState.userId) {
+          params.userId = authState.userId;
+          console.log('Adding userId to params:', authState.userId);
+        }
+        
+        const res = await fetchCommunityPosts(params);
         setData(res?.data || []);
         setTotal(res?.pagination?.total || 0);
         setPage(pageNo);
@@ -63,7 +73,7 @@ export default function PostsList() {
         setLoading(false);
       }
     },
-    [page, pageSize, searchParams],
+    [page, pageSize, searchParams, authState],
   );
 
   useEffect(() => {

@@ -38,6 +38,8 @@ export default function Login() {
           token: result.data.token,
           role: result.data.role,
           username: result.data.username,
+          userId: result.data.id,
+          nickname: result.data.nickname,
         }),
       );
       message.success("登录成功");

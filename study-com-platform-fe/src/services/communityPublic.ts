@@ -2,7 +2,7 @@ import api from "./api";
 
 type QueryParams = Record<string, string | number | boolean | null | undefined>;
 
-export const fetchCommunityPosts = async (params?: QueryParams) => {
+export const fetchCommunityPosts = async (params?: QueryParams & { userId?: number | string }) => {
   const response = await api.get("/community/posts", { params });
   return response.data;
 };
