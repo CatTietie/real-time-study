@@ -21,10 +21,13 @@ interface StudentLayoutProps {
 }
 
 export default function StudentLayout({ children }: StudentLayoutProps) {
+  console.log('=== StudentLayout 组件执行 ===');
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const { username } = useAppSelector((state: RootState) => state.auth);
+  const authState = useAppSelector((state: RootState) => state.auth);
+  const { username } = authState;
+  console.log('StudentLayout authState:', authState);
 
   const menuItems = [
     {

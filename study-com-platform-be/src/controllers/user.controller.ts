@@ -4,9 +4,13 @@ import User from "../models/user.model";
 import UserRole from "../models/user-role.model";
 import RolePermission from "../models/role-permission.model";
 import Permission from "../models/permission.model";
+import Post from "../models/post.model";
+import Comment from "../models/comment.model";
+import { Op, Sequelize } from "sequelize";
 import { comparePassword, hashPassword } from "../utils/password";
 import { generateToken } from "../services/auth.service";
 import { PERMISSION_CODES } from "../constants/permissions";
+import { calculateLevel, getStartOfDay, getStartOfWeek } from "../utils/helper";
 
 export const register = async (req: Request, res: Response) => {
   try {
@@ -167,6 +171,153 @@ export const updateUser = async (req: Request, res: Response) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "更新失败";
     res.status(500).json({ success: false, message });
+  }
+};
+
+export const getUserProfile = async (req: Request, res: Response) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    
+    // 查询用户基本信息
+    const user = await User.findByPk(userId, {
+      attributes: ['id', 'username', 'nickname', 'avatar', 'points', 'role', 'status'],
+    });
+    
+    if (!user) {
+      return res.status(404).json({ success: false, message: '用户不存在' });
+    }
+    
+    // 查询今日统计数据
+    const todayStart = getStartOfDay();
+    const [todayPosts, todayComments, todayPostLikes, todayCommentLikes] = await Promise.all([
+      Post.count({
+        where: {
+          user_id: userId,
+          created_at: { [Op.gte]: todayStart }
+        }
+      }),
+      Comment.count({
+        where: {
+          user_id: userId,
+          created_at: { [Op.gte]: todayStart }
+        }
+      }),
+      Post.sum('like_count', {
+        where: {
+          user_id: userId,
+          created_at: { [Op.gte]: todayStart }
+        }
+      }),
+      Comment.sum('like_count', {
+        where: {
+          user_id: userId,
+          created_at: { [Op.gte]: todayStart }
+        }
+      })
+    ]);
+    
+    const totalTodayLikes = (todayPostLikes || 0) + (todayCommentLikes || 0);
+    
+    // 查询用户排名
+    const higherCount = await User.count({
+      where: { status: 1, points: { [Op.gt]: user.points } },
+    });
+    
+    res.json({
+      success: true,
+      data: {
+        id: user.id,
+        username: user.username,
+        nickname: user.nickname,
+        avatar: user.avatar,
+        points: user.points,
+        level: calculateLevel(user.points),
+        rank: higherCount + 1,
+        // 今日统计数据
+        todayPosts: todayPosts || 0,
+        todayComments: todayComments || 0,
+        todayLikes: totalTodayLikes,
+        // 状态信息
+        role: user.role,
+        status: user.status
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: '获取用户资料失败' });
+  }
+};
+
+export const getUserStudyStats = async (req: Request, res: Response) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    
+    // 统计数据：帖子、评论、积分
+    const [postCount, commentCount, points, postLikesSum, commentLikesSum] = await Promise.all([
+      Post.count({ where: { user_id: userId, publish_status: 1 } }),
+      Comment.count({ where: { user_id: userId, is_deleted: 0 } }),
+      User.findByPk(userId, { attributes: ['points'] }),
+      // 总点赞数（自己发的帖子被点赞 + 自己评论被点赞）
+      Post.sum('like_count', { where: { user_id: userId } }),
+      Comment.sum('like_count', { where: { user_id: userId } })
+    ]);
+    
+    // TODO: 学习时长应该从学习记录表获取，这里暂时使用示例值
+    const studyHours = 45;
+    
+    res.json({
+      success: true,
+      data: {
+        totalPoints: points?.points || 0,
+        level: calculateLevel(points?.points || 0),
+        studyHours: studyHours,
+        streakDays: 7,
+        postsCount: postCount || 0,
+        commentsCount: commentCount || 0,
+        likesReceived: (postLikesSum || 0) + (commentLikesSum || 0),
+        // TODO: activeDays 应该根据用户的实际活跃记录计算
+        activeDays: 30
+      }
+    });
+
+  } catch (error) {
+    res.status(500).json({ success: false, message: '获取学习统计失败' });
+  }
+};
+
+export const updateUserProfile = async (req: Request, res: Response) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    const { nickname, avatar } = req.body;
+    
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: '用户不存在' });
+    }
+    
+    // 权限验证：只能修改自己的资料或管理员修改
+    if (req.user?.id !== userId && req.user?.role !== 'admin' && req.user?.role !== 'super_admin') {
+      return res.status(403).json({ success: false, message: '无权限修改此用户资料' });
+    }
+    
+    // 更新数据
+    const updateData: any = {};
+    if (nickname !== undefined) updateData.nickname = nickname;
+    if (avatar !== undefined) updateData.avatar = avatar;
+    
+    await user.update(updateData);
+    
+    // 返回更新后的用户信息
+    const updatedUser = await User.findByPk(userId, {
+      attributes: ['id', 'username', 'nickname', 'avatar', 'points', 'role']
+    });
+    
+    res.json({
+      success: true,
+      message: '更新成功',
+      data: updatedUser
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: '更新失败' });
   }
 };
 

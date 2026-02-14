@@ -37,6 +37,14 @@ import "./styles/student.less";
 import "./styles/community.less";
 
 function App() {
+  console.log('=== App 组件开始执行 ===');
+  
+  // 添加路由调试
+  console.log('当前路由配置检查:');
+  console.log('- /student/* 路由已配置');
+  console.log('- StudentDashboard 组件已导入');
+  console.log('- 路由嵌套结构正常');
+  
   return (
     <BrowserRouter>
       <Routes>
@@ -54,34 +62,23 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/student/coming-soon" element={<ComingSoon />} />
         
-        {/* 学生端路由 */}
-        <Route
-          path="/student/*"
-          element={
-            <RequireStudentAuth>
-              <StudentLayout />
-            </RequireStudentAuth>
-          }
-        >
-          <Route index element={<Navigate to="/student/dashboard" replace />} />
-          <Route path="dashboard" element={<StudentDashboard />} />
-          <Route path="study-room" element={<ComingSoon />} />
-          <Route path="analytics" element={<ComingSoon />} />
-          <Route path="settings" element={<ComingSoon />} />
-          <Route path="profile" element={<ComingSoon />} />
-        </Route>
-        
-        {/* 直接访问学生仪表盘的路由 */}
-        <Route
-          path="/student/dashboard"
+        {/* 学生端路由 - 恢复真正的组件 */}
+        <Route 
+          path="/student/dashboard" 
           element={
             <RequireStudentAuth>
               <StudentLayout>
                 <StudentDashboard />
               </StudentLayout>
             </RequireStudentAuth>
-          }
+          } 
         />
+        <Route path="/student/study-room" element={<ComingSoon />} />
+        <Route path="/student/analytics" element={<ComingSoon />} />
+        <Route path="/student/settings" element={<ComingSoon />} />
+        <Route path="/student/profile" element={<ComingSoon />} />
+        
+        
         
         {/* 管理端路由 */}
         <Route

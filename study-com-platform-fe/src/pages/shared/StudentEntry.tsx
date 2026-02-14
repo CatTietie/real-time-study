@@ -8,8 +8,10 @@ import "./StudentEntry.less";
 const { Title, Text } = Typography;
 
 export default function StudentEntry() {
+  console.log('=== StudentEntry 组件执行 ===');
   const navigate = useNavigate();
   const { username } = useAppSelector((state: RootState) => state.auth);
+  console.log('StudentEntry 用户名:', username);
 
   const quickActions = [
     {
@@ -23,7 +25,11 @@ export default function StudentEntry() {
       title: "个人中心",
       description: "查看个人信息和学习记录",
       icon: "👤",
-      onClick: () => navigate("/student/dashboard"),
+      onClick: () => {
+        console.log('=== 点击个人中心按钮 ===');
+        console.log('准备跳转到: /student/dashboard');
+        navigate("/student/dashboard");
+      },
       color: "#52c41a"
     },
     {

@@ -21,7 +21,7 @@ const initialState: AuthState = {
   token: tokenFromStorage,
   role: roleFromStorage,
   username: usernameFromStorage,
-  userId: userIdFromStorage ? Number(userIdFromStorage) : null,
+  userId: userIdFromStorage ? parseInt(userIdFromStorage, 10) : null,
   nickname: nicknameFromStorage,
 };
 
@@ -39,16 +39,28 @@ const authSlice = createSlice({
         nickname: string;
       }>,
     ) => {
+      console.log('=== loginSuccess action 执行 ===');
+      console.log('payload:', action.payload);
+      
       state.token = action.payload.token;
       state.role = action.payload.role;
       state.username = action.payload.username;
       state.userId = action.payload.userId;
       state.nickname = action.payload.nickname;
+      
       localStorage.setItem("token", action.payload.token);
       localStorage.setItem("role", action.payload.role);
       localStorage.setItem("username", action.payload.username);
       localStorage.setItem("userId", action.payload.userId.toString());
       localStorage.setItem("nickname", action.payload.nickname);
+      
+      console.log('更新后的 state:', { 
+        token: state.token, 
+        role: state.role, 
+        username: state.username, 
+        userId: state.userId, 
+        nickname: state.nickname 
+      });
     },
     logout: (state) => {
       state.token = null;
