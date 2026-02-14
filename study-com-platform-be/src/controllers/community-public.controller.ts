@@ -797,108 +797,82 @@ export const getCommunityLeaderboard = async (req: Request, res: Response) => {
   try {
     const type = String((req.query as any)?.type || "total");
 
-    if (type === "post_like") {
+    if (type === "post_hot") {
+      // 热门内容榜 - 返回帖子相关信息，按热度排序
       const posts = await Post.findAll({
-        where: { status: { [Op.in]: [0, 1] }, publish_status: 1 },
-        include: [{ model: User, attributes: ["id", "username", "nickname"] }],
-        order: [["like_count", "DESC"]],
+        where: { status: 1, publish_status: 1 },
+        include: [{
+          model: User,
+          attributes: ["id", "nickname", "username", "avatar"]
+        }],
+        order: [
+          [Sequelize.col("view_count"), "DESC"],
+          [Sequelize.col("like_count"), "DESC"],
+          [Sequelize.col("comment_count"), "DESC"],
+          [Sequelize.col("created_at"), "DESC"]
+        ],
         limit: 50,
       });
+
+      const data = posts.map((post: any) => {
+        const postData = post.toJSON();
+        return {
+          id: postData.id,
+          title: postData.title,
+          view_count: postData.view_count,
+          like_count: postData.like_count,
+          comment_count: postData.comment_count,
+          user_id: postData.User?.id,
+          user_nickname: postData.User?.nickname,
+          user_username: postData.User?.username,
+          user_avatar: postData.User?.avatar,
+          created_at: postData.created_at,
+        };
+      });
+
       return res.json({
         success: true,
         message: "获取排行榜成功",
-        data: posts,
+        data,
       });
     }
 
-    if (type === "comment_like") {
+    if (type === "comment_count") {
+      // 评论之星榜 - 按评论数量统计
       const rows = await Comment.findAll({
         attributes: [
           "user_id",
-          [Sequelize.fn("SUM", Sequelize.col("like_count")), "likeCount"],
+          [Sequelize.fn("COUNT", Sequelize.col("Comment.id")), "comment_count"],
         ],
         where: { status: 1 },
         group: ["user_id"],
-        include: [
-          { model: User, attributes: ["id", "username", "nickname", "points"] },
-        ],
-        order: [[Sequelize.literal("likeCount"), "DESC"]],
+        include: [{
+          model: User,
+          attributes: ["id", "nickname", "username", "avatar", "points"]
+        }],
+        order: [[Sequelize.literal("comment_count"), "DESC"]],
         limit: 50,
       });
 
-      const data = rows.map((row: any) => ({
-        user: row.User,
-        likeCount: Number(row.get("likeCount") || 0),
-        level: calculateLevel(Number(row.User?.points || 0)),
-      }));
+      const data = rows.map((row: any) => {
+        const rawData = row.toJSON();
+        return {
+          id: rawData.user_id,
+          nickname: rawData.User?.nickname,
+          username: rawData.User?.username,
+          avatar: rawData.User?.avatar,
+          level: calculateLevel(Number(rawData.User?.points || 0)),
+          comment_count: Number(rawData.comment_count || 0),
+        };
+      });
 
       return res.json({ success: true, message: "获取排行榜成功", data });
     }
 
-    if (type === "newbie") {
-      const start = new Date();
-      start.setDate(start.getDate() - 30);
-      const users = await User.findAll({
-        where: { status: 1, createdAt: { [Op.gte]: start } },
-        attributes: ["id", "username", "nickname", "points"],
-        order: [["points", "DESC"]],
-        limit: 30,
-      });
-      return res.json({
-        success: true,
-        message: "获取排行榜成功",
-        data: users.map((user) => ({
-          ...user.toJSON(),
-          level: calculateLevel(user.points),
-        })),
-      });
-    }
-
-    if (type === "month" || type === "week") {
-      const start = new Date();
-      if (type === "month") {
-        start.setDate(1);
-        start.setHours(0, 0, 0, 0);
-      } else {
-        const day = start.getDay() || 7;
-        start.setDate(start.getDate() - day + 1);
-        start.setHours(0, 0, 0, 0);
-      }
-
-      const rows = await PointsLog.findAll({
-        attributes: [
-          "user_id",
-          [Sequelize.fn("SUM", Sequelize.col("change")), "points"],
-        ],
-        where: { createdAt: { [Op.gte]: start } },
-        group: ["user_id"],
-        order: [[Sequelize.literal("points"), "DESC"]],
-        limit: 50,
-      });
-
-      const userIds = rows.map((row: any) => row.user_id);
-      const users = await User.findAll({
-        where: { id: userIds },
-        attributes: ["id", "username", "nickname", "points"],
-      });
-
-      const userMap = new Map(users.map((u) => [u.id, u]));
-      const data = rows
-        .map((row: any) => ({
-          user: userMap.get(row.user_id),
-          points: Number(row.get("points") || 0),
-          level: calculateLevel(Number(userMap.get(row.user_id)?.points || 0)),
-        }))
-        .filter((item) => item.user);
-
-      if (data.length > 0) {
-        return res.json({ success: true, message: "获取排行榜成功", data });
-      }
-    }
-
+    // 默认是 total - 社区达人榜（按总积分排行）
     const users = await User.findAll({
       where: { status: 1 },
-      attributes: ["id", "username", "nickname", "points"],
+      attributes: ["id", "username", "nickname", "avatar", "points"],
       order: [["points", "DESC"]],
       limit: 100,
     });
@@ -907,7 +881,11 @@ export const getCommunityLeaderboard = async (req: Request, res: Response) => {
       success: true,
       message: "获取排行榜成功",
       data: users.map((user) => ({
-        ...user.toJSON(),
+        id: user.id,
+        nickname: user.nickname,
+        username: user.username,
+        avatar: user.avatar,
+        points: user.points,
         level: calculateLevel(user.points),
       })),
     });

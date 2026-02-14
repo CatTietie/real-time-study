@@ -69,7 +69,7 @@ export default function PostsList() {
 
   return (
     <div className="page-container">
-      <Title level={3}>社区帖子</Title>
+      <Title level={3}>我的帖子</Title>
       <Card>
         <Space style={{ marginBottom: 16 }}>
           <Button type="primary" onClick={() => navigate("/community/publish")}>

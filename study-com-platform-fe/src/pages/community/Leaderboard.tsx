@@ -1,5 +1,6 @@
-import { Card, Table, Typography, message, Badge } from "antd";
+import { Card, Table, Typography, message, Badge, Button } from "antd";
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { fetchCommunityLeaderboardByType } from "../../services/communityPublic";
 import CommunityFooter from "../../components/community/CommunityFooter";
 import {
@@ -9,7 +10,8 @@ import {
     LikeOutlined,
     UserOutlined,
     EyeOutlined,
-    MessageOutlined
+    MessageOutlined,
+    HomeOutlined
 } from "@ant-design/icons";
 
 const { Title, Text } = Typography;
@@ -42,6 +44,7 @@ type LeaderboardRow = {
 };
 
 export default function Leaderboard() {
+    const navigate = useNavigate();
     const [data, setData] = useState<LeaderboardRow[]>([]);
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState("posts"); // 改为标签页形式
@@ -62,9 +65,9 @@ export default function Leaderboard() {
                     (item, index) => ({
                         ...item,
                         key: item.key ?? item.id ?? index,
-                        // 确保作者信息有值
-                        author_nickname: item.author?.nickname || item.Post?.User?.nickname,
-                        author_username: item.author?.username || item.Post?.User?.username,
+                        // 确保作者信息有值 - 适配后端返回的字段名
+                        author_nickname: item.user_nickname || item.author?.nickname || item.Post?.User?.nickname || item.nickname,
+                        author_username: item.user_username || item.author?.username || item.Post?.User?.username || item.username,
                     }),
                 );
                 setData(list);
@@ -354,7 +357,7 @@ export default function Leaderboard() {
                                     marginBottom: 2,
                                     fontSize: 15
                                 }}>
-                                    {record.nickname || record.user?.nickname || "匿名用户"}
+                                    {record.nickname || record.user?.nickname || record.user_nickname || "匿名用户"}
                                 </div>
                                 <div style={{
                                     color: "#6B7280",
@@ -364,7 +367,7 @@ export default function Leaderboard() {
                                     borderRadius: 4,
                                     display: "inline-block"
                                 }}>
-                                    @{record.username || record.user?.username || "-"}
+                                    @{record.username || record.user?.username || record.user_username || "-"}
                                 </div>
                             </div>
                         </div>
@@ -428,7 +431,7 @@ export default function Leaderboard() {
                                 fontWeight: "bold",
                                 fontSize: 18
                             }}>
-                                {(record.user?.nickname || record.nickname || "U").charAt(0).toUpperCase()}
+                                {(record.user?.nickname || record.nickname || record.user_nickname || "U").charAt(0).toUpperCase()}
                             </div>
                             <div>
                                 <div style={{
@@ -437,13 +440,13 @@ export default function Leaderboard() {
                                     marginBottom: 2,
                                     fontSize: 15
                                 }}>
-                                    {record.user?.nickname || record.nickname || "匿名用户"}
+                                    {record.user?.nickname || record.nickname || record.user_nickname || "匿名用户"}
                                 </div>
                                 <div style={{
                                     color: "#6B7280",
                                     fontSize: 13
                                 }}>
-                                    @{record.user?.username || record.username || "-"}
+                                    @{record.user?.username || record.username || record.user_username || "-"}
                                 </div>
                             </div>
                         </div>
@@ -537,6 +540,39 @@ export default function Leaderboard() {
                 position: "relative"
             }}
         >
+            {/* 返回按钮 */}
+            <Button
+                type="text"
+                icon={<HomeOutlined />}
+                onClick={() => navigate('/community')}
+                style={{
+                    position: "absolute",
+                    top: 24,
+                    left: 24,
+                    zIndex: 10,
+                    background: "rgba(255, 255, 255, 0.95)",
+                    backdropFilter: "blur(10px)",
+                    border: "1px solid rgba(255, 255, 255, 0.3)",
+                    borderRadius: 12,
+                    padding: "12px 16px",
+                    color: "#667eea",
+                    fontWeight: 600,
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+                    transition: "all 0.3s ease",
+                }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "white";
+                    e.currentTarget.style.transform = "translateY(-2px)";
+                    e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.15)";
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.95)";
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.1)";
+                }}
+            >
+                返回社区
+            </Button>
             {/* 装饰背景 */}
             <div style={{
                 position: "absolute",
@@ -680,7 +716,7 @@ export default function Leaderboard() {
                         overflow: "hidden",
                         position: "relative"
                     }}
-                    bodyStyle={{ padding: 0 }}
+                    styles={{ body: { padding: 0 } }}
                 >
                     {/* 表头装饰 */}
                     <div style={{
@@ -840,7 +876,8 @@ export default function Leaderboard() {
                 </div>
 
                 {/* 自定义样式 */}
-                <style jsx global>{`
+                <style>
+                    {`
           .leaderboard-top-row td {
             background: linear-gradient(90deg, rgba(102, 126, 234, 0.04) 0%, rgba(118, 75, 162, 0.02) 100%) !important;
           }
@@ -857,7 +894,8 @@ export default function Leaderboard() {
           .ant-card-loading .ant-card-body {
             padding: 48px;
           }
-        `}</style>
+        `}
+                </style>
             </div>
 
             <CommunityFooter
