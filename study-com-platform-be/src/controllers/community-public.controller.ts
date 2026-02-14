@@ -25,6 +25,7 @@ import {
   broadcastNewPost,
   removeCommunityClient,
 } from "../services/community-realtime.service";
+import { recordView, getUserTodayViews } from "../services/view-record.service";
 
 const parseTags = (tags?: string[] | string) => {
   const parsed = Array.isArray(tags)
@@ -220,6 +221,7 @@ export const getCommunityTagSuggestions = async (
 export const getCommunityPostDetail = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
+    const userId = req.user?.id;
 
     const post = await Post.findOne({
       where: { id, status: 1, publish_status: 1 },
@@ -235,7 +237,24 @@ export const getCommunityPostDetail = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, message: "帖子不存在" });
     }
 
-    await Post.increment({ view_count: 1 }, { where: { id } });
+    // 如果用户已登录，记录浏览行为
+    if (userId) {
+      console.log(`用户 ${userId} 正在浏览帖子 ${id}`);
+      try {
+        const ipAddress = req.ip || req.connection.remoteAddress || '';
+        const userAgent = req.get('User-Agent') || '';
+        console.log(`准备记录浏览: userId=${userId}, postId=${id}, ip=${ipAddress}`);
+        const viewResult = await recordView(userId, id, ipAddress, userAgent);
+        console.log('浏览记录结果:', viewResult);
+      } catch (viewError) {
+        // 浏览记录失败不影响主要功能
+        console.warn('记录浏览行为失败:', viewError);
+      }
+    } else {
+      console.log(`未登录用户浏览帖子 ${id}，直接增加浏览量`);
+      // 未登录用户也增加浏览量（但不记录具体用户）
+      await Post.increment({ view_count: 1 }, { where: { id } });
+    }
 
     const likeUsers = await PostLike.findAll({
       where: { post_id: id },
@@ -1683,35 +1702,49 @@ export const getCommunityProfileSummary = async (
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const [todayPosts, todayComments, todayPostLikes, todayCommentLikes] = await Promise.all([
-      Post.count({
+    
+    // 查询用户今天发布的帖子和评论
+    const [userTodayPosts, userTodayComments] = await Promise.all([
+      Post.findAll({
         where: {
           user_id: req.user.id,
           created_at: { [Op.gte]: today, [Op.lt]: tomorrow }
-        }
+        },
+        attributes: ['id']
       }),
-      Comment.count({
+      Comment.findAll({
         where: {
           user_id: req.user.id,
           created_at: { [Op.gte]: today, [Op.lt]: tomorrow }
-        }
-      }),
-      Post.sum('like_count', {
-        where: {
-          user_id: req.user.id,
-          created_at: { [Op.gte]: today, [Op.lt]: tomorrow }
-        }
-      }),
-      Comment.sum('like_count', {
-        where: {
-          user_id: req.user.id,
-          created_at: { [Op.gte]: today, [Op.lt]: tomorrow }
-        }
+        },
+        attributes: ['id']
       })
+    ]);
+    
+    const userTodayPostIds = userTodayPosts.map((post: any) => post.id);
+    const userTodayCommentIds = userTodayComments.map((comment: any) => comment.id);
+    
+    // 查询这些帖子和评论今天获得的点赞数
+    const [todayPostLikes, todayCommentLikes] = await Promise.all([
+      userTodayPostIds.length > 0 
+        ? Post.sum('like_count', {
+            where: {
+              id: { [Op.in]: userTodayPostIds }
+            }
+          })
+        : 0,
+      userTodayCommentIds.length > 0
+        ? Comment.sum('like_count', {
+            where: {
+              id: { [Op.in]: userTodayCommentIds }
+            }
+          })
+        : 0
     ]);
 
     const totalTodayLikes = (todayPostLikes || 0) + (todayCommentLikes || 0);
+    const todayPosts = userTodayPosts.length;
+    const todayComments = userTodayComments.length;
 
     res.json({
       success: true,
@@ -1778,51 +1811,61 @@ export const getUserTodayStats = async (req: Request, res: Response) => {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // 获取今日发帖数
-    const todayPosts = await Post.count({
-      where: {
-        user_id: userId,
-        created_at: {
-          [Op.gte]: today,
-          [Op.lt]: tomorrow
-        }
-      }
-    });
+    // 查询用户今天发布的帖子和评论
+    const [userTodayPosts, userTodayComments] = await Promise.all([
+      Post.findAll({
+        where: {
+          user_id: userId,
+          created_at: {
+            [Op.gte]: today,
+            [Op.lt]: tomorrow
+          }
+        },
+        attributes: ['id']
+      }),
+      Comment.findAll({
+        where: {
+          user_id: userId,
+          created_at: {
+            [Op.gte]: today,
+            [Op.lt]: tomorrow
+          }
+        },
+        attributes: ['id']
+      })
+    ]);
 
-    // 获取今日评论数
-    const todayComments = await Comment.count({
-      where: {
-        user_id: userId,
-        created_at: {
-          [Op.gte]: today,
-          [Op.lt]: tomorrow
-        }
-      }
-    });
+    const userTodayPostIds = userTodayPosts.map((post: any) => post.id);
+    const userTodayCommentIds = userTodayComments.map((comment: any) => comment.id);
 
-    // 获取今日获赞数（帖子点赞）
-    const todayPostLikes = await Post.sum('like_count', {
-      where: {
-        user_id: userId,
-        created_at: {
-          [Op.gte]: today,
-          [Op.lt]: tomorrow
-        }
-      }
-    }) || 0;
-
-    // 获取今日获赞数（评论点赞）
-    const todayCommentLikes = await Comment.sum('like_count', {
-      where: {
-        user_id: userId,
-        created_at: {
-          [Op.gte]: today,
-          [Op.lt]: tomorrow
-        }
-      }
-    }) || 0;
+    // 查询这些帖子和评论今天获得的点赞数
+    const [todayPostLikes, todayCommentLikes] = await Promise.all([
+      userTodayPostIds.length > 0 
+        ? Post.sum('like_count', {
+            where: {
+              id: { [Op.in]: userTodayPostIds }
+            }
+          })
+        : 0,
+      userTodayCommentIds.length > 0
+        ? Comment.sum('like_count', {
+            where: {
+              id: { [Op.in]: userTodayCommentIds }
+            }
+          })
+        : 0
+    ]);
 
     const totalTodayLikes = todayPostLikes + todayCommentLikes;
+
+    // 获取今日发帖数和评论数
+    const todayPosts = userTodayPosts.length;
+    const todayComments = userTodayComments.length;
+
+    // 获取今日浏览量
+    console.log(`获取用户 ${userId} 的今日浏览量`);
+    const todayViews = await getUserTodayViews(userId);
+    console.log(`用户 ${userId} 今日浏览量: ${todayViews}`);
 
     res.json({
       success: true,
@@ -1830,7 +1873,8 @@ export const getUserTodayStats = async (req: Request, res: Response) => {
       data: {
         todayPosts,
         todayComments,
-        todayLikes: totalTodayLikes
+        todayLikes: totalTodayLikes,
+        todayViews
       }
     });
   } catch (error) {

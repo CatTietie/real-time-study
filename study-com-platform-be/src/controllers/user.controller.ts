@@ -6,11 +6,13 @@ import RolePermission from "../models/role-permission.model";
 import Permission from "../models/permission.model";
 import Post from "../models/post.model";
 import Comment from "../models/comment.model";
+import ViewRecord from "../models/view-record.model";
 import { Op, Sequelize } from "sequelize";
 import { comparePassword, hashPassword } from "../utils/password";
 import { generateToken } from "../services/auth.service";
 import { PERMISSION_CODES } from "../constants/permissions";
 import { calculateLevel, getStartOfDay, getStartOfWeek } from "../utils/helper";
+import { getUserHotPostsCount } from "../services/hot-posts.service";
 
 export const register = async (req: Request, res: Response) => {
   try {
@@ -189,31 +191,53 @@ export const getUserProfile = async (req: Request, res: Response) => {
     
     // 查询今日统计数据
     const todayStart = getStartOfDay();
-    const [todayPosts, todayComments, todayPostLikes, todayCommentLikes] = await Promise.all([
-      Post.count({
+    const tomorrow = new Date(todayStart);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    // 查询用户今天发布的帖子和评论
+    const [userTodayPosts, userTodayComments] = await Promise.all([
+      Post.findAll({
         where: {
           user_id: userId,
-          created_at: { [Op.gte]: todayStart }
-        }
+          created_at: { [Op.gte]: todayStart, [Op.lt]: tomorrow }
+        },
+        attributes: ['id']
       }),
-      Comment.count({
+      Comment.findAll({
         where: {
           user_id: userId,
-          created_at: { [Op.gte]: todayStart }
-        }
-      }),
-      Post.sum('like_count', {
-        where: {
-          user_id: userId,
-          created_at: { [Op.gte]: todayStart }
-        }
-      }),
-      Comment.sum('like_count', {
-        where: {
-          user_id: userId,
-          created_at: { [Op.gte]: todayStart }
-        }
+          created_at: { [Op.gte]: todayStart, [Op.lt]: tomorrow }
+        },
+        attributes: ['id']
       })
+    ]);
+    
+    const userTodayPostIds = userTodayPosts.map((post: any) => post.id);
+    const userTodayCommentIds = userTodayComments.map((comment: any) => comment.id);
+    
+    // 查询这些帖子和评论今天获得的点赞数
+    const [todayPostLikes, todayCommentLikes, todayViews, hotPostsCount] = await Promise.all([
+      userTodayPostIds.length > 0 
+        ? Post.sum('like_count', {
+            where: {
+              id: { [Op.in]: userTodayPostIds }
+            }
+          })
+        : 0,
+      userTodayCommentIds.length > 0
+        ? Comment.sum('like_count', {
+            where: {
+              id: { [Op.in]: userTodayCommentIds }
+            }
+          })
+        : 0,
+      ViewRecord.count({
+        where: {
+          user_id: userId,
+          created_at: { [Op.gte]: todayStart, [Op.lt]: tomorrow }
+        }
+      }),
+      getUserHotPostsCount(userId)
     ]);
     
     const totalTodayLikes = (todayPostLikes || 0) + (todayCommentLikes || 0);
@@ -234,9 +258,11 @@ export const getUserProfile = async (req: Request, res: Response) => {
         level: calculateLevel(user.points),
         rank: higherCount + 1,
         // 今日统计数据
-        todayPosts: todayPosts || 0,
-        todayComments: todayComments || 0,
+        todayPosts: userTodayPosts.length || 0,
+        todayComments: userTodayComments.length || 0,
         todayLikes: totalTodayLikes,
+        todayViews: todayViews || 0,
+        hotPostsCount: hotPostsCount || 0,
         // 状态信息
         role: user.role,
         status: user.status

@@ -15,6 +15,7 @@ import Role from "./role.model";
 import Permission from "./permission.model";
 import UserRole from "./user-role.model";
 import RolePermission from "./role-permission.model";
+import ViewRecord from "./view-record.model";
 
 export const initAssociations = () => {
   // 用户与帖子/评论/点赞
@@ -89,4 +90,11 @@ export const initAssociations = () => {
     through: RolePermission,
     foreignKey: "permission_id",
   });
+
+  // 浏览记录关联
+  User.hasMany(ViewRecord, { foreignKey: "user_id" });
+  ViewRecord.belongsTo(User, { foreignKey: "user_id" });
+  
+  Post.hasMany(ViewRecord, { foreignKey: "post_id" });
+  ViewRecord.belongsTo(Post, { foreignKey: "post_id" });
 };
