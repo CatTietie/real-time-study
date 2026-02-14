@@ -56,7 +56,7 @@ function App() {
         
         {/* 学生端路由 */}
         <Route
-          path="/student"
+          path="/student/*"
           element={
             <RequireStudentAuth>
               <StudentLayout />
@@ -70,6 +70,18 @@ function App() {
           <Route path="settings" element={<ComingSoon />} />
           <Route path="profile" element={<ComingSoon />} />
         </Route>
+        
+        {/* 直接访问学生仪表盘的路由 */}
+        <Route
+          path="/student/dashboard"
+          element={
+            <RequireStudentAuth>
+              <StudentLayout>
+                <StudentDashboard />
+              </StudentLayout>
+            </RequireStudentAuth>
+          }
+        />
         
         {/* 管理端路由 */}
         <Route

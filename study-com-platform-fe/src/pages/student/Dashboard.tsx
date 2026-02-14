@@ -9,7 +9,8 @@ import {
   Typography,
   Progress,
   List,
-  Tag
+  Tag,
+  message
 } from "antd";
 import { 
   UserOutlined, 
@@ -17,7 +18,8 @@ import {
   ClockCircleOutlined,
   FireOutlined,
   BookOutlined,
-  TeamOutlined
+  TeamOutlined,
+  EditOutlined
 } from "@ant-design/icons";
 import { useAppSelector } from "../../app/hooks";
 import type { RootState } from "../../app/store";
@@ -25,9 +27,9 @@ import type { RootState } from "../../app/store";
 const { Title, Text } = Typography;
 
 export default function StudentDashboard() {
-  const { username } = useAppSelector((state: RootState) => state.auth);
-
-  // 模拟数据
+  const { username, nickname } = useAppSelector((state: RootState) => state.auth);
+  
+  // Simplified version - using mock data directly
   const statsData = {
     totalPoints: 1280,
     level: 5,
@@ -58,25 +60,39 @@ export default function StudentDashboard() {
     }
   ];
 
+  // Simplified version - removed API calls and complex state management
+
   const learningGoals = [
     { subject: "前端开发", progress: 75, target: "掌握React核心概念" },
     { subject: "数据结构", progress: 60, target: "完成基础算法练习" },
     { subject: "英语学习", progress: 40, target: "通过四级考试" }
   ];
 
+  // Displayed username and nickname
+  const displayName = nickname || username || "学生用户";
+  const displayUsername = username || "student_user";
+
   return (
     <div className="student-dashboard">
-      {/* 个人信息头部 */}
+      {/* Personal Info Header */}
       <Card className="profile-header">
         <Row align="middle" gutter={24}>
           <Col>
-            <Avatar size={80} icon={<UserOutlined />} />
+            <Avatar 
+              size={80} 
+              icon={<UserOutlined />} 
+            />
           </Col>
           <Col flex="1">
             <Space direction="vertical">
               <Title level={3} style={{ margin: 0 }}>
-                {username || "学生用户"}
+                {displayName}
+                <EditOutlined 
+                  style={{ fontSize: 16, color: '#1890ff', marginLeft: 12, cursor: 'pointer' }}
+                  onClick={() => message.info('编辑功能待开发')} 
+                />
               </Title>
+              <Text type="secondary">@{displayUsername}</Text>
               <Text type="secondary">Lv.{statsData.level} 学习者</Text>
               <Space size="large">
                 <Text>社区积分：<Text strong>{statsData.totalPoints}</Text></Text>
@@ -94,7 +110,7 @@ export default function StudentDashboard() {
         </Row>
       </Card>
 
-      {/* 统计数据卡片 */}
+      {/* Statistics Cards */}
       <Row gutter={16} style={{ marginTop: 24 }}>
         <Col span={6}>
           <Card>
@@ -138,7 +154,7 @@ export default function StudentDashboard() {
         </Col>
       </Row>
 
-      {/* 学习进度和近期活动 */}
+      {/* Learning Progress and Recent Activities */}
       <Row gutter={24} style={{ marginTop: 24 }}>
         <Col span={16}>
           <Card title="学习目标进度">
