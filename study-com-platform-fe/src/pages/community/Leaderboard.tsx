@@ -71,6 +71,11 @@ export default function Leaderboard() {
                     }),
                 );
                 setData(list);
+                
+                // 添加加载完成提示
+                if (list.length > 0) {
+                    message.success(`已加载${list.length}条${tabs.find(t => t.key === activeTab)?.label}数据`);
+                }
             } catch (err) {
                 message.error(err instanceof Error ? err.message : "加载失败");
             } finally {
@@ -596,7 +601,7 @@ export default function Leaderboard() {
                     paddingTop: 16
                 }}>
                     <div style={{
-                        display: "inline-flex",
+                        display: "flex",
                         alignItems: "center",
                         gap: 12,
                         background: "rgba(255, 255, 255, 0.95)",
@@ -605,7 +610,8 @@ export default function Leaderboard() {
                         boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
                         marginBottom: 16,
                         backdropFilter: "blur(10px)",
-                        border: "1px solid rgba(255, 255, 255, 0.3)"
+                        border: "1px solid rgba(255, 255, 255, 0.3)",
+                        animation: "pulse 2s infinite"
                     }}>
                         <TrophyOutlined style={{
                             fontSize: 28,
@@ -644,13 +650,16 @@ export default function Leaderboard() {
                 </div>
 
                 {/* 标签页 */}
-                <div style={{
-                    display: "flex",
-                    gap: 16,
-                    justifyContent: "center",
-                    marginBottom: 32,
-                    flexWrap: "wrap"
-                }}>
+                <div 
+                  style={{
+                      display: "flex",
+                      gap: 16,
+                      justifyContent: "center",
+                      marginBottom: 32,
+                      flexWrap: "wrap"
+                  }}
+                  className="leaderboard-tabs"
+                >
                     {tabs.map(tab => (
                         <div
                             key={tab.key}
@@ -662,23 +671,49 @@ export default function Leaderboard() {
                                 padding: "16px 24px",
                                 borderRadius: 16,
                                 cursor: "pointer",
-                                transition: "all 0.3s ease",
+                                transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
                                 display: "flex",
                                 alignItems: "center",
                                 gap: 10,
                                 minWidth: 180,
                                 justifyContent: "center",
                                 boxShadow: activeTab === tab.key
-                                    ? "0 8px 32px rgba(0,0,0,0.15)"
+                                    ? "0 12px 40px rgba(0,0,0,0.2)"
                                     : "0 4px 16px rgba(0,0,0,0.1)",
                                 border: activeTab === tab.key
                                     ? "2px solid #667eea"
                                     : "2px solid transparent",
-                                transform: activeTab === tab.key ? "translateY(-2px)" : "none",
+                                transform: activeTab === tab.key ? "translateY(-4px)" : "none",
                                 flexDirection: "column",
-                                textAlign: "center"
+                                textAlign: "center",
+                                position: "relative",
+                                overflow: "hidden"
+                            }}
+                            onMouseEnter={(e) => {
+                                if (activeTab !== tab.key) {
+                                    e.currentTarget.style.transform = "translateY(-2px)";
+                                    e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.15)";
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                if (activeTab !== tab.key) {
+                                    e.currentTarget.style.transform = "translateY(0)";
+                                    e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.1)";
+                                }
                             }}
                         >
+                            {/* 悬浮波纹效果 */}
+                            <div style={{
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                background: "linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)",
+                                opacity: activeTab === tab.key ? 1 : 0,
+                                transition: "opacity 0.3s ease",
+                                pointerEvents: "none"
+                            }} />
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                 <div style={{
                                     fontSize: 20,
@@ -878,21 +913,50 @@ export default function Leaderboard() {
                 {/* 自定义样式 */}
                 <style>
                     {`
+          @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+          }
+          
+          @keyframes fadeInUp {
+            from {
+              opacity: 0;
+              transform: translateY(20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          
           .leaderboard-top-row td {
             background: linear-gradient(90deg, rgba(102, 126, 234, 0.04) 0%, rgba(118, 75, 162, 0.02) 100%) !important;
+            animation: fadeInUp 0.5s ease-out;
           }
+          
           .ant-table-tbody > tr > td {
             padding: 20px 24px !important;
             border-bottom: 1px solid #F3F4F6;
+            transition: all 0.3s ease;
           }
+          
           .ant-table-tbody > tr:hover > td {
             background: #F9FAFB !important;
+            transform: translateX(4px);
           }
+          
           .leaderboard-top-row:hover > td {
             background: linear-gradient(90deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.04) 100%) !important;
           }
+          
           .ant-card-loading .ant-card-body {
             padding: 48px;
+          }
+          
+          /* 标签页切换动画 */
+          .tab-transition {
+            animation: fadeInUp 0.3s ease-out;
           }
         `}
                 </style>

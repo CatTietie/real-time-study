@@ -1,9 +1,7 @@
 import { 
   Card, 
   Row, 
-  Col, 
-  Statistic, 
-  Timeline, 
+  Col,
   Avatar, 
   Space, 
   Typography,
@@ -11,19 +9,13 @@ import {
   List,
   Tag,
   message,
-  Spin,
   Button,
-  Divider
 } from "antd";
 import { 
-  UserOutlined, 
-  TrophyOutlined, 
-  ClockCircleOutlined,
+  UserOutlined,
   FireOutlined,
-  BookOutlined,
   TeamOutlined,
   EditOutlined,
-  HeartOutlined
 } from "@ant-design/icons";
 import { useEffect, useState } from "react";
 import { useAppSelector } from "../../app/hooks";
@@ -143,6 +135,17 @@ export default function StudentDashboard() {
 
     console.log('🔍 触发数据获取...');
     fetchUserProfile();
+    
+    // 添加定时刷新机制（每30秒刷新一次）
+    const intervalId = setInterval(() => {
+      console.log('⏰ 定时刷新用户数据');
+      fetchUserProfile();
+    }, 30000);
+    
+    // 清理定时器
+    return () => {
+      clearInterval(intervalId);
+    };
   }, [userId]);
 
   // 今日目标进度状态
@@ -297,6 +300,28 @@ export default function StudentDashboard() {
               }}>
                 <FireOutlined />
                 今日目标进度
+                <Button 
+                  type="link" 
+                  size="small" 
+                  onClick={async () => {
+                    console.log('手动刷新用户数据');
+                    setLoading(true);
+                    try {
+                      const response = await api.get(`/user/profile/${userId}`);
+                      if (response.data.success) {
+                        setUserProfile(response.data.data);
+                        message.success('数据已刷新');
+                      }
+                    } catch (error) {
+                      message.error('刷新失败');
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  style={{ padding: '0 8px', fontSize: 12 }}
+                >
+                  🔄 刷新
+                </Button>
               </span>
             }
             style={{ height: '100%' }}
