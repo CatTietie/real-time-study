@@ -43,7 +43,7 @@ export default function StudentEntry() {
       title: "学习统计",
       description: "查看学习数据分析",
       icon: "📊",
-      onClick: () => navigate("/student/analytics"),
+      onClick: () => navigate("/student/learning-analytics"),
       color: "#722ed1"
     }
   ];

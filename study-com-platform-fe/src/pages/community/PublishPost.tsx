@@ -9,7 +9,6 @@ import {
   Typography,
   Upload,
   message,
-  Steps,
 } from "antd";
 import type { UploadFile } from "antd";
 import { useRef, useState } from "react";

@@ -21,6 +21,7 @@ import Favorites from "./pages/community/Favorites";
 import PointsCenter from "./pages/community/PointsCenter";
 import MyLikes from "./pages/community/MyLikes";
 import StudentDashboard from "./pages/student/Dashboard";
+import LearningAnalytics from "./pages/student/LearningAnalytics";
 import CommunityPosts from "./pages/admin/community/CommunityPosts";
 import CommunityComments from "./pages/admin/community/CommunityComments";
 import CommunityStats from "./pages/admin/community/CommunityStats";
@@ -74,7 +75,16 @@ function App() {
           } 
         />
         <Route path="/student/study-room" element={<ComingSoon />} />
-        <Route path="/student/analytics" element={<ComingSoon />} />
+        <Route 
+          path="/student/learning-analytics" 
+          element={
+            <RequireStudentAuth>
+              <StudentLayout>
+                <LearningAnalytics />
+              </StudentLayout>
+            </RequireStudentAuth>
+          } 
+        />
         <Route path="/student/settings" element={<ComingSoon />} />
         <Route path="/student/profile" element={<ComingSoon />} />
         

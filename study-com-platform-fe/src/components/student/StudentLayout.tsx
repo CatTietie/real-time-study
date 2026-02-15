@@ -41,9 +41,9 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       label: <Link to="/student/study-room">自习室</Link>,
     },
     {
-      key: "/student/analytics",
+      key: "/student/learning-analytics",
       icon: <BarChartOutlined />,
-      label: <Link to="/student/analytics">学习统计</Link>,
+      label: <Link to="/student/learning-analytics">学习统计</Link>,
     },
     {
       key: "/student/settings",
