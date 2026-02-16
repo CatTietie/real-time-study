@@ -7,6 +7,18 @@ export const fetchCommunityPosts = async (params?: QueryParams) => {
   return response.data;
 };
 
+// 获取用户所有帖子数据用于趋势分析
+export const fetchUserAllPostsForTrend = async (userId: number) => {
+  const response = await api.get(`/community/posts`, { 
+    params: { 
+      userId, 
+      page: 1, 
+      pageSize: 1000 // 获取所有帖子
+    } 
+  });
+  return response.data;
+};
+
 export const updateCommunityPostStatus = async (
   id: number,
   payload: { status: number; reason?: string },
