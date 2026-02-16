@@ -339,14 +339,10 @@ export default function PublishPost() {
                         padding: "8px 20px"
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = "#667eea";
-                        e.currentTarget.style.background = "white";
                         e.currentTarget.style.transform = "translateY(-2px)";
                         e.currentTarget.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.2)";
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = "#E5E7EB";
-                        e.currentTarget.style.background = "#FAFAFA";
                         e.currentTarget.style.transform = "translateY(0)";
                         e.currentTarget.style.boxShadow = "none";
                       }}
@@ -700,9 +696,36 @@ export default function PublishPost() {
           </Space>
         </div>
 
-        {/* 响应式样式 */}
+        {/* 自定义样式覆盖 */}
         <style>
           {`
+            /* 分类选择按钮样式调整 */
+            .ant-radio-group.ant-radio-group-large .ant-radio-button-wrapper {
+              border-color: #E5E7EB !important;
+              background: #FAFAFA !important;
+              color: #374151 !important;
+            }
+            
+            .ant-radio-group.ant-radio-group-large .ant-radio-button-wrapper:hover {
+              border-color: #667eea !important;
+              background: white !important;
+              color: #667eea !important;
+            }
+            
+            .ant-radio-group.ant-radio-group-large .ant-radio-button-wrapper-checked {
+              border-color: #667eea !important;
+              background: white !important;
+              color: #667eea !important;
+              box-shadow: none !important;
+            }
+            
+            .ant-radio-group.ant-radio-group-large .ant-radio-button-wrapper-checked:hover {
+              border-color: #667eea !important;
+              background: white !important;
+              color: #667eea !important;
+            }
+            
+            /* 响应式样式 */
             @media (max-width: 768px) {
               .publish-grid {
                 grid-template-columns: 1fr !important;

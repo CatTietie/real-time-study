@@ -61,7 +61,7 @@ export default function Leaderboard() {
                 };
 
                 const res = await fetchCommunityLeaderboardByType(typeMap[activeTab as keyof typeof typeMap]);
-                const list = ((res?.data as LeaderboardRow[] | undefined) || []).map(
+                const fullList = ((res?.data as LeaderboardRow[] | undefined) || []).map(
                     (item, index) => ({
                         ...item,
                         key: item.key ?? item.id ?? index,
@@ -70,6 +70,8 @@ export default function Leaderboard() {
                         author_username: item.user_username || item.author?.username || item.Post?.User?.username || item.username,
                     }),
                 );
+                // 只取前10条数据
+                const list = fullList.slice(0, 10);
                 setData(list);
                 
                 // 添加加载完成提示
@@ -776,7 +778,7 @@ export default function Leaderboard() {
                                     color: "white",
                                     fontWeight: 600
                                 }}>
-                                    {tabs.find(t => t.key === activeTab)?.label} TOP 10
+                                    {tabs.find(t => t.key === activeTab)?.label} 前10名
                                 </Title>
                                 <div style={{
                                     fontSize: 13,
@@ -874,8 +876,8 @@ export default function Leaderboard() {
                         gap: 12
                     }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <span>🎯</span>
-                            <span>榜单每周一更新，数据截止至昨日24:00</span>
+                            <span>🏆</span>
+                            <span>仅展示前10名，完整榜单请关注每周更新</span>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <span>📅</span>
@@ -900,13 +902,13 @@ export default function Leaderboard() {
                     backdropFilter: "blur(10px)",
                     border: "1px solid rgba(255, 255, 255, 0.2)"
                 }}>
-                    <p style={{ margin: 0 }}>💡 <strong>上榜不仅带来荣誉，还能获得更多社区曝光机会！</strong></p>
+                    <p style={{ margin: 0 }}>💡 <strong>上榜前10名不仅带来荣誉，还能获得更多社区曝光机会！</strong></p>
                     <p style={{ margin: "8px 0 0 0", fontSize: 13, opacity: 0.8 }}>
                         {activeTab === "posts"
-                            ? "热门内容根据浏览量×0.5 + 点赞数×2 + 评论数综合计算"
+                            ? "热门内容根据浏览量×0.5 + 点赞数×2 + 评论数综合计算，仅展示前10名"
                             : activeTab === "comments"
-                                ? "评论之星根据用户发布的评论数量进行排名"
-                                : "社区达人根据用户在社区积累的总积分进行排名"}
+                                ? "评论之星根据用户发布的评论数量进行排名，仅展示前10名"
+                                : "社区达人根据用户在社区积累的总积分进行排名，仅展示前10名"}
                     </p>
                 </div>
 
