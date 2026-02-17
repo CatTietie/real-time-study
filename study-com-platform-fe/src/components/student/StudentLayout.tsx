@@ -46,9 +46,9 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       label: <Link to="/student/learning-analytics">学习统计</Link>,
     },
     {
-      key: "/student/settings",
+      key: "/student/profile",
       icon: <SettingOutlined />,
-      label: <Link to="/student/settings">个人设置</Link>,
+      label: <Link to="/student/profile">个人设置</Link>,
     },
   ];
 

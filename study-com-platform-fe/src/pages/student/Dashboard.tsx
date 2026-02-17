@@ -261,11 +261,19 @@ export default function StudentDashboard() {
                 {displayName}
                 <EditOutlined 
                   style={{ fontSize: 16, color: '#1890ff', marginLeft: 12, cursor: 'pointer' }}
-                  onClick={() => message.info('编辑功能待开发')} 
+                  onClick={() => navigate('/student/profile')} 
                 />
               </Title>
               <Text type="secondary">@{displayUsername}</Text>
               <Text type="secondary">Lv.{statsData.level || 1} 学习者</Text>
+              <Button 
+                type="link" 
+                icon={<EditOutlined />}
+                onClick={() => navigate('/student/profile')}
+                style={{ padding: 0, fontSize: 14 }}
+              >
+                个人设置
+              </Button>
               <Space size="large">
                 <Text>社区积分：<Text strong>{statsData.points}</Text></Text>
                 <Text>等级：<Text strong>Lv.{statsData.level}</Text></Text>

@@ -22,6 +22,7 @@ import PointsCenter from "./pages/community/PointsCenter";
 import MyLikes from "./pages/community/MyLikes";
 import StudentDashboard from "./pages/student/Dashboard";
 import LearningAnalytics from "./pages/student/LearningAnalytics";
+import ProfileEdit from "./pages/student/ProfileEdit";
 import CommunityPosts from "./pages/admin/community/CommunityPosts";
 import CommunityComments from "./pages/admin/community/CommunityComments";
 import CommunityStats from "./pages/admin/community/CommunityStats";
@@ -85,8 +86,17 @@ function App() {
             </RequireStudentAuth>
           } 
         />
+        <Route 
+          path="/student/profile" 
+          element={
+            <RequireStudentAuth>
+              <StudentLayout>
+                <ProfileEdit />
+              </StudentLayout>
+            </RequireStudentAuth>
+          } 
+        />
         <Route path="/student/settings" element={<ComingSoon />} />
-        <Route path="/student/profile" element={<ComingSoon />} />
         
         
         
