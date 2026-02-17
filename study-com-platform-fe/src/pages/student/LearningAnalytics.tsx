@@ -156,17 +156,14 @@ const generateFallbackTrendData = (): TrendDataPoint[] => {
   const data: TrendDataPoint[] = [];
   const today = new Date();
 
+  // 对于新用户，所有数据都应该为0
   for (let i = 29; i >= 0; i--) {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
-    const basePosts = 2;
-    const variation = Math.sin(i * 0.3) * 1.5;
-    const randomFactor = (Math.random() - 0.5) * 2;
-    const postsCount = Math.max(0, Math.round(basePosts + variation + randomFactor));
-
+    
     data.push({
       date: date.toISOString().split('T')[0],
-      postsCount
+      postsCount: 0  // 新用户没有发帖记录，所以都为0
     });
   }
 
@@ -215,7 +212,9 @@ const TrendChart = ({ userPosts, fallbackStudyData }: TrendChartProps) => {
 
     const option = {
       title: {
-        text: '📈 发帖数量趋势 (近7天)',
+        text: postsCounts.every(count => count === 0) 
+          ? '📈 发帖数量趋势 (暂无发帖记录)' 
+          : '📈 发帖数量趋势 (近7天)',
         left: 'center',
         textStyle: {
           color: '#1f2937',
@@ -246,7 +245,7 @@ const TrendChart = ({ userPosts, fallbackStudyData }: TrendChartProps) => {
       yAxis: {
         type: 'value',
         min: 0,
-        max: Math.max(5, Math.max(...postsCounts) + 1),
+        max: postsCounts.every(count => count === 0) ? 1 : Math.max(5, Math.max(...postsCounts) + 1),
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: { color: '#6b7280', fontSize: 12 },
