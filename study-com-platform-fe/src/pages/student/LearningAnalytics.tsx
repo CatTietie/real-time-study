@@ -12,8 +12,11 @@ import {
   message,
   Spin
 } from "antd";
+import { SyncOutlined } from "@ant-design/icons";
 import * as echarts from 'echarts';
 import { useRef, useEffect } from "react";
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 import {
   BarChartOutlined,
   CalendarOutlined,
@@ -27,7 +30,7 @@ import { useAppSelector } from "../../app/hooks";
 import type { RootState } from "../../app/store";
 import CommunityFooter from "../../components/community/CommunityFooter";
 import api from "../../services/api";
-import { fetchCommunityPosts, fetchUserAllPostsForTrend } from "../../services/community";
+
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -38,7 +41,10 @@ interface StudyStat {
   date: string;
   postsCount: number; // 发帖数量
   todayPosts: number; // 今日发帖数量
-  taskCompletion: number; // 任务完成率(%)
+  viewCount: number; // 当日总浏览量
+  viewChange: number; // 相比前一天的变化量
+  viewChangePercent: number; // 相比前一天的变化百分比
+  viewChangeType: 'increase' | 'decrease' | 'no-change'; // 变化类型
   communityPoints: number; // 社区积分
   commentsMade: number; // 评论数
   likesReceived: number; // 获得点赞数
@@ -57,6 +63,9 @@ interface PostData {
   title: string;
   content: string;
   created_at: string;   // 注意字段名为 created_at
+  view_count: number;   // 浏览量
+  like_count: number;   // 点赞数
+  comment_count: number; // 评论数
   // 其他字段...
   [key: string]: unknown;
 }
@@ -314,86 +323,118 @@ const TrendChart = ({ userPosts, fallbackStudyData }: TrendChartProps) => {
   );
 };
 
-// 静态模拟数据（保持不变）
-const generateMockData = (userProfile: UserProfile | null): StudyStat[] => {
-  const data: StudyStat[] = [];
+// 从后端接口数据生成学习统计数据
+const generateStudyDataFromApi = (posts: PostData[]): StudyStat[] => {
+  if (!posts || posts.length === 0) {
+    return [];
+  }
+
+  // 按日期聚合数据
+  const dateMap = new Map<string, {
+    postsCount: number;
+    viewCount: number;
+    commentsMade: number;
+    likesReceived: number;
+    communityPoints: number;
+  }>();
+
+  posts.forEach(post => {
+    try {
+      const dateStr = post.created_at;
+      if (!dateStr) return;
+      
+      const postDate = new Date(dateStr);
+      if (isNaN(postDate.getTime())) return;
+      
+      const date = postDate.toISOString().split('T')[0];
+      
+      const currentDateData = dateMap.get(date) || {
+        postsCount: 0,
+        viewCount: 0,
+        commentsMade: 0,
+        likesReceived: 0,
+        communityPoints: 0
+      };
+      
+      dateMap.set(date, {
+        postsCount: currentDateData.postsCount + 1,
+        viewCount: currentDateData.viewCount + (post.view_count || 0),
+        commentsMade: currentDateData.commentsMade + (post.comment_count || 0),
+        likesReceived: currentDateData.likesReceived + (post.like_count || 0),
+        communityPoints: currentDateData.communityPoints + (post.like_count || 0) * 10 + (post.comment_count || 0) * 5 // 假设点赞10分，评论5分
+      });
+    } catch (error) {
+      console.warn('处理帖子数据时出错:', post, error);
+    }
+  });
+
+  const result: StudyStat[] = [];
+
+  // 生成最近30天的数据
   const today = new Date();
-
-  const todayGoals = {
-    posts: userProfile?.todayPosts || 0,
-    comments: userProfile?.todayComments || 0,
-    likes: userProfile?.todayLikes || 0,
-    hotPosts: userProfile?.hotPostsCount || 0
-  };
-
-  const GOAL_CONFIG = {
-    posts: 3,
-    comments: 20,
-    likes: 50,
-    hotPosts: 3
-  };
-
-  const completedToday = [
-    todayGoals.posts >= GOAL_CONFIG.posts,
-    todayGoals.comments >= GOAL_CONFIG.comments,
-    todayGoals.likes >= GOAL_CONFIG.likes,
-    todayGoals.hotPosts >= GOAL_CONFIG.hotPosts
-  ].filter(Boolean).length;
-
-  const todayTaskCompletion = Math.round((completedToday / 4) * 100);
-  const totalPosts = userProfile?.totalPosts || userProfile?.hotPostsCount || 0;
-
   for (let i = 29; i >= 0; i--) {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
-    data.push({
-      date: date.toISOString().split('T')[0],
-      postsCount: totalPosts,
-      todayPosts: userProfile?.todayPosts || 0,
-      taskCompletion: todayTaskCompletion,
-      communityPoints: userProfile?.points || 0,
-      commentsMade: userProfile?.todayComments || 0,
-      likesReceived: userProfile?.todayLikes || 0
+    const dateStr = date.toISOString().split('T')[0];
+    
+    const currentData = dateMap.get(dateStr);
+    const yesterdayDate = new Date(date);
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+    const yesterdayData = dateMap.get(yesterdayStr);
+    
+    let viewChange = 0;
+    let viewChangePercent = 0;
+    let viewChangeType: 'increase' | 'decrease' | 'no-change' = 'no-change';
+    
+    if (currentData) {
+      if (yesterdayData) {
+        viewChange = currentData.viewCount - yesterdayData.viewCount;
+        viewChangePercent = yesterdayData.viewCount > 0 
+          ? Math.round((viewChange / yesterdayData.viewCount) * 100)
+          : (viewChange > 0 ? 100 : 0);
+        viewChangeType = viewChange > 0 ? 'increase' : viewChange < 0 ? 'decrease' : 'no-change';
+      } else {
+        // 昨天没有数据，今天有数据则视为增长
+        viewChange = currentData.viewCount;
+        viewChangePercent = 100;
+        viewChangeType = 'increase';
+      }
+    }
+    
+    result.push({
+      date: dateStr,
+      postsCount: currentData?.postsCount || 0,
+      todayPosts: currentData?.postsCount || 0,
+      viewCount: currentData?.viewCount || 0,
+      viewChange,
+      viewChangePercent,
+      viewChangeType,
+      communityPoints: currentData?.communityPoints || 0,
+      commentsMade: currentData?.commentsMade || 0,
+      likesReceived: currentData?.likesReceived || 0
     });
   }
 
-  return data;
+  return result;
 };
 
 const generateWeeklySummary = (data: StudyStat[], userProfile: UserProfile | null): WeeklySummary => {
   const totalPosts = userProfile?.totalPosts || userProfile?.hotPostsCount || 0;
   const todayPosts = userProfile?.todayPosts || 0;
-
-  const todayGoals = {
-    posts: userProfile?.todayPosts || 0,
-    comments: userProfile?.todayComments || 0,
-    likes: userProfile?.todayLikes || 0,
-    hotPosts: userProfile?.hotPostsCount || 0
-  };
-
-  const GOAL_CONFIG = {
-    posts: 3,
-    comments: 20,
-    likes: 50,
-    hotPosts: 3
-  };
-
-  const completedTasks = [
-    todayGoals.posts >= GOAL_CONFIG.posts,
-    todayGoals.comments >= GOAL_CONFIG.comments,
-    todayGoals.likes >= GOAL_CONFIG.likes,
-    todayGoals.hotPosts >= GOAL_CONFIG.hotPosts
-  ].filter(Boolean).length;
-
-  const taskCompletionRate = Math.round((completedTasks / 4) * 100);
   const totalCommunityPoints = userProfile?.points || 0;
+  
+  // 计算平均浏览量作为任务完成率的替代
+  const avgViewCount = data.length > 0 
+    ? Math.round(data.reduce((sum, day) => sum + day.viewCount, 0) / data.length)
+    : 0;
 
   return {
     totalPosts,
     todayPosts,
-    taskCompletionRate,
+    taskCompletionRate: Math.min(100, Math.max(0, avgViewCount)), // 使用平均浏览量替代
     totalCommunityPoints,
-    completedTasks,
+    completedTasks: Math.floor(avgViewCount / 50), // 基于浏览量计算完成任务数
     rank: userProfile?.rank || 1,
     hotPostsCount: userProfile?.hotPostsCount || 0
   };
@@ -409,6 +450,62 @@ export default function LearningAnalytics() {
   const [userPosts, setUserPosts] = useState<PostData[]>([]);
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'custom'>('week');
 
+  // 导出统计数据到Excel
+  const exportToExcel = () => {
+    try {
+      // 准备详细数据
+      const exportData = studyData.map(day => ({
+        '日期': new Date(day.date).toLocaleDateString('zh-CN'),
+        '发帖数量': day.postsCount,
+        '浏览量': day.viewCount,
+        '浏览量变化': `${day.viewChange > 0 ? '+' : ''}${day.viewChange} (${day.viewChange > 0 ? '+' : ''}${day.viewChangePercent}%)`,
+        '社区积分': day.communityPoints,
+        '评论数': day.commentsMade,
+        '获赞数': day.likesReceived
+      }));
+
+      // 创建工作簿
+      const wb = XLSX.utils.book_new();
+      
+      // 添加详细数据表
+      const ws1 = XLSX.utils.json_to_sheet(exportData);
+      XLSX.utils.book_append_sheet(wb, ws1, '详细参与记录');
+
+      // 添加汇总数据表
+      const summaryData = [{
+        '统计项目': '累计发帖',
+        '数值': weeklySummary?.totalPosts || 0,
+        '单位': '篇'
+      }, {
+        '统计项目': '任务完成率',
+        '数值': weeklySummary?.taskCompletionRate || 0,
+        '单位': '%'
+      }, {
+        '统计项目': '社区积分',
+        '数值': weeklySummary?.totalCommunityPoints || 0,
+        '单位': '分'
+      }, {
+        '统计项目': '热榜帖子',
+        '数值': weeklySummary?.hotPostsCount || 0,
+        '单位': '篇'
+      }];
+      
+      const ws2 = XLSX.utils.json_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(wb, ws2, '数据汇总');
+
+      // 生成文件并下载
+      const fileName = `学习统计_${new Date().toISOString().split('T')[0]}.xlsx`;
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([wbout], { type: 'application/octet-stream' });
+      saveAs(blob, fileName);
+      
+      message.success('统计数据导出成功！');
+    } catch (error) {
+      console.error('导出失败:', error);
+      message.error('导出失败，请重试');
+    }
+  };
+
   useEffect(() => {
     void loadData();
   }, [userId]);
@@ -419,33 +516,33 @@ export default function LearningAnalytics() {
       console.log('开始加载学习统计数据，userId:', userId);
 
       if (userId) {
-        const [profileResponse, postsCountResponse, allPostsResponse] = await Promise.all([
-          api.get(`/user/profile/${userId}`),
-          fetchCommunityPosts({ userId, page: 1, pageSize: 1 }),
-          fetchUserAllPostsForTrend(userId)
-        ]);
+        // 获取用户所有帖子数据
+        const postsResponse = await api.get(`/community/posts?userId=${userId}&page=1&pageSize=1000`);
+        
+        console.log('用户帖子API响应:', postsResponse.data);
 
-        console.log('用户资料API响应:', profileResponse.data);
-        console.log('用户帖子总数API响应:', postsCountResponse);
-        console.log('用户所有帖子API响应:', allPostsResponse);
-
-        if (profileResponse.data.success) {
-          const userData = profileResponse.data.data;
-          const totalPostsCount = postsCountResponse?.pagination?.total || 0;
-          // 从 allPostsResponse 中提取帖子数组（假设 data 字段是帖子列表）
-          const userPostsData = allPostsResponse?.data || [];
+        if (postsResponse.data.success) {
+          const userPostsData: PostData[] = postsResponse.data.data || [];
           console.log('用户帖子数据:', userPostsData);
           setUserPosts(userPostsData);
 
-          const enhancedUserData = {
-            ...userData,
-            totalPosts: totalPostsCount
+          // 从帖子数据生成学习统计数据
+          const studyDataFromApi = generateStudyDataFromApi(userPostsData);
+          setStudyData(studyDataFromApi);
+          
+          // 生成汇总数据
+          const totalPostsCount = userPostsData.length;
+          const userProfileData: UserProfile = {
+            totalPosts: totalPostsCount,
+            todayPosts: studyDataFromApi[studyDataFromApi.length - 1]?.todayPosts || 0,
+            todayComments: studyDataFromApi[studyDataFromApi.length - 1]?.commentsMade || 0,
+            todayLikes: studyDataFromApi[studyDataFromApi.length - 1]?.likesReceived || 0,
+            points: studyDataFromApi.reduce((sum, day) => sum + day.communityPoints, 0),
+            hotPostsCount: userPostsData.filter(post => post.view_count > 50).length // 假设浏览量>50为热门帖子
           };
-
-          setUserProfile(enhancedUserData);
-          const mockData = generateMockData(enhancedUserData);
-          setStudyData(mockData);
-          const summary = generateWeeklySummary(mockData, enhancedUserData);
+          
+          setUserProfile(userProfileData);
+          const summary = generateWeeklySummary(studyDataFromApi, userProfileData);
           setWeeklySummary(summary);
           message.success('学习统计数据加载成功');
         } else {
@@ -453,7 +550,7 @@ export default function LearningAnalytics() {
         }
       } else {
         console.warn('未找到用户ID，使用默认数据');
-        const mockData = generateMockData(null);
+        const mockData = generateStudyDataFromApi([]);
         setStudyData(mockData);
         setUserPosts([]);
         const defaultSummary = generateWeeklySummary(mockData, null);
@@ -462,7 +559,7 @@ export default function LearningAnalytics() {
     } catch (error) {
       console.error('数据加载失败:', error);
       message.error('数据加载失败，使用默认数据');
-      const mockData = generateMockData(null);
+      const mockData = generateStudyDataFromApi([]);
       setStudyData(mockData);
       setUserPosts([]);
       const errorSummary = generateWeeklySummary(mockData, null);
@@ -495,7 +592,7 @@ export default function LearningAnalytics() {
 
         <div style={{ maxWidth: 1400, margin: "0 auto", position: "relative", zIndex: 1 }}>
           {/* 标题区域 */}
-          <div style={{ textAlign: "center", marginBottom: 32, paddingTop: 16 }}>
+          <div style={{ textAlign: "center", marginBottom: 24, paddingTop: 16 }}>
             <div style={{
               display: "inline-flex",
               alignItems: "center",
@@ -530,6 +627,45 @@ export default function LearningAnalytics() {
             }}>
               全面了解你的社区参与情况，追踪任务完成进度，提升学习活跃度
             </Text>
+          </div>
+
+          {/* 操作按钮区域 - 右上角 */}
+          <div style={{
+            position: "absolute",
+            top: 24,
+            right: 24,
+            zIndex: 10,
+            display: "flex",
+            gap: 12
+          }}>
+            <Button 
+              type="primary" 
+              icon={<DownloadOutlined />} 
+              size="large"
+              onClick={exportToExcel}
+              style={{ 
+                borderRadius: 24, 
+                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", 
+                border: "none",
+                padding: "0 16px"
+              }}
+            >
+              导出
+            </Button>
+            <Button 
+              onClick={loadData} 
+              size="large"
+              icon={<SyncOutlined />}
+              style={{ 
+                borderRadius: 24, 
+                borderColor: "#667eea", 
+                color: "#667eea",
+                background: "rgba(255, 255, 255, 0.9)",
+                padding: "0 16px"
+              }}
+            >
+              刷新
+            </Button>
           </div>
 
           <Spin spinning={loading}>
@@ -617,7 +753,7 @@ export default function LearningAnalytics() {
                     <tr style={{ background: "#fafafa" }}>
                       <th style={{ padding: "12px 16px", textAlign: "left", borderBottom: "2px solid #f0f0f0" }}>日期</th>
                       <th style={{ padding: "12px 16px", textAlign: "center", borderBottom: "2px solid #f0f0f0" }}>发帖数量</th>
-                      <th style={{ padding: "12px 16px", textAlign: "center", borderBottom: "2px solid #f0f0f0" }}>任务完成率</th>
+                      <th style={{ padding: "12px 16px", textAlign: "center", borderBottom: "2px solid #f0f0f0" }}>浏览量变化</th>
                       <th style={{ padding: "12px 16px", textAlign: "center", borderBottom: "2px solid #f0f0f0" }}>社区积分</th>
                       <th style={{ padding: "12px 16px", textAlign: "center", borderBottom: "2px solid #f0f0f0" }}>评论数</th>
                       <th style={{ padding: "12px 16px", textAlign: "center", borderBottom: "2px solid #f0f0f0" }}>获赞数</th>
@@ -633,10 +769,27 @@ export default function LearningAnalytics() {
                             <Text strong>{day.postsCount}</Text><Text type="secondary" style={{ fontSize: 12 }}> 篇</Text>
                           </td>
                           <td style={{ padding: "12px 16px", textAlign: "center" }}>
-                            <Progress percent={day.taskCompletion} size="small" showInfo={false}
-                                      strokeColor={day.taskCompletion > 80 ? "#52c41a" : day.taskCompletion > 60 ? "#faad14" : "#ff4d4f"}
-                                      style={{ width: 80, display: "inline-block" }} />
-                            <Text style={{ marginLeft: 8 }}>{day.taskCompletion}%</Text>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+                              <Text strong>{day.viewCount}</Text>
+                              <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                {day.viewChangeType === 'increase' ? (
+                                  <span style={{ color: "#52c41a", fontSize: "16px" }}>↑</span>
+                                ) : day.viewChangeType === 'decrease' ? (
+                                  <span style={{ color: "#ff4d4f", fontSize: "16px" }}>↓</span>
+                                ) : (
+                                  <span style={{ color: "#faad14", fontSize: "16px" }}>-</span>
+                                )}
+                                <Text 
+                                  style={{ 
+                                    color: day.viewChangeType === 'increase' ? "#52c41a" : 
+                                           day.viewChangeType === 'decrease' ? "#ff4d4f" : "#faad14",
+                                    fontSize: "12px" 
+                                  }}
+                                >
+                                  {day.viewChange > 0 ? '+' : ''}{day.viewChange} ({day.viewChange > 0 ? '+' : ''}{day.viewChangePercent}%)
+                                </Text>
+                              </div>
+                            </div>
                           </td>
                           <td style={{ padding: "12px 16px", textAlign: "center" }}>
                             <Text strong style={{ color: "#1890ff" }}>+{day.communityPoints}</Text>
@@ -652,26 +805,7 @@ export default function LearningAnalytics() {
             </div>
           </Spin>
 
-          <div style={{
-            textAlign: "center",
-            marginTop: 24,
-            padding: "20px",
-            background: "rgba(255, 255, 255, 0.9)",
-            borderRadius: 16,
-            backdropFilter: "blur(10px)",
-            border: "1px solid rgba(255, 255, 255, 0.3)"
-          }}>
-            <Space size="large">
-              <Button type="primary" icon={<DownloadOutlined />} size="large"
-                      style={{ borderRadius: 24, background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", border: "none" }}>
-                导出统计
-              </Button>
-              <Button onClick={loadData} size="large"
-                      style={{ borderRadius: 24, borderColor: "#667eea", color: "#667eea" }}>
-                刷新数据
-              </Button>
-            </Space>
-          </div>
+
         </div>
 
         <CommunityFooter style={{
