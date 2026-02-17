@@ -11,10 +11,9 @@ import {
   Space,
   Typography,
   Divider,
-  Slider,
-  Switch,
   InputNumber
 } from "antd";
+import { PlusOutlined, MinusOutlined } from "@ant-design/icons";
 import {
   UserOutlined,
   LockOutlined,
@@ -27,12 +26,81 @@ import {
   StarOutlined,
   EditOutlined
 } from "@ant-design/icons";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAppSelector } from "../../app/hooks";
 import type { RootState } from "../../app/store";
 import { useNavigate } from "react-router-dom";
+import api from "../../services/api";
 
 const { Title, Text } = Typography;
+
+// 自定义带步长按钮的输入组件
+interface InputNumberWithStepProps {
+  value?: number;
+  onChange?: (value: number | null) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  addonAfter?: React.ReactNode;
+  parser?: (value: string | undefined) => number | null;
+  formatter?: (value: number | undefined) => string;
+  size?: 'large' | 'middle' | 'small';
+  style?: React.CSSProperties;
+  [key: string]: unknown;
+}
+
+const InputNumberWithStep: React.FC<InputNumberWithStepProps> = ({
+  value,
+  onChange,
+  min,
+  max,
+  step = 100,
+  addonAfter,
+  parser,
+  formatter,
+  size = 'large',
+  style,
+  ...rest
+}) => {
+  const handleStep = (type: 'plus' | 'minus') => {
+    const currentValue = value ?? 0;
+    let newValue = type === 'plus' ? currentValue + step : currentValue - step;
+    // 限制在 min/max 范围内
+    if (min !== undefined) newValue = Math.max(min, newValue);
+    if (max !== undefined) newValue = Math.min(max, newValue);
+    onChange?.(newValue);
+  };
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', ...style }}>
+      <Button
+        icon={<MinusOutlined />}
+        onClick={() => handleStep('minus')}
+        size={size}
+        disabled={min !== undefined && value !== undefined && value <= min}
+      />
+      <InputNumber
+        value={value}
+        onChange={onChange}
+        min={min}
+        max={max}
+        step={1}
+        parser={parser}
+        formatter={formatter}
+        size={size}
+        addonAfter={addonAfter}
+        style={{ width: '100%', margin: '0 8px' }}
+        {...rest}
+      />
+      <Button
+        icon={<PlusOutlined />}
+        onClick={() => handleStep('plus')}
+        size={size}
+        disabled={max !== undefined && value !== undefined && value >= max}
+      />
+    </div>
+  );
+};
 
 interface ProfileFormData {
   nickname: string;
@@ -48,11 +116,12 @@ interface ProfileFormData {
 
 export default function ProfileEdit() {
   const authState = useAppSelector((state: RootState) => state.auth);
-  const { username, nickname } = authState;
+  const { username, nickname, userId } = authState;
   const navigate = useNavigate();
   const [form] = Form.useForm<ProfileFormData>();
   const [loading, setLoading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string>("");
+  const [goalsLoading, setGoalsLoading] = useState(false);
 
   // 默认表单数据
   const defaultFormData: ProfileFormData = {
@@ -67,8 +136,36 @@ export default function ProfileEdit() {
     goalPoints: 500
   };
 
+  // 获取用户学习目标
+  useEffect(() => {
+    if (userId) {
+      fetchLearningGoals();
+    }
+  }, [userId]);
+
+  const fetchLearningGoals = async () => {
+    setGoalsLoading(true);
+    try {
+      const response = await api.get('/learning-goals/me');
+      if (response.data.success && response.data.data) {
+        const goals = response.data.data;
+        form.setFieldsValue({
+          goalPosts: goals.goal_posts,
+          goalComments: goals.goal_comments,
+          goalHotPosts: goals.goal_hot_posts,
+          goalPoints: goals.goal_points
+        });
+      }
+    } catch (error) {
+      console.error('获取学习目标失败:', error);
+      message.warning('获取学习目标失败，使用默认值');
+    } finally {
+      setGoalsLoading(false);
+    }
+  };
+
   // 头像上传处理
-  const handleAvatarUpload = (info: any) => {
+  const handleAvatarUpload = (info: unknown) => {
     if (info.file.status === 'done') {
       // 模拟上传成功，实际应该调用后端API
       const mockUrl = URL.createObjectURL(info.file.originFileObj);
@@ -85,33 +182,40 @@ export default function ProfileEdit() {
     try {
       console.log('提交的表单数据:', values);
       
-      // 这里应该调用后端API保存用户资料
-      // await api.put('/user/profile', {
-      //   nickname: values.nickname,
-      //   avatar: avatarUrl,
-      //   goals: {
-      //     posts: values.goalPosts,
-      //     comments: values.goalComments,
-      //     hotPosts: values.goalHotPosts,
-      //     points: values.goalPoints
-      //   }
-      // });
+      // 保存学习目标
+      const goalsResponse = await api.post('/learning-goals/me', {
+        goal_posts: values.goalPosts,
+        goal_comments: values.goalComments,
+        goal_hot_posts: values.goalHotPosts,
+        goal_points: values.goalPoints
+      });
+      
+      if (!goalsResponse.data.success) {
+        throw new Error(goalsResponse.data.message || '保存学习目标失败');
+      }
+
+      // 保存用户基本信息（如果有修改）
+      if (values.nickname !== nickname) {
+        await api.put(`/user/${userId}`, {
+          nickname: values.nickname
+        });
+      }
 
       // 如果修改了密码
       if (values.newPassword) {
-        // await api.put('/user/password', {
-        //   currentPassword: values.currentPassword,
-        //   newPassword: values.newPassword
-        // });
+        await api.put(`/user/${userId}/password`, {
+          currentPassword: values.currentPassword,
+          newPassword: values.newPassword
+        });
       }
 
       message.success('个人资料更新成功！');
       setTimeout(() => {
         navigate('/student/dashboard');
       }, 1500);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('保存失败:', error);
-      message.error('保存失败，请重试');
+      message.error(error.response?.data?.message || error.message || '保存失败，请重试');
     } finally {
       setLoading(false);
     }
@@ -221,6 +325,23 @@ export default function ProfileEdit() {
             initialValues={defaultFormData}
             style={{ maxWidth: 1200, margin: "0 auto" }}
           >
+            {goalsLoading && (
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(255,255,255,0.7)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1000,
+                borderRadius: 16
+              }}>
+                <div>加载学习目标中...</div>
+              </div>
+            )}
             <Row gutter={[24, 24]}>
               {/* 左侧：基本信息 */}
               <Col xs={24} lg={12}>
@@ -427,12 +548,15 @@ export default function ProfileEdit() {
                           name="goalPosts"
                           style={{ margin: 0 }}
                         >
-                          <InputNumber
+                          <InputNumberWithStep
                             min={1}
                             max={20}
+                            step={1}
+                            addonAfter="篇/天"
+                            parser={(value) => value ? parseInt(value.replace(/[^\d]/g, ''), 10) : 0}
+                            formatter={(value) => `${value}`}
                             size="large"
                             style={{ width: "100%" }}
-                            addonAfter="篇/天"
                           />
                         </Form.Item>
                         <Text type="secondary" style={{ fontSize: 12, display: "block", marginTop: 8 }}>
@@ -457,12 +581,15 @@ export default function ProfileEdit() {
                           name="goalComments"
                           style={{ margin: 0 }}
                         >
-                          <InputNumber
+                          <InputNumberWithStep
                             min={5}
                             max={100}
+                            step={5}
+                            addonAfter="条/天"
+                            parser={(value) => value ? parseInt(value.replace(/[^\d]/g, ''), 10) : 0}
+                            formatter={(value) => `${value}`}
                             size="large"
                             style={{ width: "100%" }}
-                            addonAfter="条/天"
                           />
                         </Form.Item>
                         <Text type="secondary" style={{ fontSize: 12, display: "block", marginTop: 8 }}>
@@ -487,12 +614,15 @@ export default function ProfileEdit() {
                           name="goalHotPosts"
                           style={{ margin: 0 }}
                         >
-                          <InputNumber
+                          <InputNumberWithStep
                             min={0}
                             max={10}
+                            step={1}
+                            addonAfter="篇/周"
+                            parser={(value) => value ? parseInt(value.replace(/[^\d]/g, ''), 10) : 0}
+                            formatter={(value) => `${value}`}
                             size="large"
                             style={{ width: "100%" }}
-                            addonAfter="篇/周"
                           />
                         </Form.Item>
                         <Text type="secondary" style={{ fontSize: 12, display: "block", marginTop: 8 }}>
@@ -517,13 +647,15 @@ export default function ProfileEdit() {
                           name="goalPoints"
                           style={{ margin: 0 }}
                         >
-                          <InputNumber
+                          <InputNumberWithStep
                             min={100}
                             max={5000}
                             step={100}
+                            addonAfter="分/月"
+                            parser={(value) => value ? parseInt(value.replace(/[^\d]/g, ''), 10) : 0}
+                            formatter={(value) => `${value}`}
                             size="large"
                             style={{ width: "100%" }}
-                            addonAfter="分/月"
                           />
                         </Form.Item>
                         <Text type="secondary" style={{ fontSize: 12, display: "block", marginTop: 8 }}>

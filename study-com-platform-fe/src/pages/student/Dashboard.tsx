@@ -40,7 +40,7 @@ interface UserProfile {
   status: number;
 }
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 
 export default function StudentDashboard() {
   console.log('=== Dashboard 组件开始执行 ===');
@@ -53,7 +53,7 @@ export default function StudentDashboard() {
   
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [userPosts, setUserPosts] = useState<any[]>([]);
+  const [userPosts, setUserPosts] = useState<Array<Record<string, unknown>>>([]);
   const [postsLoading, setPostsLoading] = useState(false);
   const navigate = useNavigate();
   
@@ -76,26 +76,26 @@ export default function StudentDashboard() {
   // 强制使用默认数据显示（临时测试）
   // const statsData = defaultStatsData;
 
-  const recentActivities = [
-    {
-      activity: "发布了新帖子",
-      content: "《React Hooks 学习心得》",
-      time: "2小时前",
-      type: "post"
-    },
-    {
-      activity: "获得了社区积分",
-      content: "+50 积分（优质内容奖励）",
-      time: "昨天",
-      type: "points"
-    },
-    {
-      activity: "参与了讨论",
-      content: "回复了《算法学习疑问》",
-      time: "前天",
-      type: "comment"
-    }
-  ];
+  // const recentActivities = [
+  //   {
+  //     activity: "发布了新帖子",
+  //     content: "《React Hooks 学习心得》",
+  //     time: "2小时前",
+  //     type: "post"
+  //   },
+  //   {
+  //     activity: "获得了社区积分",
+  //     content: "+50 积分（优质内容奖励）",
+  //     time: "昨天",
+  //     type: "points"
+  //   },
+  //   {
+  //     activity: "参与了讨论",
+  //     content: "回复了《算法学习疑问》",
+  //     time: "前天",
+  //     type: "comment"
+  //   }
+  // ];
 
   // 获取用户资料数据
   useEffect(() => {
@@ -157,15 +157,15 @@ export default function StudentDashboard() {
   });
   
   // 浏览记录状态（不再使用localStorage）
-  const [viewedPosts, setViewedPosts] = useState<Set<number>>(new Set());
+  // const [viewedPosts, setViewedPosts] = useState<Set<number>>(new Set());
   
-  // 目标值配置
-  const GOAL_CONFIG = {
+  // 目标值配置（从学习目标获取）
+  const [GOAL_CONFIG, setGoalConfig] = useState({
     posts: 3,      // 发帖目标
     comments: 20,  // 评论目标
     likes: 50,     // 点赞目标
-    hotPosts: 3    // 热榜帖子目标
-  };
+    hotPosts: 1    // 热榜帖子目标
+  });
 
   // Displayed username and nickname
   const displayName = userProfile?.nickname || nickname || username || "学生用户";
@@ -178,6 +178,31 @@ export default function StudentDashboard() {
   
   // 不再需要初始化浏览记录，使用真实数据
   
+  // 获取用户学习目标配置
+  useEffect(() => {
+    const fetchLearningGoals = async () => {
+      if (!userId) return;
+      
+      try {
+        const response = await api.get('/learning-goals/me');
+        if (response.data.success && response.data.data) {
+          const goals = response.data.data;
+          setGoalConfig({
+            posts: goals.goal_posts,
+            comments: goals.goal_comments,
+            likes: 50, // 点赞目标暂时固定
+            hotPosts: goals.goal_hot_posts
+          });
+        }
+      } catch (error) {
+        console.error('获取学习目标配置失败:', error);
+        // 使用默认值
+      }
+    };
+    
+    fetchLearningGoals();
+  }, [userId]);
+
   // 更新今日目标数据（包括热榜帖子数量）
   useEffect(() => {
     if (userProfile) {
@@ -197,14 +222,14 @@ export default function StudentDashboard() {
   console.log('显示数据:', { displayName, displayUsername, statsData });
   
   // 模拟浏览帖子函数（演示用）
-  const simulateViewPost = (postId: number) => {
-    setViewedPosts(prev => {
-      const newSet = new Set(prev);
-      newSet.add(postId);
-      return newSet;
-    });
-    message.success(`浏览了帖子 ${postId}，浏览任务 +1`);
-  };
+  // const simulateViewPost = (postId: number) => {
+  //   setViewedPosts(prev => {
+  //     const newSet = new Set(prev);
+  //     newSet.add(postId);
+  //     return newSet;
+  //   });
+  //   message.success(`浏览了帖子 ${postId}，浏览任务 +1`);
+  // };
   
   // 获取用户发布的帖子
   const fetchUserPosts = async () => {
@@ -320,7 +345,7 @@ export default function StudentDashboard() {
                         setUserProfile(response.data.data);
                         message.success('数据已刷新');
                       }
-                    } catch (error) {
+                    } catch (_err) {
                       message.error('刷新失败');
                     } finally {
                       setLoading(false);
@@ -510,7 +535,7 @@ export default function StudentDashboard() {
             <List
               loading={postsLoading}
               dataSource={userPosts}
-              renderItem={(post: any) => (
+              renderItem={(post: Record<string, unknown>) => (
                 <List.Item 
                   style={{ 
                     padding: '12px 0', 

@@ -24,3 +24,10 @@ export const getUserByUsername = async (username: string) => {
 export const getAllUsers = async () => {
   return await User.findAll();
 };
+
+// 获取用户基本信息（用于学习目标设置）
+export const getUserBasicInfo = async (userId: number) => {
+  return await User.findByPk(userId, {
+    attributes: ['id', 'username', 'nickname']
+  });
+};

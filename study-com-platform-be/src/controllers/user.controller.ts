@@ -7,6 +7,7 @@ import Permission from "../models/permission.model";
 import Post from "../models/post.model";
 import Comment from "../models/comment.model";
 import ViewRecord from "../models/view-record.model";
+import { LearningGoal } from "../models/learning-goal.model";
 import { Op, Sequelize } from "sequelize";
 import { comparePassword, hashPassword } from "../utils/password";
 import { generateToken } from "../services/auth.service";
@@ -42,6 +43,25 @@ export const register = async (req: Request, res: Response) => {
       status: 1,
       points: 0,
     });
+
+    // 为新注册的学生用户创建默认学习目标
+    if (user.role === "student") {
+      try {
+        await LearningGoal.create({
+          user_id: user.id,
+          nickname: user.nickname,
+          username: user.username,
+          goal_posts: 3,      // 发帖3篇/天
+          goal_comments: 5,   // 评论5条/天
+          goal_hot_posts: 2,  // 热榜目标2篇/周
+          goal_points: 50     // 积分目标50分/月
+        });
+        console.log(`✅ 为用户 ${user.username} 创建了默认学习目标`);
+      } catch (goalError) {
+        console.error(`❌ 创建学习目标失败:`, goalError);
+        // 不影响用户注册流程，即使学习目标创建失败也要继续
+      }
+    }
 
     res.json({
       success: true,
