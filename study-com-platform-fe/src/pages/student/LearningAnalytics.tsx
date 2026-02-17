@@ -323,6 +323,14 @@ const TrendChart = ({ userPosts, fallbackStudyData }: TrendChartProps) => {
   );
 };
 
+// 学习目标类型定义
+interface LearningGoals {
+  goal_posts: number;
+  goal_comments: number;
+  goal_hot_posts: number;
+  goal_points: number;
+}
+
 // 从后端接口数据生成学习统计数据
 const generateStudyDataFromApi = (posts: PostData[]): StudyStat[] => {
   if (!posts || posts.length === 0) {
@@ -335,7 +343,6 @@ const generateStudyDataFromApi = (posts: PostData[]): StudyStat[] => {
     viewCount: number;
     commentsMade: number;
     likesReceived: number;
-    communityPoints: number;
   }>();
 
   posts.forEach(post => {
@@ -352,16 +359,14 @@ const generateStudyDataFromApi = (posts: PostData[]): StudyStat[] => {
         postsCount: 0,
         viewCount: 0,
         commentsMade: 0,
-        likesReceived: 0,
-        communityPoints: 0
+        likesReceived: 0
       };
       
       dateMap.set(date, {
         postsCount: currentDateData.postsCount + 1,
         viewCount: currentDateData.viewCount + (post.view_count || 0),
         commentsMade: currentDateData.commentsMade + (post.comment_count || 0),
-        likesReceived: currentDateData.likesReceived + (post.like_count || 0),
-        communityPoints: currentDateData.communityPoints + (post.like_count || 0) * 10 + (post.comment_count || 0) * 5 // 假设点赞10分，评论5分
+        likesReceived: currentDateData.likesReceived + (post.like_count || 0)
       });
     } catch (error) {
       console.warn('处理帖子数据时出错:', post, error);
@@ -410,7 +415,7 @@ const generateStudyDataFromApi = (posts: PostData[]): StudyStat[] => {
       viewChange,
       viewChangePercent,
       viewChangeType,
-      communityPoints: currentData?.communityPoints || 0,
+      communityPoints: 0, // 社区积分从用户资料获取
       commentsMade: currentData?.commentsMade || 0,
       likesReceived: currentData?.likesReceived || 0
     });
@@ -419,22 +424,46 @@ const generateStudyDataFromApi = (posts: PostData[]): StudyStat[] => {
   return result;
 };
 
-const generateWeeklySummary = (data: StudyStat[], userProfile: UserProfile | null): WeeklySummary => {
+const generateWeeklySummary = (data: StudyStat[], userProfile: UserProfile | null, learningGoals: LearningGoals | null): WeeklySummary => {
   const totalPosts = userProfile?.totalPosts || userProfile?.hotPostsCount || 0;
   const todayPosts = userProfile?.todayPosts || 0;
   const totalCommunityPoints = userProfile?.points || 0;
   
-  // 计算平均浏览量作为任务完成率的替代
-  const avgViewCount = data.length > 0 
-    ? Math.round(data.reduce((sum, day) => sum + day.viewCount, 0) / data.length)
+  // 基于学习目标计算任务完成率
+  const goalPosts = learningGoals?.goal_posts || 3;
+  const goalComments = learningGoals?.goal_comments || 20;
+  const goalHotPosts = learningGoals?.goal_hot_posts || 1;
+  const goalPoints = learningGoals?.goal_points || 500;
+  
+  // 计算各项任务完成度
+  const postsCompletion = Math.min(100, Math.round((todayPosts / goalPosts) * 100));
+  const commentsCompletion = userProfile?.todayComments !== undefined 
+    ? Math.min(100, Math.round((userProfile.todayComments / goalComments) * 100))
     : 0;
+  const hotPostsCompletion = userProfile?.hotPostsCount !== undefined
+    ? Math.min(100, Math.round((userProfile.hotPostsCount / goalHotPosts) * 100))
+    : 0;
+  const pointsCompletion = totalCommunityPoints !== undefined
+    ? Math.min(100, Math.round((totalCommunityPoints / goalPoints) * 100))
+    : 0;
+  
+  // 综合任务完成率（平均值）
+  const taskCompletionRate = Math.round((postsCompletion + commentsCompletion + hotPostsCompletion + pointsCompletion) / 4);
+  
+  // 计算已完成的任务数（达到80%以上算完成）
+  const completedTasks = [
+    postsCompletion >= 80 ? 1 : 0,
+    commentsCompletion >= 80 ? 1 : 0,
+    hotPostsCompletion >= 80 ? 1 : 0,
+    pointsCompletion >= 80 ? 1 : 0
+  ].reduce((sum, val) => sum + val, 0);
 
   return {
     totalPosts,
     todayPosts,
-    taskCompletionRate: Math.min(100, Math.max(0, avgViewCount)), // 使用平均浏览量替代
+    taskCompletionRate: Math.max(0, Math.min(100, taskCompletionRate)),
     totalCommunityPoints,
-    completedTasks: Math.floor(avgViewCount / 50), // 基于浏览量计算完成任务数
+    completedTasks,
     rank: userProfile?.rank || 1,
     hotPostsCount: userProfile?.hotPostsCount || 0
   };
@@ -510,12 +539,33 @@ export default function LearningAnalytics() {
     void loadData();
   }, [userId]);
 
+  // 获取学习目标数据
+  const fetchLearningGoals = async () => {
+    if (!userId) return null;
+    
+    try {
+      const response = await api.get('/learning-goals/me');
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+    } catch (error) {
+      console.error('获取学习目标失败:', error);
+    }
+    return null;
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
       console.log('开始加载学习统计数据，userId:', userId);
 
       if (userId) {
+        // 并行获取用户资料和学习目标
+        const [profileResponse, goalsData] = await Promise.all([
+          api.get(`/user/profile/${userId}`),
+          fetchLearningGoals()
+        ]);
+        
         // 获取用户所有帖子数据
         const postsResponse = await api.get(`/community/posts?userId=${userId}&page=1&pageSize=1000`);
         
@@ -526,43 +576,54 @@ export default function LearningAnalytics() {
           console.log('用户帖子数据:', userPostsData);
           setUserPosts(userPostsData);
 
-          // 从帖子数据生成学习统计数据
-          const studyDataFromApi = generateStudyDataFromApi(userPostsData);
-          setStudyData(studyDataFromApi);
+          // 设置用户资料（使用真实的后端数据）
+          if (profileResponse.data.success) {
+            const profileData = profileResponse.data.data;
+            const userProfileData: UserProfile = {
+              totalPosts: profileData.totalPosts || userPostsData.length,
+              todayPosts: profileData.todayPosts || 0,
+              todayComments: profileData.todayComments || 0,
+              todayLikes: profileData.todayLikes || 0,
+              points: profileData.points || 0,
+              rank: profileData.rank || 1,
+              hotPostsCount: profileData.hotPostsCount || 0
+            };
+            
+            setUserProfile(userProfileData);
+            
+            // 从帖子数据生成学习统计数据
+            const studyDataFromApi = generateStudyDataFromApi(userPostsData, userProfileData);
+            setStudyData(studyDataFromApi);
+            
+            // 生成汇总数据
+            const summary = generateWeeklySummary(studyDataFromApi, userProfileData, goalsData);
+            setWeeklySummary(summary);
+                      
+            // 显示学习目标信息
+            if (goalsData) {
+              console.log('学习目标数据:', goalsData);
+            }
+          }
           
-          // 生成汇总数据
-          const totalPostsCount = userPostsData.length;
-          const userProfileData: UserProfile = {
-            totalPosts: totalPostsCount,
-            todayPosts: studyDataFromApi[studyDataFromApi.length - 1]?.todayPosts || 0,
-            todayComments: studyDataFromApi[studyDataFromApi.length - 1]?.commentsMade || 0,
-            todayLikes: studyDataFromApi[studyDataFromApi.length - 1]?.likesReceived || 0,
-            points: studyDataFromApi.reduce((sum, day) => sum + day.communityPoints, 0),
-            hotPostsCount: userPostsData.filter(post => post.view_count > 50).length // 假设浏览量>50为热门帖子
-          };
-          
-          setUserProfile(userProfileData);
-          const summary = generateWeeklySummary(studyDataFromApi, userProfileData);
-          setWeeklySummary(summary);
           message.success('学习统计数据加载成功');
         } else {
           throw new Error('API返回失败');
         }
       } else {
         console.warn('未找到用户ID，使用默认数据');
-        const mockData = generateStudyDataFromApi([]);
+        const mockData = generateStudyDataFromApi([], null);
         setStudyData(mockData);
         setUserPosts([]);
-        const defaultSummary = generateWeeklySummary(mockData, null);
+        const defaultSummary = generateWeeklySummary(mockData, null, null);
         setWeeklySummary({ ...defaultSummary, hotPostsCount: 0 });
       }
     } catch (error) {
       console.error('数据加载失败:', error);
       message.error('数据加载失败，使用默认数据');
-      const mockData = generateStudyDataFromApi([]);
+      const mockData = generateStudyDataFromApi([], null);
       setStudyData(mockData);
       setUserPosts([]);
-      const errorSummary = generateWeeklySummary(mockData, null);
+      const errorSummary = generateWeeklySummary(mockData, null, null);
       setWeeklySummary({ ...errorSummary, hotPostsCount: 0 });
     } finally {
       setLoading(false);

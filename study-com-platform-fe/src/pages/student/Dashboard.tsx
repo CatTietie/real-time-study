@@ -72,30 +72,7 @@ export default function StudentDashboard() {
 
   // 使用真实数据或默认数据
   const statsData = userProfile || defaultStatsData;
-  
-  // 强制使用默认数据显示（临时测试）
-  // const statsData = defaultStatsData;
 
-  // const recentActivities = [
-  //   {
-  //     activity: "发布了新帖子",
-  //     content: "《React Hooks 学习心得》",
-  //     time: "2小时前",
-  //     type: "post"
-  //   },
-  //   {
-  //     activity: "获得了社区积分",
-  //     content: "+50 积分（优质内容奖励）",
-  //     time: "昨天",
-  //     type: "points"
-  //   },
-  //   {
-  //     activity: "参与了讨论",
-  //     content: "回复了《算法学习疑问》",
-  //     time: "前天",
-  //     type: "comment"
-  //   }
-  // ];
 
   // 获取用户资料数据
   useEffect(() => {
@@ -155,10 +132,7 @@ export default function StudentDashboard() {
     likes: 0,
     hotPosts: 0 // 热榜帖子目标
   });
-  
-  // 浏览记录状态（不再使用localStorage）
-  // const [viewedPosts, setViewedPosts] = useState<Set<number>>(new Set());
-  
+
   // 目标值配置（从学习目标获取）
   const [GOAL_CONFIG, setGoalConfig] = useState({
     posts: 3,      // 发帖目标
@@ -220,16 +194,7 @@ export default function StudentDashboard() {
   
   // 调试：打印实际使用的数据
   console.log('显示数据:', { displayName, displayUsername, statsData });
-  
-  // 模拟浏览帖子函数（演示用）
-  // const simulateViewPost = (postId: number) => {
-  //   setViewedPosts(prev => {
-  //     const newSet = new Set(prev);
-  //     newSet.add(postId);
-  //     return newSet;
-  //   });
-  //   message.success(`浏览了帖子 ${postId}，浏览任务 +1`);
-  // };
+
   
   // 获取用户发布的帖子
   const fetchUserPosts = async () => {
@@ -254,16 +219,6 @@ export default function StudentDashboard() {
       fetchUserPosts();
     }
   }, [userProfile?.id]);
-
-  // 临时移除加载状态检查进行测试
-  // if (loading) {
-  //   return (
-  //     <div style={{ textAlign: 'center', padding: '50px' }}>
-  //       <Spin size="large" />
-  //       <div style={{ marginTop: 16 }}>加载中...</div>
-  //     </div>
-  //   );
-  // }
 
   console.log('=== 开始渲染 Dashboard JSX ===');
   console.log('statsData 内容:', statsData);
