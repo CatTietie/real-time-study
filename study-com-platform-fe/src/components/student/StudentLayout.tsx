@@ -81,8 +81,9 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
         breakpoint="lg"
         collapsedWidth="0"
         theme="light"
+        width={180}
         style={{
-          boxShadow: "4px 0 20px rgba(0,0,0,0.1)",
+          boxShadow: "2px 0 12px rgba(0,0,0,0.08)",
           position: "fixed",
           height: "100vh",
           left: 0,
@@ -93,7 +94,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       >
         <div
           style={{
-            height: 64,
+            height: 56,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -101,7 +102,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
             background: "#90CAF9",
           }}
         >
-          <Text strong style={{ fontSize: 18, color: "#212121" }}>
+          <Text strong style={{ fontSize: 16, color: "#212121" }}>
             学习平台
           </Text>
         </div>
@@ -115,25 +116,27 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
             color: "#212121"
           }}
           theme="light"
+          inlineIndent={16}
         />
       </Sider>
       
-      <Layout style={{ marginLeft: 200 }}>
+      <Layout style={{ marginLeft: 180 }}>
         <Header
           style={{
-            padding: "0 24px",
+            padding: "0 20px",
             background: "#E3F2FD",
-            boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+            boxShadow: "0 1px 8px rgba(0,0,0,0.06)",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
             borderBottom: "1px solid #BBDEFB",
+            height: 56,
           }}
         >
           <Text strong style={{ 
-            fontSize: 16,
+            fontSize: 14,
             color: "#212121",
-            fontWeight: 600
+            fontWeight: 500
           }}>
             {menuItems.find(item => item.key === location.pathname)?.label?.props?.children || "学生平台"}
           </Text>
@@ -142,8 +145,8 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
               style={{ 
                 cursor: "pointer",
                 background: "#F5F5F5",
-                padding: "8px 16px",
-                borderRadius: 20,
+                padding: "6px 12px",
+                borderRadius: 16,
                 border: "1px solid #E0E0E0",
                 transition: "all 0.3s ease"
               }}
@@ -172,17 +175,17 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
         </Header>
         
         <Content style={{ 
-          margin: "24px 16px 24px",
+          margin: "20px 12px 20px",
           position: "relative"
         }}>
           <div
             style={{
-              padding: 32,
+              padding: 24,
               background: "#FFFFFF",
-              borderRadius: 24,
-              boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
-              minHeight: 400,
-              border: "1px solid #E0E0E0",
+              borderRadius: 16,
+              boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
+              minHeight: 300,
+              border: "1px solid #EEEEEE",
             }}
           >
             {children}
