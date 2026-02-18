@@ -6,6 +6,24 @@ export const getStudyRooms = async (params?: Record<string, unknown>) => {
   return response.data;
 };
 
+// 确认预约
+export const confirmReservation = async (reservationId: number) => {
+  const response = await api.post("/study-rooms/reservations/confirm", { reservationId });
+  return response.data;
+};
+
+// 完成预约
+export const completeReservation = async (reservationId: number) => {
+  const response = await api.post("/study-rooms/reservations/complete", { reservationId });
+  return response.data;
+};
+
+// 取消预约
+export const cancelReservation = async (reservationId: number) => {
+  const response = await api.post("/study-rooms/reservations/cancel", { reservationId });
+  return response.data;
+};
+
 // 获取自习室详情
 export const getStudyRoomDetail = async (id: number) => {
   const response = await api.get(`/study-rooms/${id}`);

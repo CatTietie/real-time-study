@@ -230,6 +230,123 @@ export const leaveStudyRoom = async (req: Request, res: Response) => {
   }
 };
 
+// 确认预约
+export const confirmReservation = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+    
+    const { reservationId } = req.body as { reservationId: number };
+    
+    // 查找预约记录
+    const reservation = await RoomReservation.findByPk(reservationId);
+    if (!reservation) {
+      return res.status(404).json({ success: false, message: "预约记录不存在" });
+    }
+    
+    // 检查是否是当前用户的预约
+    if (reservation.user_id !== req.user.id) {
+      return res.status(403).json({ success: false, message: "无权限操作他人预约" });
+    }
+    
+    // 检查状态是否为pending
+    if (reservation.status !== 'pending') {
+      return res.status(400).json({ success: false, message: "预约状态不是待确认，无法确认" });
+    }
+    
+    // 更新预约状态为confirmed
+    await reservation.update({ status: 'confirmed' });
+    
+    res.json({
+      success: true,
+      message: "确认成功，预约状态已更新为已确认",
+      data: reservation
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "确认失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+// 完成预约（加入自习室后调用）
+export const completeReservation = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+    
+    const { reservationId } = req.body as { reservationId: number };
+    
+    // 查找预约记录
+    const reservation = await RoomReservation.findByPk(reservationId);
+    if (!reservation) {
+      return res.status(404).json({ success: false, message: "预约记录不存在" });
+    }
+    
+    // 检查是否是当前用户的预约
+    if (reservation.user_id !== req.user.id) {
+      return res.status(403).json({ success: false, message: "无权限操作他人预约" });
+    }
+    
+    // 检查状态是否为confirmed
+    if (reservation.status !== 'confirmed') {
+      return res.status(400).json({ success: false, message: "预约状态不是已确认，无法完成" });
+    }
+    
+    // 更新预约状态为completed
+    await reservation.update({ status: 'completed' });
+    
+    res.json({
+      success: true,
+      message: "预约已完成",
+      data: reservation
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "完成失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+// 取消预约
+export const cancelReservation = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+    
+    const { reservationId } = req.body as { reservationId: number };
+    
+    // 查找预约记录
+    const reservation = await RoomReservation.findByPk(reservationId);
+    if (!reservation) {
+      return res.status(404).json({ success: false, message: "预约记录不存在" });
+    }
+    
+    // 检查是否是当前用户的预约
+    if (reservation.user_id !== req.user.id) {
+      return res.status(403).json({ success: false, message: "无权限操作他人预约" });
+    }
+    
+    // 检查状态是否为pending或confirmed
+    if (reservation.status !== 'pending' && reservation.status !== 'confirmed') {
+      return res.status(400).json({ success: false, message: "预约状态已结束，无法取消" });
+    }
+    
+    // 更新预约状态为cancelled
+    await reservation.update({ status: 'cancelled' });
+    
+    res.json({
+      success: true,
+      message: "取消成功，预约状态已更新为已取消",
+      data: reservation
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "取消失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
 // 获取我的预约记录
 export const getMyReservations = async (req: Request, res: Response) => {
   try {

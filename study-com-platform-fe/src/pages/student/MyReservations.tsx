@@ -12,9 +12,10 @@ import {
   CalendarOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
-  ClockCircleOutlined
+  ClockCircleOutlined,
+  TeamOutlined
 } from "@ant-design/icons";
-import { getMyReservations } from "../../services/studyRoom";
+import { getMyReservations, confirmReservation, cancelReservation, completeReservation, getStudyRoomDetail, joinStudyRoom } from "../../services/studyRoom";
 import type { RoomReservation } from "../../types/study-room";
 
 const { TabPane } = Tabs;
@@ -53,8 +54,7 @@ export default function MyReservations() {
           total: response.pagination.total
         });
       }
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (_error: unknown) {
+    } catch (_error) {
       message.error("获取预约记录失败");
     } finally {
       setLoading(false);
@@ -103,22 +103,84 @@ export default function MyReservations() {
       render: (_: unknown, record: RoomReservation) => (
         <Space>
           {record.status === 'pending' && (
-            <Button 
-              type="link" 
-              danger
-              icon={<CloseCircleOutlined />}
-              onClick={() => message.info('取消预约功能待实现')}
-            >
-              取消
-            </Button>
+            <>
+              <Button 
+                type="link" 
+                icon={<CheckCircleOutlined />}
+                onClick={async () => {
+                  try {
+                    const response = await confirmReservation(record.id);
+                    if (response.success) {
+                      message.success('确认成功，预约状态已更新为已确认');
+                      // 刷新数据
+                      fetchReservations(pagination.current, pagination.pageSize, activeTab === 'all' ? undefined : activeTab);
+                    } else {
+                      message.error(response.message || '确认失败');
+                    }
+                  } catch (_error) {
+                    message.error('确认失败');
+                  }
+                }}
+              >
+                确认
+              </Button>
+              <Button 
+                type="link" 
+                danger
+                icon={<CloseCircleOutlined />}
+                onClick={async () => {
+                  try {
+                    const response = await cancelReservation(record.id);
+                    if (response.success) {
+                      message.success('取消预约成功');
+                      // 刷新数据
+                      fetchReservations(pagination.current, pagination.pageSize, activeTab === 'all' ? undefined : activeTab);
+                    } else {
+                      message.error(response.message || '取消预约失败');
+                    }
+                  } catch (_error) {
+                    message.error('取消预约失败');
+                  }
+                }}
+              >
+                取消
+              </Button>
+            </>
           )}
           {record.status === 'confirmed' && (
             <Button 
               type="link" 
-              icon={<CheckCircleOutlined />}
-              onClick={() => message.info('确认到场功能待实现')}
+              icon={<TeamOutlined />}
+              onClick={async () => {
+                try {
+                  // 先获取自习室详情
+                  const roomResponse = await getStudyRoomDetail(record.room_id);
+                  if (roomResponse.success) {
+                    const room = roomResponse.data;
+                    // 检查容量
+                    if (room.current_occupancy >= room.capacity) {
+                      message.error('自习室已满，无法加入');
+                      return;
+                    }
+                    
+                    // 加入自习室
+                    const joinResponse = await joinStudyRoom(record.room_id);
+                    if (joinResponse.success) {
+                      message.success('加入自习室成功');
+                      // 更新预约状态为已完成
+                      await completeReservation(record.id);
+                      // 刷新数据
+                      fetchReservations(pagination.current, pagination.pageSize, activeTab === 'all' ? undefined : activeTab);
+                    } else {
+                      message.error(joinResponse.message || '加入自习室失败');
+                    }
+                  }
+                } catch (_error) {
+                  message.error('加入自习室失败');
+                }
+              }}
             >
-              确认到场
+              加入自习室
             </Button>
           )}
         </Space>
