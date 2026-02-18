@@ -8,7 +8,7 @@ import User from "../models/user.model";
 // 获取自习室列表
 export const getStudyRooms = async (req: Request, res: Response) => {
   try {
-    const { page = 1, pageSize = 10, keyword, status, minCapacity } = req.query;
+    const { page = 1, pageSize = 10, keyword, status, minCapacity, userId } = req.query;
     
     const where: any = {};
     
@@ -28,17 +28,82 @@ export const getStudyRooms = async (req: Request, res: Response) => {
       where.capacity = { [Op.gte]: Number(minCapacity) };
     }
     
+    // 先获取符合条件的自习室基础信息
     const result = await StudyRoom.findAndCountAll({
       where,
-      order: [['current_occupancy', 'DESC']],
+      order: [['id', 'ASC']], // 先按ID排序，后面再重新排序
       offset: (Number(page) - 1) * Number(pageSize),
       limit: Number(pageSize),
     });
     
+    // 为每个自习室查询实时占用人数
+    const roomsWithRealOccupancy = await Promise.all(
+      result.rows.map(async (room: any) => {
+        let activeOccupancyCount = 0;
+        let confirmedReservationCount = 0;
+        
+        // 如果指定了用户ID，则只统计该用户的占用情况
+        if (userId) {
+          // 查询该用户在该自习室中状态为active的占用记录数
+          activeOccupancyCount = await RoomOccupancy.count({
+            where: {
+              room_id: room.id,
+              user_id: Number(userId),
+              status: 'active'
+            }
+          });
+          
+          // 查询该用户在该自习室中状态为confirmed且在预约时间段内的预约记录数
+          const now = new Date();
+          confirmedReservationCount = await RoomReservation.count({
+            where: {
+              room_id: room.id,
+              user_id: Number(userId),
+              status: 'confirmed',
+              start_time: { [Op.lte]: now },
+              end_time: { [Op.gt]: now }
+            }
+          });
+        } else {
+          // 否则统计所有用户的占用情况
+          // 查询该自习室中状态为active的占用记录数
+          activeOccupancyCount = await RoomOccupancy.count({
+            where: {
+              room_id: room.id,
+              status: 'active'
+            }
+          });
+          
+          // 查询该自习室中状态为confirmed且在预约时间段内的预约记录数
+          const now = new Date();
+          confirmedReservationCount = await RoomReservation.count({
+            where: {
+              room_id: room.id,
+              status: 'confirmed',
+              start_time: { [Op.lte]: now },
+              end_time: { [Op.gt]: now }
+            }
+          });
+        }
+        
+        // 总占用人数 = active占用记录 + 已确认的有效预约记录
+        const totalOccupancy = activeOccupancyCount + confirmedReservationCount;
+        
+        // 返回包含实时占用人数的数据
+        return {
+          ...room.toJSON(),
+          current_occupancy: totalOccupancy
+        };
+      })
+    );
+    
+    // 按占用人数降序排列
+    const sortedRooms = roomsWithRealOccupancy.sort((a, b) => b.current_occupancy - a.current_occupancy);
+    
     res.json({
       success: true,
       message: "获取成功",
-      data: result.rows,
+      data: sortedRooms,
       pagination: {
         page: Number(page),
         pageSize: Number(pageSize),
@@ -46,6 +111,7 @@ export const getStudyRooms = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
+    console.error('获取自习室列表错误:', error);
     const message = error instanceof Error ? error.message : "获取失败";
     res.status(500).json({ success: false, message });
   }
@@ -89,6 +155,30 @@ export const reserveStudyRoom = async (req: Request, res: Response) => {
     const room = await StudyRoom.findByPk(roomId);
     if (!room || room.status !== 'active') {
       return res.status(400).json({ success: false, message: "自习室不可用" });
+    }
+    
+    // 检查自习室是否已满（实时查询，包括active占用和已确认的有效预约）
+    const activeOccupancyCount = await RoomOccupancy.count({
+      where: {
+        room_id: roomId,
+        status: 'active'
+      }
+    });
+    
+    const now = new Date();
+    const confirmedReservationCount = await RoomReservation.count({
+      where: {
+        room_id: roomId,
+        status: 'confirmed',
+        start_time: { [Op.lte]: now },
+        end_time: { [Op.gt]: now }
+      }
+    });
+    
+    const totalOccupancy = activeOccupancyCount + confirmedReservationCount;
+    
+    if (totalOccupancy >= room.capacity) {
+      return res.status(400).json({ success: false, message: "自习室已满" });
     }
     
     // 检查时间冲突
@@ -146,10 +236,11 @@ export const leaveStudyRoom = async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, message: "未授权访问" });
     }
     
-    // 查找用户最近的占用记录（无论什么状态）
+    // 查找用户当前active状态的占用记录
     const occupancy = await RoomOccupancy.findOne({
       where: {
-        user_id: req.user.id
+        user_id: req.user.id,
+        status: 'active'
       },
       order: [['join_time', 'DESC']]
     });
@@ -157,15 +248,7 @@ export const leaveStudyRoom = async (req: Request, res: Response) => {
     if (!occupancy) {
       return res.status(400).json({ 
         success: false, 
-        message: "您没有自习室占用记录" 
-      });
-    }
-    
-    // 如果已经是离开状态，直接返回成功
-    if (occupancy.status === 'left') {
-      return res.json({
-        success: true,
-        message: "已处于退出状态"
+        message: "您不在任何自习室中" 
       });
     }
     
@@ -174,12 +257,6 @@ export const leaveStudyRoom = async (req: Request, res: Response) => {
       status: 'left',
       leave_time: new Date()
     });
-    
-    // 更新自习室当前人数
-    const room = await StudyRoom.findByPk(occupancy.room_id);
-    if (room && room.current_occupancy > 0) {
-      await room.decrement('current_occupancy');
-    }
     
     res.json({
       success: true,
