@@ -3,7 +3,6 @@ import { Op } from "sequelize";
 import StudyRoom from "../models/study-room.model";
 import RoomReservation from "../models/room-reservation.model";
 import RoomOccupancy from "../models/room-occupancy.model";
-import User from "../models/user.model";
 
 // 获取自习室列表
 export const getStudyRooms = async (req: Request, res: Response) => {
