@@ -6,6 +6,7 @@ import postRoutes from "./post.routes";
 import dashboardRoutes from "./dashboard.routes";
 import communityRoutes from "./community.routes";
 import learningGoalRoutes from "./learning-goal.routes";
+import studyRoomRoutes from "./study-room.routes";
 
 const router = Router();
 
@@ -15,5 +16,6 @@ router.use("/post", postRoutes);
 router.use("/dashboard", dashboardRoutes);
 router.use("/community", communityRoutes);
 router.use("/learning-goals", learningGoalRoutes);
+router.use("/study-rooms", studyRoomRoutes);
 
 export default router;

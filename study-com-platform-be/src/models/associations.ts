@@ -16,6 +16,9 @@ import Permission from "./permission.model";
 import UserRole from "./user-role.model";
 import RolePermission from "./role-permission.model";
 import ViewRecord from "./view-record.model";
+import StudyRoom from "./study-room.model";
+import RoomReservation from "./room-reservation.model";
+import RoomOccupancy from "./room-occupancy.model";
 
 export const initAssociations = () => {
   // 用户与帖子/评论/点赞
@@ -97,4 +100,17 @@ export const initAssociations = () => {
   
   Post.hasMany(ViewRecord, { foreignKey: "post_id" });
   ViewRecord.belongsTo(Post, { foreignKey: "post_id" });
+  
+  // 自习室相关关联
+  User.hasMany(RoomReservation, { foreignKey: "user_id" });
+  RoomReservation.belongsTo(User, { foreignKey: "user_id" });
+  
+  StudyRoom.hasMany(RoomReservation, { foreignKey: "room_id" });
+  RoomReservation.belongsTo(StudyRoom, { foreignKey: "room_id" });
+  
+  User.hasMany(RoomOccupancy, { foreignKey: "user_id" });
+  RoomOccupancy.belongsTo(User, { foreignKey: "user_id" });
+  
+  StudyRoom.hasMany(RoomOccupancy, { foreignKey: "room_id" });
+  RoomOccupancy.belongsTo(StudyRoom, { foreignKey: "room_id" });
 };
