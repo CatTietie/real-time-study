@@ -1,12 +1,13 @@
 import { Layout, Menu, Avatar, Dropdown, Space, Typography } from "antd";
 import {
   HomeOutlined,
-  BookOutlined,
   BarChartOutlined,
   SettingOutlined,
   LogoutOutlined,
   UserOutlined,
   TeamOutlined,
+  UsergroupAddOutlined,
+  CalendarOutlined,
 } from "@ant-design/icons";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAppSelector, useAppDispatch } from "../../app/hooks";
@@ -36,9 +37,14 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       label: <Link to="/student/dashboard">个人中心</Link>,
     },
     {
-      key: "/student/study-room",
-      icon: <BookOutlined />,
-      label: <Link to="/student/study-room">自习室</Link>,
+      key: "/student/study-rooms",
+      icon: <UsergroupAddOutlined />,
+      label: <Link to="/student/study-rooms">自习室</Link>,
+    },
+    {
+      key: "/student/my-reservations",
+      icon: <CalendarOutlined />,
+      label: <Link to="/student/my-reservations">我的预约</Link>,
     },
     {
       key: "/student/learning-analytics",

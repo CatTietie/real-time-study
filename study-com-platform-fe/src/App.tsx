@@ -23,6 +23,8 @@ import MyLikes from "./pages/community/MyLikes";
 import StudentDashboard from "./pages/student/Dashboard";
 import LearningAnalytics from "./pages/student/LearningAnalytics";
 import ProfileEdit from "./pages/student/ProfileEdit";
+import StudyRoomList from "./pages/student/StudyRoomList";
+import MyReservations from "./pages/student/MyReservations";
 import CommunityPosts from "./pages/admin/community/CommunityPosts";
 import CommunityComments from "./pages/admin/community/CommunityComments";
 import CommunityStats from "./pages/admin/community/CommunityStats";
@@ -75,7 +77,26 @@ function App() {
             </RequireStudentAuth>
           } 
         />
-        <Route path="/student/study-room" element={<ComingSoon />} />
+        <Route 
+          path="/student/study-rooms" 
+          element={
+            <RequireStudentAuth>
+              <StudentLayout>
+                <StudyRoomList />
+              </StudentLayout>
+            </RequireStudentAuth>
+          } 
+        />
+        <Route 
+          path="/student/my-reservations" 
+          element={
+            <RequireStudentAuth>
+              <StudentLayout>
+                <MyReservations />
+              </StudentLayout>
+            </RequireStudentAuth>
+          } 
+        />
         <Route 
           path="/student/learning-analytics" 
           element={
