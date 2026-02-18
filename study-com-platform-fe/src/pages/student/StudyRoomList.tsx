@@ -19,7 +19,7 @@ import {
   EnvironmentOutlined,
   TeamOutlined
 } from "@ant-design/icons";
-import { getStudyRooms, joinStudyRoom, reserveStudyRoom } from "../../services/studyRoom";
+import { getStudyRooms, reserveStudyRoom } from "../../services/studyRoom";
 import type { StudyRoom } from "../../types/study-room";
 
 const { Option } = Select;
@@ -55,18 +55,7 @@ export default function StudyRoomList() {
     fetchRooms();
   }, [searchParams]);
 
-  const handleJoinRoom = async (roomId: number) => {
-    try {
-      const response = await joinStudyRoom(roomId);
-      if (response.success) {
-        message.success("加入成功");
-        fetchRooms(); // 刷新列表
-      }
-    } catch (error: unknown) {
-      const err = error as { response?: { data?: { message?: string } } };
-      message.error(err.response?.data?.message || "加入失败");
-    }
-  };
+
 
   const handleReserve = async (values: unknown) => {
     if (!selectedRoom) return;
@@ -172,13 +161,7 @@ export default function StudyRoomList() {
                 }
                 actions={[
                   <Button 
-                    type="primary" 
-                    onClick={() => handleJoinRoom(room.id)}
-                    disabled={room.current_occupancy >= room.capacity || room.status !== 'active'}
-                  >
-                    立即加入
-                  </Button>,
-                  <Button 
+                    type="primary"
                     onClick={() => {
                       setSelectedRoom(room);
                       setReserveModalVisible(true);

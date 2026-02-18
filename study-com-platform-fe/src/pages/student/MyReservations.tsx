@@ -15,7 +15,7 @@ import {
   ClockCircleOutlined,
   TeamOutlined
 } from "@ant-design/icons";
-import { getMyReservations, confirmReservation, cancelReservation, completeReservation, getStudyRoomDetail, joinStudyRoom } from "../../services/studyRoom";
+import { getMyReservations, confirmReservation, cancelReservation, endReservation, leaveStudyRoom, forceUpdateExpired } from "../../services/studyRoom";
 import type { RoomReservation } from "../../types/study-room";
 
 const { TabPane } = Tabs;
@@ -24,7 +24,8 @@ const statusMap = {
   pending: { text: '待确认', color: 'orange' },
   confirmed: { text: '已确认', color: 'green' },
   cancelled: { text: '已取消', color: 'red' },
-  completed: { text: '已完成', color: 'blue' }
+  completed: { text: '已加入', color: 'blue' },
+  ended: { text: '已结束', color: 'gray' }
 };
 
 export default function MyReservations() {
@@ -54,7 +55,8 @@ export default function MyReservations() {
           total: response.pagination.total
         });
       }
-    } catch (_error) {
+    } catch (error) {
+      console.error('获取预约记录失败:', error);
       message.error("获取预约记录失败");
     } finally {
       setLoading(false);
@@ -117,7 +119,8 @@ export default function MyReservations() {
                     } else {
                       message.error(response.message || '确认失败');
                     }
-                  } catch (_error) {
+                  } catch (error) {
+                    console.error('确认失败:', error);
                     message.error('确认失败');
                   }
                 }}
@@ -138,7 +141,8 @@ export default function MyReservations() {
                     } else {
                       message.error(response.message || '取消预约失败');
                     }
-                  } catch (_error) {
+                  } catch (error) {
+                    console.error('取消预约失败:', error);
                     message.error('取消预约失败');
                   }
                 }}
@@ -147,40 +151,56 @@ export default function MyReservations() {
               </Button>
             </>
           )}
-          {record.status === 'confirmed' && (
+          {record.status === 'completed' && (
             <Button 
               type="link" 
               icon={<TeamOutlined />}
               onClick={async () => {
+                // 已加入状态下退出自习室并立即结束预约
                 try {
-                  // 先获取自习室详情
-                  const roomResponse = await getStudyRoomDetail(record.room_id);
-                  if (roomResponse.success) {
-                    const room = roomResponse.data;
-                    // 检查容量
-                    if (room.current_occupancy >= room.capacity) {
-                      message.error('自习室已满，无法加入');
-                      return;
-                    }
-                    
-                    // 加入自习室
-                    const joinResponse = await joinStudyRoom(record.room_id);
-                    if (joinResponse.success) {
-                      message.success('加入自习室成功');
-                      // 更新预约状态为已完成
-                      await completeReservation(record.id);
-                      // 刷新数据
+                  // 先退出自习室
+                  const leaveResponse = await leaveStudyRoom();
+                  if (leaveResponse.success) {
+                    // 然后立即更新预约状态为已结束
+                    const endResponse = await endReservation(record.id);
+                    if (endResponse.success) {
+                      message.success('退出自习室并结束预约成功');
                       fetchReservations(pagination.current, pagination.pageSize, activeTab === 'all' ? undefined : activeTab);
                     } else {
-                      message.error(joinResponse.message || '加入自习室失败');
+                      message.error(`结束预约失败: ${endResponse.message}`);
                     }
+                  } else {
+                    message.error(`退出自习室失败: ${leaveResponse.message}`);
                   }
-                } catch (_error) {
-                  message.error('加入自习室失败');
+                } catch (error) {
+                  console.error('退出操作异常:', error);
+                  message.error(`退出操作失败: ${error instanceof Error ? error.message : '未知错误'}`);
                 }
               }}
             >
-              加入自习室
+              退出自习室
+            </Button>
+          )}
+          {(record.status === 'confirmed' || record.status === 'completed') && (
+            <Button 
+              type="link" 
+              danger
+              icon={<CloseCircleOutlined />}
+              onClick={async () => {
+                try {
+                  const response = await cancelReservation(record.id);
+                  if (response.success) {
+                    message.success('取消预约成功');
+                    fetchReservations(pagination.current, pagination.pageSize, activeTab === 'all' ? undefined : activeTab);
+                  } else {
+                    message.error(response.message || '取消预约失败');
+                  }
+                } catch (_error) {
+                  message.error('取消预约失败');
+                }
+              }}
+            >
+              提前取消
             </Button>
           )}
         </Space>
@@ -204,7 +224,18 @@ export default function MyReservations() {
           tabBarExtraContent={
             <Button 
               type="primary" 
-              onClick={() => fetchReservations(pagination.current, pagination.pageSize, activeTab === 'all' ? undefined : activeTab)}
+              onClick={async () => {
+                try {
+                  // 强制更新过期状态
+                  const response = await forceUpdateExpired();
+                  message.success(response.message || '刷新完成');
+                  // 刷新数据
+                  fetchReservations(pagination.current, pagination.pageSize, activeTab === 'all' ? undefined : activeTab);
+                } catch (error) {
+                  console.error('刷新失败:', error);
+                  message.error('刷新失败');
+                }
+              }}
               icon={<ClockCircleOutlined />}
             >
               刷新
@@ -214,7 +245,8 @@ export default function MyReservations() {
           <TabPane tab="全部" key="all" />
           <TabPane tab="待确认" key="pending" />
           <TabPane tab="已确认" key="confirmed" />
-          <TabPane tab="已完成" key="completed" />
+          <TabPane tab="已加入" key="completed" />
+          <TabPane tab="已结束" key="ended" />
           <TabPane tab="已取消" key="cancelled" />
         </Tabs>
         

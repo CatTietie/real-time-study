@@ -18,6 +18,12 @@ export const completeReservation = async (reservationId: number) => {
   return response.data;
 };
 
+// 结束预约
+export const endReservation = async (reservationId: number) => {
+  const response = await api.post("/study-rooms/reservations/end", { reservationId });
+  return response.data;
+};
+
 // 取消预约
 export const cancelReservation = async (reservationId: number) => {
   const response = await api.post("/study-rooms/reservations/cancel", { reservationId });
@@ -36,11 +42,7 @@ export const reserveStudyRoom = async (data: Record<string, unknown>) => {
   return response.data;
 };
 
-// 加入自习室
-export const joinStudyRoom = async (roomId: number) => {
-  const response = await api.post("/study-rooms/join", { roomId });
-  return response.data;
-};
+
 
 // 退出自习室
 export const leaveStudyRoom = async () => {
@@ -51,5 +53,17 @@ export const leaveStudyRoom = async () => {
 // 获取我的预约记录
 export const getMyReservations = async (params?: Record<string, unknown>) => {
   const response = await api.get("/study-rooms/my/reservations", { params });
+  return response.data;
+};
+
+// 手动检查过期预约
+export const checkExpiredReservations = async () => {
+  const response = await api.post("/study-rooms/check-expired");
+  return response.data;
+};
+
+// 强制更新过期状态
+export const forceUpdateExpired = async () => {
+  const response = await api.post("/study-rooms/force-update-expired");
   return response.data;
 };

@@ -6,6 +6,7 @@ dotenv.config();
 import app from "./app";
 import { connectDB } from "./config/database";
 import { log } from "./utils/logger";
+import { checkExpiredReservations } from "./controllers/study-room.controller";
 
 const PORT = process.env.PORT || 3000;
 
@@ -20,6 +21,11 @@ const startServer = async () => {
       console.log(`✅ Server is running on http://localhost:${PORT}`);
       console.log(`📊 Health check: http://localhost:${PORT}/health`);
       console.log(`🧪 API test: http://localhost:${PORT}/api/test`);
+      
+      // 启动定时任务，每5分钟检查一次过期预约
+      setInterval(checkExpiredReservations, 5 * 60 * 1000);
+      // 立即执行一次检查
+      checkExpiredReservations();
     });
   } catch (error) {
     console.error("❌ Failed to start server:", error);

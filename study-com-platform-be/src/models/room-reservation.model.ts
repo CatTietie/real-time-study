@@ -7,7 +7,7 @@ export class RoomReservation extends Model {
   public room_id!: number;
   public start_time!: Date;
   public end_time!: Date;
-  public status!: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  public status!: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'ended';
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -40,7 +40,7 @@ RoomReservation.init(
       comment: "结束时间"
     },
     status: { 
-      type: DataTypes.ENUM('pending', 'confirmed', 'cancelled', 'completed'), 
+      type: DataTypes.ENUM('pending', 'confirmed', 'cancelled', 'completed', 'ended'), 
       defaultValue: 'pending',
       comment: "预约状态"
     },
