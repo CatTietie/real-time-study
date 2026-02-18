@@ -367,6 +367,73 @@ export const updateUserProfile = async (req: Request, res: Response) => {
   }
 };
 
+export const updateUserPassword = async (req: Request, res: Response) => {
+  try {
+    const userId = parseInt(req.params.id);
+    const { currentPassword, newPassword } = req.body;
+    
+    // 参数验证
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ 
+        success: false, 
+        message: '当前密码和新密码都不能为空' 
+      });
+    }
+    
+    if (newPassword.length < 6 || newPassword.length > 32) {
+      return res.status(400).json({ 
+        success: false, 
+        message: '新密码长度必须在6-32位之间' 
+      });
+    }
+    
+    // 权限验证：只能修改自己的密码
+    if (req.user?.id !== userId) {
+      return res.status(403).json({ 
+        success: false, 
+        message: '无权限修改此用户密码' 
+      });
+    }
+    
+    // 查找用户
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: '用户不存在' 
+      });
+    }
+    
+    // 验证当前密码
+    const isCurrentPasswordValid = await comparePassword(currentPassword, user.password);
+    if (!isCurrentPasswordValid) {
+      return res.status(400).json({ 
+        success: false, 
+        message: '当前密码错误' 
+      });
+    }
+    
+    // 生成新密码哈希
+    const hashedNewPassword = await hashPassword(newPassword);
+    
+    // 更新密码
+    await user.update({
+      password: hashedNewPassword
+    });
+    
+    res.json({
+      success: true,
+      message: '密码修改成功'
+    });
+  } catch (error) {
+    console.error('密码更新失败:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error instanceof Error ? error.message : '密码更新失败' 
+    });
+  }
+};
+
 export const getMyPermissions = async (req: Request, res: Response) => {
   try {
     if (!req.user) {

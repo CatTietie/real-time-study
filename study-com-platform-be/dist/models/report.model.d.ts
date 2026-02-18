@@ -7,6 +7,8 @@ export declare class Report extends Model {
     reason: string;
     status: number;
     handle_result?: string;
+    handler_admin_id?: number;
+    handled_at?: Date;
     createdAt: Date;
 }
 export default Report;

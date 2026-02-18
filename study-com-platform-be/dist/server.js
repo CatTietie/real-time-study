@@ -9,19 +9,21 @@ const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const app_1 = __importDefault(require("./app"));
 const database_1 = require("./config/database");
-const logger_1 = require("./utils/logger");
 const PORT = process.env.PORT || 3000;
 const startServer = async () => {
     try {
+        console.log(`🚀 Starting server on port ${PORT}...`);
         // 连接数据库
         await (0, database_1.connectDB)();
         // 启动服务器
         app_1.default.listen(PORT, () => {
-            (0, logger_1.log)(`Server is running on port ${PORT}`);
+            console.log(`✅ Server is running on http://localhost:${PORT}`);
+            console.log(`📊 Health check: http://localhost:${PORT}/health`);
+            console.log(`🧪 API test: http://localhost:${PORT}/api/test`);
         });
     }
     catch (error) {
-        (0, logger_1.log)("Failed to start server", error);
+        console.error("❌ Failed to start server:", error);
         process.exit(1);
     }
 };

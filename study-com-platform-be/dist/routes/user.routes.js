@@ -38,6 +38,14 @@ const express_1 = require("express");
 const userController = __importStar(require("../controllers/user.controller"));
 const auth_middleware_1 = require("../middlewares/auth.middleware");
 const router = (0, express_1.Router)();
+router.post("/login", userController.login);
+router.post("/register", userController.register);
+router.get("/permissions", auth_middleware_1.authMiddleware, userController.getMyPermissions);
+// 用户资料相关路由
+router.get("/profile/:userId", auth_middleware_1.authMiddleware, userController.getUserProfile);
+router.get("/study-stats/:userId", auth_middleware_1.authMiddleware, userController.getUserStudyStats);
+router.put("/profile/:userId", auth_middleware_1.authMiddleware, userController.updateUserProfile);
+router.put("/:id/password", auth_middleware_1.authMiddleware, userController.updateUserPassword);
 router.get("/:id", auth_middleware_1.authMiddleware, userController.getUser);
 router.put("/:id", auth_middleware_1.authMiddleware, userController.updateUser);
 exports.default = router;

@@ -5,4 +5,5 @@ export declare const createUser: (userData: any) => Promise<User>;
 export declare const getUserByEmail: (email: string) => Promise<User | null>;
 export declare const getUserByUsername: (username: string) => Promise<User | null>;
 export declare const getAllUsers: () => Promise<User[]>;
+export declare const getUserBasicInfo: (userId: number) => Promise<User | null>;
 //# sourceMappingURL=user.service.d.ts.map

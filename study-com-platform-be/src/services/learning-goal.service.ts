@@ -12,8 +12,8 @@ export interface LearningGoalData {
   goal_points: number;
 }
 
-// 学习目标返回类型
-export interface LearningGoalResponse {
+// 单个学习目标返回类型
+export interface SingleLearningGoalResponse {
   id: number;
   user_id: number;
   nickname: string;
@@ -31,7 +31,7 @@ export interface LearningGoalResponse {
  * @param userId 用户ID
  * @returns 学习目标数据或null
  */
-export async function getUserLearningGoal(userId: number): Promise<LearningGoalResponse | null> {
+export async function getUserLearningGoal(userId: number): Promise<SingleLearningGoalResponse | null> {
   try {
     const goal = await LearningGoal.findOne({
       where: { user_id: userId }
@@ -64,7 +64,7 @@ export async function getUserLearningGoal(userId: number): Promise<LearningGoalR
  * @param goalData 学习目标数据
  * @returns 更新后的学习目标
  */
-export async function setLearningGoal(goalData: LearningGoalData): Promise<LearningGoalResponse> {
+export async function setLearningGoal(goalData: LearningGoalData): Promise<SingleLearningGoalResponse> {
   try {
     // 验证用户是否存在
     const user = await User.findByPk(goalData.user_id);
@@ -130,7 +130,7 @@ export async function setLearningGoal(goalData: LearningGoalData): Promise<Learn
  * @param userIds 用户ID数组
  * @returns 学习目标数据数组
  */
-export async function getBatchLearningGoals(userIds: number[]): Promise<LearningGoalResponse[]> {
+export async function getBatchLearningGoals(userIds: number[]): Promise<SingleLearningGoalResponse[]> {
   try {
     const goals = await LearningGoal.findAll({
       where: {
@@ -180,7 +180,26 @@ export async function deleteLearningGoal(userId: number): Promise<boolean> {
  * @param pageSize 每页数量
  * @returns 学习目标列表和总数
  */
-export async function getAllLearningGoals(page: number = 1, pageSize: number = 10) {
+export interface GetAllLearningGoalsResponse {
+  goals: Array<{
+    id: number;
+    user_id: number;
+    nickname: string;
+    username: string;
+    goal_posts: number;
+    goal_comments: number;
+    goal_hot_posts: number;
+    goal_points: number;
+    created_at: Date;
+    updated_at: Date;
+  }>;
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export async function getAllLearningGoals(page: number = 1, pageSize: number = 10): Promise<GetAllLearningGoalsResponse> {
   try {
     const offset = (page - 1) * pageSize;
     

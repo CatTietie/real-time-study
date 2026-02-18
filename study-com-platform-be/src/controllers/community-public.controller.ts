@@ -1838,7 +1838,7 @@ export const getUserTodayStats = async (req: Request, res: Response) => {
     const userTodayPostIds = userTodayPosts.map((post: any) => post.id);
     const userTodayCommentIds = userTodayComments.map((comment: any) => comment.id);
 
-    // 查询这些帖子和评论今天获得的点赞数
+    // 查询这些帖子和评论今天获得的点赞数（保持原有逻辑用于其他用途）
     const [todayPostLikes, todayCommentLikes] = await Promise.all([
       userTodayPostIds.length > 0 
         ? Post.sum('like_count', {
@@ -1856,7 +1856,31 @@ export const getUserTodayStats = async (req: Request, res: Response) => {
         : 0
     ]);
 
-    const totalTodayLikes = todayPostLikes + todayCommentLikes;
+    const totalTodayReceivedLikes = todayPostLikes + todayCommentLikes;
+
+    // 新增：统计用户今天点过的赞数（包括帖子点赞和评论点赞）
+    const [todayPostGivenLikes, todayCommentGivenLikes] = await Promise.all([
+      PostLike.count({
+        where: {
+          user_id: userId,
+          created_at: {
+            [Op.gte]: today,
+            [Op.lt]: tomorrow
+          }
+        }
+      }),
+      CommentLike.count({
+        where: {
+          user_id: userId,
+          created_at: {
+            [Op.gte]: today,
+            [Op.lt]: tomorrow
+          }
+        }
+      })
+    ]);
+
+    const totalTodayGivenLikes = todayPostGivenLikes + todayCommentGivenLikes;
 
     // 获取今日发帖数和评论数
     const todayPosts = userTodayPosts.length;
@@ -1873,8 +1897,12 @@ export const getUserTodayStats = async (req: Request, res: Response) => {
       data: {
         todayPosts,
         todayComments,
-        todayLikes: totalTodayLikes,
-        todayViews
+        todayLikes: totalTodayGivenLikes, // 改为统计点过的赞数
+        todayViews,
+        // 保留原始数据供其他用途使用
+        receivedLikes: totalTodayReceivedLikes,
+        givenPostLikes: todayPostGivenLikes,
+        givenCommentLikes: todayCommentGivenLikes
       }
     });
   } catch (error) {

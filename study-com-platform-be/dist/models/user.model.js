@@ -1,12 +1,9 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.User = void 0;
 // 用户数据模型
 const sequelize_1 = require("sequelize");
-const database_1 = __importDefault(require("../config/database"));
+const sequelize_2 = require("../config/sequelize");
 class User extends sequelize_1.Model {
 }
 exports.User = User;
@@ -37,9 +34,9 @@ User.init({
         comment: "头像URL路径",
     },
     role: {
-        type: sequelize_1.DataTypes.ENUM("admin", "student"),
+        type: sequelize_1.DataTypes.ENUM("admin", "student", "super_admin"),
         defaultValue: "student",
-        comment: "角色权限：admin-管理员, student-学生",
+        comment: "角色权限：super_admin-超级管理员, admin-管理员, student-学生",
     },
     points: {
         type: sequelize_1.DataTypes.INTEGER,
@@ -56,12 +53,17 @@ User.init({
         comment: "最后登录时间",
     },
 }, {
-    sequelize: database_1.default,
+    sequelize: sequelize_2.sequelize,
     modelName: "User",
     tableName: "users",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: "updated_at",
+    indexes: [
+        { fields: ["role"] },
+        { fields: ["status"] },
+        { fields: ["created_at"] },
+    ],
 });
 exports.default = User;
 //# sourceMappingURL=user.model.js.map

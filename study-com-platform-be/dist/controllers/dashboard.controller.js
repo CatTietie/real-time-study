@@ -1,14 +1,21 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getDashboard = void 0;
+const dashboard_service_1 = require("../services/dashboard.service");
 const getDashboard = async (req, res) => {
     try {
-        // 获取仪表板数据逻辑
-        res.json({ success: true });
+        const stats = await (0, dashboard_service_1.getDashboardStats)();
+        res.json({
+            success: true,
+            data: stats,
+        });
     }
     catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
-        res.status(500).json({ error: message });
+        res.status(500).json({
+            success: false,
+            error: message,
+        });
     }
 };
 exports.getDashboard = getDashboard;

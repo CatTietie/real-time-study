@@ -37,7 +37,58 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const adminController = __importStar(require("../controllers/admin.controller"));
 const auth_middleware_1 = require("../middlewares/auth.middleware");
+const rbacController = __importStar(require("../controllers/rbac.controller"));
+const communityController = __importStar(require("../controllers/community.controller"));
+const reportController = __importStar(require("../controllers/report.controller"));
+const sensitiveWordController = __importStar(require("../controllers/sensitive-word.controller"));
+const pointsRuleController = __importStar(require("../controllers/points-rule.controller"));
 const router = (0, express_1.Router)();
-router.get("/stats", auth_middleware_1.authMiddleware, adminController.getAdminStats);
+// 登录相关（不需要认证）
+router.post("/login", adminController.login);
+// 测试路由
+router.get("/test", (req, res) => {
+    res.json({ message: "Admin routes working!" });
+});
+// 需要认证的路由
+router.post("/logout", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, adminController.logout);
+router.get("/profile", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, adminController.getProfile);
+router.put("/editinfo", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, adminController.editProfile);
+// 操作日志相关（需要管理员权限）
+router.get("/logs", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, adminController.getAdminLogs);
+router.get("/logs/stats", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, adminController.getAdminLogStats);
+// 超级管理员管理普通管理员
+router.get("/admins", auth_middleware_1.authMiddleware, auth_middleware_1.superAdminMiddleware, adminController.getAdmins);
+router.post("/admins", auth_middleware_1.authMiddleware, auth_middleware_1.superAdminMiddleware, adminController.createAdmin);
+router.delete("/admins/:id", auth_middleware_1.authMiddleware, auth_middleware_1.superAdminMiddleware, adminController.deleteAdmin);
+// RBAC 角色与权限
+router.get("/rbac/roles", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, rbacController.getRoles);
+router.post("/rbac/roles", auth_middleware_1.authMiddleware, auth_middleware_1.superAdminMiddleware, rbacController.createRole);
+router.get("/rbac/permissions", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, rbacController.getPermissions);
+router.post("/rbac/roles/:id/permissions", auth_middleware_1.authMiddleware, auth_middleware_1.superAdminMiddleware, rbacController.setRolePermissions);
+router.post("/admins/:id/role", auth_middleware_1.authMiddleware, auth_middleware_1.superAdminMiddleware, rbacController.setAdminRole);
+// 社区管理（管理员）
+router.get("/community/posts", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, communityController.getCommunityPosts);
+router.patch("/community/posts/:id/status", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, communityController.updateCommunityPostStatus);
+router.get("/community/comments", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, communityController.getCommunityComments);
+router.patch("/community/comments/:id/status", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, communityController.updateCommunityCommentStatus);
+router.get("/community/stats", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, communityController.getCommunityStats);
+// 敏感词库
+router.get("/sensitive-words", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, sensitiveWordController.getSensitiveWords);
+router.post("/sensitive-words", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, sensitiveWordController.createSensitiveWord);
+router.put("/sensitive-words/:id", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, sensitiveWordController.updateSensitiveWord);
+router.delete("/sensitive-words/:id", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, sensitiveWordController.deleteSensitiveWord);
+router.patch("/sensitive-words/:id/status", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, sensitiveWordController.updateSensitiveWordStatus);
+router.get("/community/sensitive-words", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, sensitiveWordController.getSensitiveWords);
+router.post("/community/sensitive-words", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, sensitiveWordController.createSensitiveWord);
+router.put("/community/sensitive-words/:id", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, sensitiveWordController.updateSensitiveWord);
+router.delete("/community/sensitive-words/:id", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, sensitiveWordController.deleteSensitiveWord);
+router.patch("/community/sensitive-words/:id/status", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, sensitiveWordController.updateSensitiveWordStatus);
+// 举报处理
+router.get("/reports", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, reportController.getReports);
+router.patch("/reports/:id/handle", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, reportController.handleReport);
+router.get("/community/reports", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, reportController.getReports);
+router.patch("/community/reports/:id/handle", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, reportController.handleReport);
+// 积分规则
+router.get("/points-rules", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, pointsRuleController.getPointsRules);
 exports.default = router;
 //# sourceMappingURL=admin.routes.js.map

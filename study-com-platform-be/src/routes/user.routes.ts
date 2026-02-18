@@ -12,6 +12,7 @@ router.get("/permissions", authMiddleware, userController.getMyPermissions);
 router.get("/profile/:userId", authMiddleware, userController.getUserProfile);
 router.get("/study-stats/:userId", authMiddleware, userController.getUserStudyStats);
 router.put("/profile/:userId", authMiddleware, userController.updateUserProfile);
+router.put("/:id/password", authMiddleware, userController.updateUserPassword);
 router.get("/:id", authMiddleware, userController.getUser);
 router.put("/:id", authMiddleware, userController.updateUser);
 

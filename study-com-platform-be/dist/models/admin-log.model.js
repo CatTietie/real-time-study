@@ -1,12 +1,9 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AdminLog = void 0;
 // 管理员日志数据模型
 const sequelize_1 = require("sequelize");
-const database_1 = __importDefault(require("../config/database"));
+const sequelize_2 = require("../config/sequelize");
 class AdminLog extends sequelize_1.Model {
 }
 exports.AdminLog = AdminLog;
@@ -20,6 +17,10 @@ AdminLog.init({
         type: sequelize_1.DataTypes.INTEGER,
         allowNull: false,
         comment: "执行操作的管理员ID",
+        references: {
+            model: "users",
+            key: "id",
+        },
     },
     action_type: {
         type: sequelize_1.DataTypes.STRING(50),
@@ -43,12 +44,18 @@ AdminLog.init({
         comment: "操作者IP",
     },
 }, {
-    sequelize: database_1.default,
+    sequelize: sequelize_2.sequelize,
     modelName: "AdminLog",
     tableName: "admin_logs",
     timestamps: true,
     createdAt: "created_at",
     updatedAt: false,
+    indexes: [
+        { fields: ["admin_id"] },
+        { fields: ["created_at"] },
+        { fields: ["target_table"] },
+        { fields: ["target_id"] },
+    ],
 });
 exports.default = AdminLog;
 //# sourceMappingURL=admin-log.model.js.map

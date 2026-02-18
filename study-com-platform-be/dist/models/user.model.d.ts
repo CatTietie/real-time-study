@@ -5,7 +5,7 @@ export declare class User extends Model {
     password: string;
     nickname: string;
     avatar?: string;
-    role: "admin" | "student";
+    role: "admin" | "student" | "super_admin";
     points: number;
     status: number;
     last_login?: Date;
