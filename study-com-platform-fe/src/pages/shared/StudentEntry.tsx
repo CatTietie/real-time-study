@@ -36,7 +36,7 @@ export default function StudentEntry() {
       title: "自习室",
       description: "进入虚拟自习环境",
       icon: "📚",
-      onClick: () => navigate("/student/study-room"),
+      onClick: () => navigate("/student/study-rooms"),
       color: "#faad14"
     },
     {
