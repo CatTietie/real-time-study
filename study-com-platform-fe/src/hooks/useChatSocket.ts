@@ -64,17 +64,18 @@ export const useChatSocket = ({ roomId, userId, username }: UseChatSocketProps) 
 
     // 收到历史消息
     newSocket.on('chat_history', (historyMessages: ChatMessage[]) => {
+      console.log('收到历史消息:', historyMessages.length, '条');
       setMessages(historyMessages);
     });
 
     // 收到新消息
     newSocket.on('receive_chat_message', (message: ChatMessage) => {
+      console.log('收到新消息:', message);
       setMessages(prev => [...prev, message]);
     });
 
     // 用户加入
     newSocket.on('user_joined', (data: { username: string }) => {
-      // 可以在这里更新在线用户列表
       console.log(`${data.username} 加入了聊天`);
     });
 
@@ -98,7 +99,30 @@ export const useChatSocket = ({ roomId, userId, username }: UseChatSocketProps) 
       console.log('清理Socket连接');
       newSocket.close();
     };
-  }, []); // 移除依赖项，只在组件挂载时初始化一次
+  }, []); // 只在组件挂载时初始化一次
+
+  // 监听roomId变化，重新加入房间
+  useEffect(() => {
+    if (socket && isConnected && roomId && userId > 0 && username) {
+      console.log('roomId变化，重新加入房间:', roomId);
+      
+      // 清空旧消息
+      setMessages([]);
+      
+      // 离开当前房间（如果在房间中）
+      socket.emit('leave_chat_room', { roomId: userInfoRef.current.roomId });
+      
+      // 更新用户信息ref
+      userInfoRef.current = { roomId, userId, username };
+      
+      // 加入新房间
+      socket.emit('join_chat_room', { 
+        roomId, 
+        userId, 
+        username 
+      });
+    }
+  }, [roomId, socket, isConnected, userId, username]);
 
   // 发送普通消息
   const sendMessage = useCallback((content: string, messageType: string = 'text') => {

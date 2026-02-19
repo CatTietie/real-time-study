@@ -102,6 +102,40 @@ export const initChatSockets = (io: Server) => {
       }
     });
 
+    // 用户离开房间
+    socket.on('leave_chat_room', (data: { roomId: number }) => {
+      try {
+        const clientInfo = connectedClients.get(socket.id);
+        if (!clientInfo) return;
+        
+        console.log('用户离开房间:', { userId: clientInfo.userId, username: clientInfo.username, roomId: data.roomId });
+        
+        // 从房间在线用户列表中移除
+        const roomUsers = roomOnlineUsers.get(data.roomId);
+        if (roomUsers) {
+          roomUsers.delete(clientInfo.userId);
+          // 如果房间没人了，清理房间记录
+          if (roomUsers.size === 0) {
+            roomOnlineUsers.delete(data.roomId);
+          }
+        }
+        
+        // 通知其他用户
+        socket.to(`chat_${data.roomId}`).emit('user_left', {
+          userId: clientInfo.userId,
+          username: clientInfo.username,
+          message: `${clientInfo.username} 离开了聊天`
+        });
+        
+        // 离开Socket房间
+        socket.leave(`chat_${data.roomId}`);
+        
+        console.log('用户已离开房间:', data.roomId);
+      } catch (error) {
+        console.error('离开房间失败:', error);
+      }
+    });
+
     // 断开连接处理
     socket.on('disconnect', () => {
       const clientInfo = connectedClients.get(socket.id);

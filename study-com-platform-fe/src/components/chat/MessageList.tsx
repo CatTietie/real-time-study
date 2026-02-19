@@ -25,7 +25,27 @@ export const MessageList: React.FC<MessageListProps> = ({
 
   // 格式化时间的辅助函数
   const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
+    // 处理各种可能的时间格式
+    let date: Date;
+    
+    if (dateString instanceof Date) {
+      date = dateString;
+    } else if (typeof dateString === 'string') {
+      // 尝试解析ISO字符串
+      date = new Date(dateString);
+      // 如果解析失败，尝试其他格式
+      if (isNaN(date.getTime())) {
+        date = new Date(Date.parse(dateString));
+      }
+    } else {
+      date = new Date();
+    }
+    
+    // 如果日期仍然无效，返回默认值
+    if (isNaN(date.getTime())) {
+      return '刚刚';
+    }
+    
     return date.toLocaleTimeString('zh-CN', { 
       hour: '2-digit', 
       minute: '2-digit' 
@@ -89,7 +109,7 @@ export const MessageList: React.FC<MessageListProps> = ({
               }}>
                 <div>
                   <Text strong style={{ fontSize: '12px', color: message.user_id === currentUserId ? '#fff' : '#888' }}>
-                    {message.username || `用户${message.user_id}`}
+                    {message.username || message.nickname || `用户${message.user_id}`}
                   </Text>
                   <Text 
                     type="secondary" 
