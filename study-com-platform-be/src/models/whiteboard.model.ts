@@ -5,6 +5,7 @@ class Whiteboard extends Model {
   public id!: number;
   public room_id!: number;
   public name!: string;
+  public type!: string;
   public width!: number;
   public height!: number;
   public background_color!: string;
@@ -20,12 +21,17 @@ Whiteboard.init({
   },
   room_id: {
     type: DataTypes.INTEGER,
-    allowNull: false,
-    unique: true  // 一个房间对应一个白板
+    allowNull: false
+    // 移除unique约束，允许多个白板关联同一个房间
   },
   name: {
     type: DataTypes.STRING(100),
     defaultValue: '协作白板'
+  },
+  type: {
+    type: DataTypes.STRING(50),
+    defaultValue: 'general', // general, brainstorming, diagram, sketch 等
+    allowNull: false
   },
   width: {
     type: DataTypes.INTEGER,

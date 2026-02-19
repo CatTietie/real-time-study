@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import Whiteboard from '../models/whiteboard.model';
 import WhiteboardAction from '../models/whiteboard-action.model';
+import ChatRoom from '../models/chat-room.model';
 
 interface WhiteboardClient {
   userId: number;
@@ -56,7 +57,7 @@ export const initWhiteboardSockets = (io: Server) => {
     // 白板操作同步
     socket.on('whiteboard_action', async (data: {
       whiteboardId: number;
-      actionType: string;
+      actionType: 'draw' | 'erase' | 'text' | 'shape' | 'image' | 'clear' | 'undo' | 'redo';
       actionData: any;
     }) => {
       try {
@@ -71,7 +72,21 @@ export const initWhiteboardSockets = (io: Server) => {
           data: JSON.stringify(data.actionData)
         });
 
-        // 广播操作给其他用户
+        // 获取白板信息以获取关联的聊天室
+        const whiteboard = await Whiteboard.findByPk(data.whiteboardId);
+        if (whiteboard) {
+          // 同时向聊天室广播白板活动
+          const chatMessage = `用户 ${clientInfo.username} 在白板上进行了 ${data.actionType} 操作`;
+          socket.to(`chat_${whiteboard.room_id}`).emit('system_message', {
+            type: 'whiteboard_activity',
+            content: chatMessage,
+            sender: clientInfo.username,
+            whiteboardId: data.whiteboardId,
+            actionType: data.actionType
+          });
+        }
+
+        // 广播操作给其他白板用户
         socket.to(`whiteboard_${data.whiteboardId}`).emit('whiteboard_update', {
           userId: clientInfo.userId,
           username: clientInfo.username,

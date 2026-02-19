@@ -5,6 +5,7 @@ import type { WhiteboardState } from '../types/whiteboard';
 export const createWhiteboard = async (whiteboardData: {
   roomId: number;
   name?: string;
+  type?: string;
   width?: number;
   height?: number;
   backgroundColor?: string;
@@ -44,4 +45,10 @@ export const getWhiteboardActions = async (
 // 清空白板
 export const clearWhiteboard = async (whiteboardId: number): Promise<void> => {
   await api.post(`/whiteboard/clear/${whiteboardId}`);
+};
+
+// 导出白板为PNG
+export const exportWhiteboardToPng = async (whiteboardId: number): Promise<any> => {
+  const response = await api.get(`/whiteboard/export/${whiteboardId}`);
+  return response.data.data;
 };

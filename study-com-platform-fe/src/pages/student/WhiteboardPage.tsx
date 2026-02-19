@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Layout, Spin, message, Button, Modal, Form, Input, Select } from 'antd';
+import { Card, Layout, Spin, message, Button, Modal, Form, Input, Select, Space } from 'antd';
 import { WhiteboardCanvas } from '../../components/whiteboard/WhileboardCanvas';
 import { Toolbar } from '../../components/whiteboard/Toolbar';
 import { WhiteboardProvider, useWhiteboard } from '../../components/whiteboard/WhiteboardProvider';
-import { createWhiteboard, getWhiteboard } from '../../services/whiteboard';
+import { createWhiteboard, getWhiteboard, exportWhiteboardToPng } from '../../services/whiteboard';
+import { getChatRooms } from '../../services/chat';
 import { useAppSelector } from '../../app/hooks';
+import type { ChatRoom } from '../../types/chat';
 
 const { Content } = Layout;
 const { Option } = Select;
@@ -23,64 +25,84 @@ const WhiteboardContent: React.FC<WhiteboardPageProps> = ({ whiteboardId }) => {
     currentColor, 
     setCurrentColor,
     lineWidth, 
-    setLineWidth 
+    setLineWidth,
+    fontSize,
+    setFontSize,
+    fontFamily,
+    setFontFamily,
+    shapeType,
+    setShapeType,
+    fillColor,
+    setFillColor
   } = useWhiteboard();
   
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [form] = Form.useForm();
+  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
 
   useEffect(() => {
-    const loadWhiteboard = async () => {
+    const loadInitialData = async () => {
       try {
         setLoading(true);
+        // 加载聊天室列表
+        const rooms = await getChatRooms();
+        setChatRooms(rooms);
+        
         if (whiteboardId) {
           // 加载现有白板
           const wb = await getWhiteboard(whiteboardId);
           setWhiteboard(wb);
-        } else {
-          // 创建新白板
-          const newWb = await createWhiteboard({
-            roomId: 1, // 默认房间ID，实际应该从路由参数获取
-            name: '协作白板',
-            width: 1200,
-            height: 800
-          });
-          setWhiteboard(newWb);
         }
       } catch (error) {
-        console.error('加载白板失败:', error);
-        message.error('加载白板失败');
+        console.error('加载数据失败:', error);
+        message.error('加载数据失败');
       } finally {
         setLoading(false);
       }
     };
 
-    loadWhiteboard();
+    loadInitialData();
   }, [whiteboardId, setWhiteboard]);
 
   const handleCreateWhiteboard = async (values: any) => {
     try {
+      console.log('Form values:', values);
       const newWb = await createWhiteboard({
-        roomId: values.roomId,
+        roomId: Number(values.roomId), // 确保roomId是数字类型
         name: values.name,
-        width: values.width || 1200,
-        height: values.height || 800,
+        type: values.type || 'general',
+        width: Number(values.width) || 1200,
+        height: Number(values.height) || 800,
         backgroundColor: values.backgroundColor || '#FFFFFF'
       });
       setWhiteboard(newWb);
       setModalVisible(false);
       form.resetFields();
       message.success('白板创建成功');
-    } catch (error) {
+    } catch (error: any) {
       console.error('创建白板失败:', error);
-      message.error('创建白板失败');
+      message.error(error.response?.data?.message || '创建白板失败');
     }
   };
 
   const handleClear = () => {
     // 清空白板逻辑将在WhiteboardCanvas中处理
     console.log('清空白板');
+  };
+
+  const handleExport = async () => {
+    if (!whiteboard) return;
+    
+    try {
+      const exportData = await exportWhiteboardToPng(whiteboard.id);
+      message.success('白板数据导出成功');
+      console.log('导出数据:', exportData);
+      // 这里可以添加实际的PNG生成逻辑
+    } catch (error) {
+      console.error('导出失败:', error);
+      message.error('导出失败');
+    }
   };
 
   if (loading) {
@@ -102,9 +124,16 @@ const WhiteboardContent: React.FC<WhiteboardPageProps> = ({ whiteboardId }) => {
         <Card 
           title={`协作白板 - ${whiteboard?.name || '未命名'}`}
           extra={
-            <Button type="primary" onClick={() => setModalVisible(true)}>
-              新建白板
-            </Button>
+            <Space>
+              <Button type="primary" onClick={() => setModalVisible(true)}>
+                新建白板
+              </Button>
+              {whiteboard && (
+                <Button onClick={handleExport}>
+                  导出PNG
+                </Button>
+              )}
+            </Space>
           }
           style={{ 
             maxWidth: 1400, 
@@ -123,6 +152,14 @@ const WhiteboardContent: React.FC<WhiteboardPageProps> = ({ whiteboardId }) => {
                 lineWidth={lineWidth}
                 onLineWidthChange={setLineWidth}
                 onClear={handleClear}
+                fontSize={fontSize}
+                onFontSizeChange={setFontSize}
+                fontFamily={fontFamily}
+                onFontFamilyChange={setFontFamily}
+                shapeType={shapeType}
+                onShapeTypeChange={setShapeType}
+                fillColor={fillColor}
+                onFillColorChange={setFillColor}
               />
               <div style={{ 
                 display: 'flex', 
@@ -133,8 +170,17 @@ const WhiteboardContent: React.FC<WhiteboardPageProps> = ({ whiteboardId }) => {
                   whiteboardId={whiteboard.id}
                   userId={user?.id || 0}
                   username={user?.username || ''}
+                  roomId={whiteboard.room_id}
                   width={whiteboard.width}
                   height={whiteboard.height}
+                  currentTool={currentTool}
+                  currentColor={currentColor}
+                  lineWidth={lineWidth}
+                  fontSize={fontSize}
+                  fontFamily={fontFamily}
+                  shapeType={shapeType}
+                  fillColor={fillColor}
+                  onClear={handleClear}
                 />
               </div>
             </>
@@ -174,11 +220,28 @@ const WhiteboardContent: React.FC<WhiteboardPageProps> = ({ whiteboardId }) => {
             
             <Form.Item
               name="roomId"
-              label="关联房间"
-              initialValue={1}
+              label="关联聊天室"
+              rules={[{ required: true, message: '请选择关联的聊天室' }]}
             >
-              <Select placeholder="选择关联的学习房间">
-                <Option value={1}>默认学习室</Option>
+              <Select placeholder="选择关联的聊天室">
+                {chatRooms.map(room => (
+                  <Option key={room.id} value={room.id}>
+                    {room.name} ({room.type})
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+            
+            <Form.Item
+              name="type"
+              label="白板类型"
+              initialValue="general"
+            >
+              <Select>
+                <Option value="general">通用白板</Option>
+                <Option value="brainstorming">头脑风暴</Option>
+                <Option value="diagram">图表绘制</Option>
+                <Option value="sketch">草图绘制</Option>
               </Select>
             </Form.Item>
             

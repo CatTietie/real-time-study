@@ -5,7 +5,7 @@ class WhiteboardAction extends Model {
   public id!: number;
   public whiteboard_id!: number;
   public user_id!: number;
-  public action_type!: 'draw' | 'erase' | 'clear' | 'undo' | 'redo';
+  public action_type!: 'draw' | 'erase' | 'text' | 'shape' | 'image' | 'clear' | 'undo' | 'redo';
   public data!: string; // JSON格式的操作数据
   public timestamp!: Date;
 }
@@ -25,7 +25,7 @@ WhiteboardAction.init({
     allowNull: false
   },
   action_type: {
-    type: DataTypes.ENUM('draw', 'erase', 'clear', 'undo', 'redo'),
+    type: DataTypes.ENUM('draw', 'erase', 'text', 'shape', 'image', 'clear', 'undo', 'redo'),
     allowNull: false
   },
   data: {

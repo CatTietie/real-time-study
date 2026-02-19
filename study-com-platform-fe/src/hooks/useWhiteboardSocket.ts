@@ -7,12 +7,14 @@ interface UseWhiteboardSocketProps {
   whiteboardId: number;
   userId: number;
   username: string;
+  roomId?: number; // 关联的聊天室ID
 }
 
 export const useWhiteboardSocket = ({ 
   whiteboardId, 
   userId, 
-  username 
+  username,
+  roomId
 }: UseWhiteboardSocketProps) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [actions, setActions] = useState<WhiteboardAction[]>([]);
@@ -30,7 +32,7 @@ export const useWhiteboardSocket = ({
 
     newSocket.on('connect', () => {
       setIsConnected(true);
-      newSocket.emit('join_whiteboard', { whiteboardId, userId, username });
+      newSocket.emit('join_whiteboard', { whiteboardId, userId, username, roomId });
     });
 
     // 接收白板状态
@@ -60,7 +62,7 @@ export const useWhiteboardSocket = ({
     return () => {
       newSocket.close();
     };
-  }, [whiteboardId, userId, username]);
+  }, [whiteboardId, userId, username, roomId]);
 
   // 发送白板操作
   const sendAction = useCallback((action: Omit<WhiteboardAction, 'userId' | 'username'>) => {
