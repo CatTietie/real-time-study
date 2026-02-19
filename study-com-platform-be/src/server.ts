@@ -3,10 +3,29 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import app from "./app";
 import { connectDB } from "./config/database";
 import { log } from "./utils/logger";
 import { checkExpiredReservations } from "./controllers/study-room.controller";
+import { initChatSockets } from './services/chat-realtime.service';
+import { initWhiteboardSockets } from './services/whiteboard-realtime.service';
+
+// 创建HTTP服务器
+const httpServer = createServer(app);
+
+// 初始化Socket.IO
+const io = new Server(httpServer, {
+  cors: {
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    credentials: true
+  }
+});
+
+// 初始化实时服务
+initChatSockets(io);
+initWhiteboardSockets(io);
 
 const PORT = process.env.PORT || 3000;
 
@@ -17,10 +36,11 @@ const startServer = async () => {
     await connectDB();
 
     // 启动服务器
-    app.listen(PORT, () => {
+    httpServer.listen(PORT, () => {
       console.log(`✅ Server is running on http://localhost:${PORT}`);
       console.log(`📊 Health check: http://localhost:${PORT}/health`);
       console.log(`🧪 API test: http://localhost:${PORT}/api/test`);
+      console.log(`🔌 Socket.IO real-time service started`);
       
       // 启动定时任务，每5分钟检查一次过期预约
       setInterval(checkExpiredReservations, 5 * 60 * 1000);

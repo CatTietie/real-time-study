@@ -25,6 +25,8 @@ import LearningAnalytics from "./pages/student/LearningAnalytics";
 import ProfileEdit from "./pages/student/ProfileEdit";
 import StudyRoomList from "./pages/student/StudyRoomList";
 import MyReservations from "./pages/student/MyReservations";
+import ChatPage from "./pages/student/ChatPage";
+import WhiteboardPage from "./pages/student/WhiteboardPage";
 import CommunityPosts from "./pages/admin/community/CommunityPosts";
 import CommunityComments from "./pages/admin/community/CommunityComments";
 import CommunityStats from "./pages/admin/community/CommunityStats";
@@ -113,6 +115,36 @@ function App() {
             <RequireStudentAuth>
               <StudentLayout>
                 <ProfileEdit />
+              </StudentLayout>
+            </RequireStudentAuth>
+          } 
+        />
+        <Route 
+          path="/student/chat" 
+          element={
+            <RequireStudentAuth>
+              <StudentLayout>
+                <ChatPage />
+              </StudentLayout>
+            </RequireStudentAuth>
+          } 
+        />
+        <Route 
+          path="/student/whiteboard" 
+          element={
+            <RequireStudentAuth>
+              <StudentLayout>
+                <WhiteboardPage />
+              </StudentLayout>
+            </RequireStudentAuth>
+          } 
+        />
+        <Route 
+          path="/student/whiteboard/:id" 
+          element={
+            <RequireStudentAuth>
+              <StudentLayout>
+                <WhiteboardPage />
               </StudentLayout>
             </RequireStudentAuth>
           } 

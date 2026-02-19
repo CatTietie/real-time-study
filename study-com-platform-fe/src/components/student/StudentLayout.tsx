@@ -8,6 +8,8 @@ import {
   TeamOutlined,
   UsergroupAddOutlined,
   CalendarOutlined,
+  MessageOutlined,
+  EditOutlined,
 } from "@ant-design/icons";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAppSelector, useAppDispatch } from "../../app/hooks";
@@ -50,6 +52,16 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       key: "/student/learning-analytics",
       icon: <BarChartOutlined />,
       label: <Link to="/student/learning-analytics">学习统计</Link>,
+    },
+    {
+      key: "/student/chat",
+      icon: <MessageOutlined />,
+      label: <Link to="/student/chat">实时聊天</Link>,
+    },
+    {
+      key: "/student/whiteboard",
+      icon: <EditOutlined />,
+      label: <Link to="/student/whiteboard">协作白板</Link>,
     },
     {
       key: "/student/profile",

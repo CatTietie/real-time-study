@@ -19,6 +19,10 @@ import ViewRecord from "./view-record.model";
 import StudyRoom from "./study-room.model";
 import RoomReservation from "./room-reservation.model";
 import RoomOccupancy from "./room-occupancy.model";
+import ChatRoom from "./chat-room.model";
+import ChatMessage from "./chat-message.model";
+import Whiteboard from "./whiteboard.model";
+import WhiteboardAction from "./whiteboard-action.model";
 
 export const initAssociations = () => {
   // 用户与帖子/评论/点赞
@@ -113,4 +117,23 @@ export const initAssociations = () => {
   
   StudyRoom.hasMany(RoomOccupancy, { foreignKey: "room_id" });
   RoomOccupancy.belongsTo(StudyRoom, { foreignKey: "room_id" });
+  
+  // 聊天相关关联
+  // 聊天房间与用户关联
+  User.hasMany(ChatRoom, { foreignKey: "created_by" });
+  ChatRoom.belongsTo(User, { foreignKey: "created_by" });
+
+  // 聊天消息关联
+  ChatRoom.hasMany(ChatMessage, { foreignKey: "room_id" });
+  ChatMessage.belongsTo(ChatRoom, { foreignKey: "room_id" });
+  User.hasMany(ChatMessage, { foreignKey: "user_id" });
+  ChatMessage.belongsTo(User, { foreignKey: "user_id" });
+
+  // 白板关联
+  ChatRoom.hasOne(Whiteboard, { foreignKey: "room_id" });
+  Whiteboard.belongsTo(ChatRoom, { foreignKey: "room_id" });
+  Whiteboard.hasMany(WhiteboardAction, { foreignKey: "whiteboard_id" });
+  WhiteboardAction.belongsTo(Whiteboard, { foreignKey: "whiteboard_id" });
+  User.hasMany(WhiteboardAction, { foreignKey: "user_id" });
+  WhiteboardAction.belongsTo(User, { foreignKey: "user_id" });
 };

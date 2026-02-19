@@ -9,6 +9,7 @@ const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const app_1 = __importDefault(require("./app"));
 const database_1 = require("./config/database");
+const study_room_controller_1 = require("./controllers/study-room.controller");
 const PORT = process.env.PORT || 3000;
 const startServer = async () => {
     try {
@@ -20,6 +21,10 @@ const startServer = async () => {
             console.log(`✅ Server is running on http://localhost:${PORT}`);
             console.log(`📊 Health check: http://localhost:${PORT}/health`);
             console.log(`🧪 API test: http://localhost:${PORT}/api/test`);
+            // 启动定时任务，每5分钟检查一次过期预约
+            setInterval(study_room_controller_1.checkExpiredReservations, 5 * 60 * 1000);
+            // 立即执行一次检查
+            (0, study_room_controller_1.checkExpiredReservations)();
         });
     }
     catch (error) {
