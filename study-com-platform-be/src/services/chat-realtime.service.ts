@@ -6,9 +6,13 @@ interface ClientInfo {
   userId: number;
   username: string;
   roomId: number;
+  joinTime: Date;
 }
 
+// 存储所有连接的客户端
 const connectedClients = new Map<string, ClientInfo>();
+// 存储每个房间的在线用户
+const roomOnlineUsers = new Map<number, Set<number>>();
 
 export const initChatSockets = (io: Server) => {
   io.on('connection', (socket: Socket) => {
@@ -17,12 +21,15 @@ export const initChatSockets = (io: Server) => {
     // 用户加入房间
     socket.on('join_chat_room', async (data: { roomId: number; userId: number; username: string }) => {
       try {
+        console.log('用户尝试加入房间:', data);
         // 验证用户权限
         const room = await ChatRoom.findByPk(data.roomId);
         if (!room) {
+          console.log('房间不存在:', data.roomId);
           socket.emit('error', { message: '房间不存在' });
           return;
         }
+        console.log('找到房间:', room.toJSON());
 
         // 加入房间
         socket.join(`chat_${data.roomId}`);
@@ -31,8 +38,15 @@ export const initChatSockets = (io: Server) => {
         connectedClients.set(socket.id, {
           userId: data.userId,
           username: data.username,
-          roomId: data.roomId
+          roomId: data.roomId,
+          joinTime: new Date()
         });
+
+        // 更新房间在线用户列表
+        if (!roomOnlineUsers.has(data.roomId)) {
+          roomOnlineUsers.set(data.roomId, new Set());
+        }
+        roomOnlineUsers.get(data.roomId)!.add(data.userId);
 
         // 通知其他用户
         socket.to(`chat_${data.roomId}`).emit('user_joined', {
@@ -74,10 +88,14 @@ export const initChatSockets = (io: Server) => {
         });
 
         // 广播给房间内所有用户
-        io.to(`chat_${data.roomId}`).emit('receive_chat_message', {
+        const messageData = {
           ...message.toJSON(),
-          username: clientInfo.username
-        });
+          username: clientInfo.username,
+          user_id: clientInfo.userId,
+          created_at: new Date().toISOString()
+        };
+        
+        io.to(`chat_${data.roomId}`).emit('receive_chat_message', messageData);
 
       } catch (error) {
         socket.emit('error', { message: '发送消息失败' });
@@ -88,6 +106,16 @@ export const initChatSockets = (io: Server) => {
     socket.on('disconnect', () => {
       const clientInfo = connectedClients.get(socket.id);
       if (clientInfo) {
+        // 从房间在线用户列表中移除
+        const roomUsers = roomOnlineUsers.get(clientInfo.roomId);
+        if (roomUsers) {
+          roomUsers.delete(clientInfo.userId);
+          // 如果房间没人了，清理房间记录
+          if (roomUsers.size === 0) {
+            roomOnlineUsers.delete(clientInfo.roomId);
+          }
+        }
+        
         socket.to(`chat_${clientInfo.roomId}`).emit('user_left', {
           userId: clientInfo.userId,
           username: clientInfo.username,
@@ -96,6 +124,60 @@ export const initChatSockets = (io: Server) => {
         connectedClients.delete(socket.id);
       }
       console.log('用户断开:', socket.id);
+    });
+
+    // 发送系统消息
+    socket.on('send_system_message', async (data: { roomId: number; message: string }) => {
+      try {
+        console.log('收到系统消息请求:', data);
+        
+        // 保存系统消息到数据库
+        const systemMessage = await ChatMessage.create({
+          room_id: data.roomId,
+          user_id: 0, // 系统消息用户ID设为0
+          content: data.message,
+          message_type: 'system'
+        });
+        
+        console.log('系统消息保存成功:', systemMessage.toJSON());
+
+        // 广播系统消息给房间内所有用户
+        io.to(`chat_${data.roomId}`).emit('receive_chat_message', {
+          ...systemMessage.toJSON(),
+          username: '系统',
+          user_id: 0,
+          created_at: new Date().toISOString()
+        });
+        
+        console.log('系统消息已广播到房间:', `chat_${data.roomId}`);
+      } catch (error) {
+        console.error('发送系统消息失败:', error);
+      }
+    });
+
+    // 获取房间在线用户
+    socket.on('get_online_users', (data: { roomId: number }) => {
+      const roomUsers = roomOnlineUsers.get(data.roomId);
+      if (roomUsers) {
+        // 获取用户详细信息
+        const onlineUserInfo = Array.from(roomUsers).map(userId => {
+          // 查找该用户的连接信息
+          for (const [socketId, clientInfo] of connectedClients) {
+            if (clientInfo.userId === userId && clientInfo.roomId === data.roomId) {
+              return {
+                userId: clientInfo.userId,
+                username: clientInfo.username,
+                joinTime: clientInfo.joinTime
+              };
+            }
+          }
+          return null;
+        }).filter(Boolean);
+        
+        socket.emit('online_users_list', onlineUserInfo);
+      } else {
+        socket.emit('online_users_list', []);
+      }
     });
   });
 };

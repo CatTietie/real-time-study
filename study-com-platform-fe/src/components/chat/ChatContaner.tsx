@@ -16,11 +16,56 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
   roomId, 
   onRoomChange 
 }) => {
-  const { user } = useAppSelector(state => state.auth);
-  const { messages, isConnected, sendMessage } = useChatSocket({
+  const authState = useAppSelector(state => state.auth);
+  
+  // 正确提取用户信息
+  const { token, role, username, userId, nickname } = authState;
+  
+  // 构造user对象用于兼容性
+  const user = username && userId ? {
+    id: userId,
+    username: username,
+    nickname: nickname || '',
+    role: role || 'student'
+  } : undefined;
+  
+  // 强制调试输出
+  console.log('%c=== ChatContainer 调试信息 ===', 'color: blue; font-weight: bold');
+  console.log('完整auth state:', authState);
+  console.log('user对象:', user);
+  
+  // 更严格的用户信息验证
+  const isValidUser = user && 
+                     typeof user.id === 'number' && 
+                     user.id > 0 && 
+                     typeof user.username === 'string' && 
+                     user.username.length > 0;
+  
+  console.log('用户信息是否有效:', isValidUser);
+  
+  // 只有在用户信息有效时才提取参数
+  const extractedUserId = isValidUser ? user.id : 0;
+  const extractedUsername = isValidUser ? user.username : '';
+  
+  console.log('最终使用的参数:', { roomId, userId: extractedUserId, username: extractedUsername });
+  
+  // 如果用户信息无效，显示错误信息而不是聊天界面
+  if (!isValidUser) {
+    console.log('%c用户信息无效，显示错误界面', 'color: red; font-weight: bold');
+    return (
+      <Card title="聊天室">
+        <div style={{ textAlign: 'center', padding: '40px', color: '#ff4d4f' }}>
+          <p>❌ 用户信息加载失败</p>
+          <p>请刷新页面或重新登录</p>
+        </div>
+      </Card>
+    );
+  }
+  
+  const { messages, isConnected, sendMessage, sendSystemMessage, socket } = useChatSocket({
     roomId,
-    userId: user?.id || 0,
-    username: user?.username || ''
+    userId: extractedUserId,
+    username: extractedUsername
   });
 
   const [inputValue, setInputValue] = useState('');
@@ -52,7 +97,11 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
             currentRoomId={roomId}
             onRoomChange={onRoomChange}
           />
-          <OnlineUsers roomId={roomId} />
+          <OnlineUsers 
+            roomId={roomId} 
+            socket={socket}
+            sendSystemMessage={sendSystemMessage}
+          />
         </Col>
       </Row>
     </Card>

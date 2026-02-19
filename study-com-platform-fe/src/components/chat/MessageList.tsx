@@ -37,45 +37,90 @@ export const MessageList: React.FC<MessageListProps> = ({
       height: '400px', 
       overflowY: 'auto', 
       border: '1px solid #f0f0f0',
-      borderRadius: '4px',
-      padding: '12px',
-      marginBottom: '12px'
+      borderRadius: '8px',
+      padding: '16px',
+      marginBottom: '12px',
+      backgroundColor: '#fff'
     }}>
       <List
         dataSource={messages}
-        renderItem={(message) => (
-          <List.Item style={{ 
-            border: 'none', 
-            padding: '8px 0',
-            justifyContent: message.user_id === currentUserId ? 'flex-end' : 'flex-start'
-          }}>
-            <div style={{
-              maxWidth: '70%',
-              textAlign: message.user_id === currentUserId ? 'right' : 'left'
-            }}>
-              <div>
-                <Text strong style={{ fontSize: '12px', color: '#888' }}>
-                  {message.username || `用户${message.user_id}`}
-                </Text>
-                <Text type="secondary" style={{ fontSize: '12px', marginLeft: '8px' }}>
-                  {formatTime(message.created_at)}
-                </Text>
-              </div>
-              <div style={{
-                backgroundColor: message.user_id === currentUserId ? '#1890ff' : '#f0f0f0',
-                color: message.user_id === currentUserId ? 'white' : 'black',
-                padding: '8px 12px',
-                borderRadius: '12px',
-                marginTop: '4px',
-                display: 'inline-block',
-                maxWidth: '100%',
-                wordBreak: 'break-word'
+        locale={{ emptyText: '暂无消息，快来发送第一条消息吧！' }}
+        renderItem={(message) => {
+          // 系统消息的特殊处理
+          if (message.message_type === 'system') {
+            return (
+              <List.Item style={{ 
+                border: 'none', 
+                padding: '8px 0',
+                justifyContent: 'center'
               }}>
-                {message.content}
+                <div style={{
+                  backgroundColor: '#e6f7ff',
+                  color: '#1890ff',
+                  padding: '8px 16px',
+                  borderRadius: '16px',
+                  display: 'inline-block',
+                  maxWidth: '90%',
+                  textAlign: 'center',
+                  border: '1px solid #91d5ff',
+                  fontSize: '14px'
+                }}>
+                  <Text type="secondary" style={{ fontSize: '12px', marginRight: '8px' }}>
+                    {formatTime(message.created_at)}
+                  </Text>
+                  <Text style={{ color: '#1890ff' }}>
+                    {message.content}
+                  </Text>
+                </div>
+              </List.Item>
+            );
+          }
+          
+          // 普通消息的处理
+          return (
+            <List.Item style={{ 
+              border: 'none', 
+              padding: '12px 0',
+              justifyContent: message.user_id === currentUserId ? 'flex-end' : 'flex-start'
+            }}>
+              <div style={{
+                maxWidth: '80%',
+                textAlign: message.user_id === currentUserId ? 'right' : 'left'
+              }}>
+                <div>
+                  <Text strong style={{ fontSize: '12px', color: message.user_id === currentUserId ? '#fff' : '#888' }}>
+                    {message.username || `用户${message.user_id}`}
+                  </Text>
+                  <Text 
+                    type="secondary" 
+                    style={{ 
+                      fontSize: '12px', 
+                      marginLeft: '8px',
+                      color: message.user_id === currentUserId ? 'rgba(255,255,255,0.7)' : '#aaa'
+                    }}
+                  >
+                    {formatTime(message.created_at)}
+                  </Text>
+                </div>
+                <div style={{
+                  backgroundColor: message.user_id === currentUserId ? '#1890ff' : '#f0f0f0',
+                  color: message.user_id === currentUserId ? 'white' : 'rgba(0,0,0,0.85)',
+                  padding: '10px 14px',
+                  borderRadius: '16px',
+                  marginTop: '4px',
+                  display: 'inline-block',
+                  maxWidth: '100%',
+                  wordBreak: 'break-word',
+                  boxShadow: message.user_id === currentUserId 
+                    ? '0 2px 8px rgba(24, 144, 255, 0.2)' 
+                    : '0 1px 4px rgba(0,0,0,0.1)'
+                }}>
+                  {message.content}
+                </div>
               </div>
-            </div>
-          </List.Item>
-        )}
+            </List.Item>
+          );
+        }}
       />
       <div ref={messagesEndRef} />
     </div>

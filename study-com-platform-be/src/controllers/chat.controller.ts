@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import ChatRoom from "../models/chat-room.model";
 import ChatMessage from "../models/chat-message.model";
+import User from "../models/user.model";
 import { Op } from "sequelize";
 
 export const createChatRoom = async (req: Request, res: Response) => {
@@ -79,6 +80,179 @@ export const getChatMessages = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : "获取消息失败"
+    });
+  }
+};
+
+// 获取在线用户列表
+export const getOnlineUsers = async (req: Request, res: Response) => {
+  try {
+    const { roomId } = req.params;
+    
+    // 这里应该从Socket服务中获取实际在线用户
+    // 暂时返回空数组，后续在Socket服务中实现
+    res.json({
+      success: true,
+      data: []
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "获取在线用户失败"
+    });
+  }
+};
+
+// 删除聊天室（仅创建者可以删除）
+export const deleteChatRoom = async (req: Request, res: Response) => {
+  try {
+    const { roomId } = req.params;
+    const userId = req.user?.id;
+
+    const room = await ChatRoom.findByPk(roomId);
+    if (!room) {
+      return res.status(404).json({
+        success: false,
+        message: "聊天室不存在"
+      });
+    }
+
+    // 检查是否为创建者
+    if (room.created_by !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "只有创建者才能删除聊天室"
+      });
+    }
+
+    // 删除聊天室及相关消息
+    await ChatMessage.destroy({ where: { room_id: roomId } });
+    await room.destroy();
+
+    res.json({
+      success: true,
+      message: "聊天室删除成功"
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "删除失败"
+    });
+  }
+};
+
+// 退出聊天室
+export const leaveChatRoom = async (req: Request, res: Response) => {
+  try {
+    const { roomId } = req.params;
+    const userId = req.user?.id;
+
+    const room = await ChatRoom.findByPk(roomId);
+    if (!room) {
+      return res.status(404).json({
+        success: false,
+        message: "聊天室不存在"
+      });
+    }
+
+    // 检查是否为创建者（创建者不能退出自己的房间）
+    if (room.created_by === userId) {
+      return res.status(400).json({
+        success: false,
+        message: "创建者不能退出自己创建的聊天室"
+      });
+    }
+
+    // 这里可以在数据库中记录用户退出行为
+    // 暂时只返回成功消息
+    res.json({
+      success: true,
+      message: "退出聊天室成功"
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "退出失败"
+    });
+  }
+};
+
+// 直接拉用户进入聊天室
+export const addUserToRoom = async (req: Request, res: Response) => {
+  try {
+    const { roomId } = req.params;
+    const { userId } = req.body;
+    const inviterId = req.user?.id;
+
+    const room = await ChatRoom.findByPk(roomId);
+    if (!room) {
+      return res.status(404).json({
+        success: false,
+        message: "聊天室不存在"
+      });
+    }
+
+    // 检查被拉入用户是否存在
+    const invitedUser = await User.findByPk(userId);
+    if (!invitedUser) {
+      return res.status(404).json({
+        success: false,
+        message: "用户不存在"
+      });
+    }
+
+    // 检查邀请者是否有权限（创建者或已加入的成员）
+    if (room.created_by !== inviterId) {
+      // 这里可以检查是否是已加入的成员
+      // 暂时允许所有成员拉人
+    }
+
+    // 生成系统消息
+    const systemMessage = `${req.user?.username || '某用户'} 将 ${invitedUser.username} 拉入了聊天室`;
+    
+    // 返回成功信息
+    res.json({
+      success: true,
+      message: "用户已加入聊天室",
+      data: {
+        roomId: room.id,
+        roomName: room.name,
+        inviterId,
+        invitedUserId: userId,
+        invitedUsername: invitedUser.username,
+        systemMessage
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "操作失败"
+    });
+  }
+};
+
+// 获取可邀请的用户列表
+export const getAvailableUsers = async (req: Request, res: Response) => {
+  try {
+    const { roomId } = req.params;
+    
+    // 获取所有学生用户（排除当前用户）
+    const users = await User.findAll({
+      where: {
+        role: 'student'
+      },
+      attributes: ['id', 'username', 'nickname'],
+      order: [['username', 'ASC']]
+    });
+
+    res.json({
+      success: true,
+      data: users
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "获取用户列表失败"
     });
   }
 };

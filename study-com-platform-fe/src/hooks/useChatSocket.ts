@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import io, { Socket } from 'socket.io-client';
-import type { ChatMessage, OnlineUser } from '../types/chat';
+import type { ChatMessage } from '../types/chat';
 import { API_BASE } from '../services/api';
 
 interface UseChatSocketProps {
@@ -12,8 +12,20 @@ interface UseChatSocketProps {
 export const useChatSocket = ({ roomId, userId, username }: UseChatSocketProps) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  
+  // 使用useRef存储最新的用户信息
+  const userInfoRef = useRef({ roomId, userId, username });
+  
+  // 只有当用户信息有效时才更新ref
+  if (userId > 0 && username) {
+    userInfoRef.current = { roomId, userId, username };
+  }
+  
+  // 调试信息 - 只在用户信息有效时显示
+  if (userId > 0 && username) {
+    console.log('useChatSocket 接收到的有效参数:', { roomId, userId, username });
+  }
 
   useEffect(() => {
     // 创建Socket连接
@@ -22,15 +34,32 @@ export const useChatSocket = ({ roomId, userId, username }: UseChatSocketProps) 
       withCredentials: true
     });
 
-    setSocket(newSocket);
+    setTimeout(() => {
+      setSocket(newSocket);
+    }, 0);
 
     // 连接成功
     newSocket.on('connect', () => {
       console.log('聊天Socket连接成功');
+      
+      // 使用最新的用户信息
+      const { roomId: currentRoomId, userId: currentUserId, username: currentUsername } = userInfoRef.current;
+      console.log('准备加入房间，参数:', { roomId: currentRoomId, userId: currentUserId, username: currentUsername });
+      
+      // 验证用户信息
+      if (!currentUserId || !currentUsername) {
+        console.error('用户信息不完整，无法加入房间:', { userId: currentUserId, username: currentUsername });
+        return;
+      }
+      
       setIsConnected(true);
       
       // 加入聊天房间
-      newSocket.emit('join_chat_room', { roomId, userId, username });
+      newSocket.emit('join_chat_room', { 
+        roomId: currentRoomId, 
+        userId: currentUserId, 
+        username: currentUsername 
+      });
     });
 
     // 收到历史消息
@@ -66,11 +95,12 @@ export const useChatSocket = ({ roomId, userId, username }: UseChatSocketProps) 
     });
 
     return () => {
+      console.log('清理Socket连接');
       newSocket.close();
     };
-  }, [roomId, userId, username]);
+  }, []); // 移除依赖项，只在组件挂载时初始化一次
 
-  // 发送消息
+  // 发送普通消息
   const sendMessage = useCallback((content: string, messageType: string = 'text') => {
     if (socket && isConnected) {
       socket.emit('send_chat_message', {
@@ -81,10 +111,21 @@ export const useChatSocket = ({ roomId, userId, username }: UseChatSocketProps) 
     }
   }, [socket, isConnected, roomId]);
 
+  // 发送系统消息
+  const sendSystemMessage = useCallback((message: string) => {
+    if (socket && isConnected) {
+      socket.emit('send_system_message', {
+        roomId,
+        message
+      });
+    }
+  }, [socket, isConnected, roomId]);
+
   return {
+    socket,
     messages,
-    onlineUsers,
     isConnected,
-    sendMessage
+    sendMessage,
+    sendSystemMessage
   };
 };

@@ -121,7 +121,7 @@ export const initAssociations = () => {
   // 聊天相关关联
   // 聊天房间与用户关联
   User.hasMany(ChatRoom, { foreignKey: "created_by" });
-  ChatRoom.belongsTo(User, { foreignKey: "created_by" });
+  ChatRoom.belongsTo(User, { foreignKey: "created_by", as: "createdBy" });
 
   // 聊天消息关联
   ChatRoom.hasMany(ChatMessage, { foreignKey: "room_id" });

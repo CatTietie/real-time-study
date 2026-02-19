@@ -25,5 +25,11 @@ export interface OnlineUser {
   isOnline: boolean;
 }
 
+export interface AvailableUser {
+  id: number;
+  username: string;
+  nickname?: string;
+}
+
 // 明确导出所有类型
-export type { ChatRoom, ChatMessage, OnlineUser };
+export type { ChatRoom, ChatMessage, OnlineUser, AvailableUser };
