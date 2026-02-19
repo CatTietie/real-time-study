@@ -3,6 +3,12 @@
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 24px;
   
+  // 内容包装器 - 统一页面最大宽度
+  .content-wrapper {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  
   // 欢迎区域样式
   .welcome-section {
     text-align: center;
@@ -39,6 +45,13 @@
       color: white;
       margin-bottom: 24px;
       text-align: center;
+    }
+    
+    // 卡片容器 - 确保居中对齐
+    .cards-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 12px;
     }
     
     .action-card {
@@ -110,6 +123,10 @@
   .student-entry-page {
     padding: 16px;
     
+    .content-wrapper {
+      max-width: 100%;
+    }
+    
     .welcome-section {
       padding: 24px 0;
       
@@ -127,6 +144,10 @@
     }
     
     .quick-actions-section {
+      .cards-container {
+        padding: 0;
+      }
+      
       .action-card {
         .action-content {
           .action-icon {
@@ -138,6 +159,34 @@
             }
           }
         }
+      }
+    }
+  }
+}
+
+// 大屏优化
+@media (min-width: 1200px) {
+  .student-entry-page {
+    .quick-actions-section {
+      .cards-container {
+        max-width: 1400px;
+      }
+    }
+  }
+}
+
+// 超大屏优化
+@media (min-width: 1920px) {
+  .student-entry-page {
+    padding: 40px;
+    
+    .content-wrapper {
+      max-width: 1600px;
+    }
+    
+    .quick-actions-section {
+      .cards-container {
+        max-width: 1500px;
       }
     }
   }
