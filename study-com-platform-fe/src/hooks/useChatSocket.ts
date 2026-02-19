@@ -7,24 +7,25 @@ interface UseChatSocketProps {
   roomId: number;
   userId: number;
   username: string;
+  nickname?: string;
 }
 
-export const useChatSocket = ({ roomId, userId, username }: UseChatSocketProps) => {
+export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSocketProps) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   
   // 使用useRef存储最新的用户信息
-  const userInfoRef = useRef({ roomId, userId, username });
+  const userInfoRef = useRef({ roomId, userId, username, nickname });
   
   // 只有当用户信息有效时才更新ref
   if (userId > 0 && username) {
-    userInfoRef.current = { roomId, userId, username };
+    userInfoRef.current = { roomId, userId, username, nickname };
   }
   
   // 调试信息 - 只在用户信息有效时显示
   if (userId > 0 && username) {
-    console.log('useChatSocket 接收到的有效参数:', { roomId, userId, username });
+    console.log('useChatSocket 接收到的有效参数:', { roomId, userId, username, nickname });
   }
 
   useEffect(() => {
@@ -58,7 +59,8 @@ export const useChatSocket = ({ roomId, userId, username }: UseChatSocketProps) 
       newSocket.emit('join_chat_room', { 
         roomId: currentRoomId, 
         userId: currentUserId, 
-        username: currentUsername 
+        username: currentUsername,
+        nickname: userInfoRef.current.nickname
       });
     });
 
@@ -119,7 +121,8 @@ export const useChatSocket = ({ roomId, userId, username }: UseChatSocketProps) 
       socket.emit('join_chat_room', { 
         roomId, 
         userId, 
-        username 
+        username,
+        nickname
       });
     }
   }, [roomId, socket, isConnected, userId, username]);

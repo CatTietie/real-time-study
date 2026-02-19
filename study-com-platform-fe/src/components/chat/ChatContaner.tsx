@@ -65,7 +65,8 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
   const { messages, isConnected, sendMessage, sendSystemMessage, socket } = useChatSocket({
     roomId,
     userId: extractedUserId,
-    username: extractedUsername
+    username: extractedUsername,
+    nickname: user?.nickname
   });
 
   const [inputValue, setInputValue] = useState('');

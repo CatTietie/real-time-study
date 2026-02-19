@@ -5,6 +5,7 @@ import ChatRoom from '../models/chat-room.model';
 interface ClientInfo {
   userId: number;
   username: string;
+  nickname?: string;
   roomId: number;
   joinTime: Date;
 }
@@ -19,7 +20,7 @@ export const initChatSockets = (io: Server) => {
     console.log('用户连接:', socket.id);
 
     // 用户加入房间
-    socket.on('join_chat_room', async (data: { roomId: number; userId: number; username: string }) => {
+    socket.on('join_chat_room', async (data: { roomId: number; userId: number; username: string; nickname?: string }) => {
       try {
         console.log('用户尝试加入房间:', data);
         // 验证用户权限
@@ -38,6 +39,7 @@ export const initChatSockets = (io: Server) => {
         connectedClients.set(socket.id, {
           userId: data.userId,
           username: data.username,
+          nickname: data.nickname,
           roomId: data.roomId,
           joinTime: new Date()
         });
@@ -58,11 +60,26 @@ export const initChatSockets = (io: Server) => {
         // 发送历史消息（最近50条）
         const recentMessages = await ChatMessage.findAll({
           where: { room_id: data.roomId },
+          include: [{
+            association: 'user',
+            attributes: ['id', 'username', 'nickname']
+          }],
           order: [['created_at', 'DESC']],
           limit: 50
         });
         
-        socket.emit('chat_history', recentMessages.reverse());
+        // 处理消息数据，确保包含正确的用户名
+        const processedMessages = recentMessages.map(msg => {
+          const msgJson: any = msg.toJSON();
+          // 通过关联获取用户信息
+          const user = (msg as any).user;
+          return {
+            ...msgJson,
+            username: user?.nickname || user?.username || `用户${msgJson.user_id}`
+          };
+        });
+        
+        socket.emit('chat_history', processedMessages.reverse());
 
       } catch (error) {
         socket.emit('error', { message: '加入房间失败' });
@@ -90,7 +107,7 @@ export const initChatSockets = (io: Server) => {
         // 广播给房间内所有用户
         const messageData = {
           ...message.toJSON(),
-          username: clientInfo.username,
+          username: clientInfo.nickname || clientInfo.username,
           user_id: clientInfo.userId,
           created_at: new Date().toISOString()
         };
@@ -215,3 +232,5 @@ export const initChatSockets = (io: Server) => {
     });
   });
 };
+
+
