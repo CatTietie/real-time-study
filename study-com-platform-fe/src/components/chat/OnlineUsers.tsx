@@ -14,9 +14,10 @@ interface OnlineUsersProps {
   roomId: number;
   socket: any;
   sendSystemMessage: (message: string) => void;
+  currentUser?: { id: number; username: string };
 }
 
-export const OnlineUsers: React.FC<OnlineUsersProps> = ({ roomId, socket, sendSystemMessage }) => {
+export const OnlineUsers: React.FC<OnlineUsersProps> = ({ roomId, socket, sendSystemMessage, currentUser }) => {
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
@@ -94,7 +95,9 @@ export const OnlineUsers: React.FC<OnlineUsersProps> = ({ roomId, socket, sendSy
         style={{ marginTop: '16px' }}
         extra={
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '12px', color: '#888' }}>{onlineUsers.length}人在线</span>
+            <span style={{ fontSize: '12px', color: '#888' }}>
+              {onlineUsers.filter(user => user.userId !== currentUser?.id).length}人在线
+            </span>
             <Button 
               type="primary" 
               icon={<UsergroupAddOutlined />} 
@@ -113,7 +116,7 @@ export const OnlineUsers: React.FC<OnlineUsersProps> = ({ roomId, socket, sendSy
         </div>
       ) : (
         <List
-          dataSource={onlineUsers}
+          dataSource={onlineUsers.filter(user => user.userId !== currentUser?.id)}
           renderItem={(user) => (
             <List.Item style={{ padding: '8px 0' }}>
               <List.Item.Meta

@@ -101,6 +101,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
             roomId={roomId} 
             socket={socket}
             sendSystemMessage={sendSystemMessage}
+            currentUser={user}
           />
         </Col>
       </Row>
