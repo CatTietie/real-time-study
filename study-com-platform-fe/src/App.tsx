@@ -34,6 +34,7 @@ import Reports from "./pages/admin/Reports";
 import SensitiveWords from "./pages/admin/SensitiveWords";
 import PointsRules from "./pages/admin/PointsRules";
 import PointsLogs from "./pages/admin/PointsLogs";
+import UserManagement from "./pages/admin/UserManagement";
 import NotFound from "./pages/shared/NotFound";
 import Register from "./pages/shared/Register";
 import ComingSoon from "./pages/shared/ComingSoon";
@@ -186,6 +187,7 @@ function App() {
           <Route path="community/stats" element={<CommunityStats />} />
           <Route path="rbac/roles" element={<RBACRoles />} />
           <Route path="rbac/permissions" element={<RBACPermissions />} />
+          <Route path="user-management" element={<UserManagement />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

@@ -357,7 +357,7 @@ export const createCommunityPost = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, message: "用户不存在" });
     }
 
-    const isNewUser = user.createdAt >= todayStart;
+    const isNewUser = user.created_at >= todayStart;
     const textToCheck = [title, content, category, uniqueTags.join(" ")]
       .filter(Boolean)
       .join(" ");
@@ -691,7 +691,7 @@ export const createCommunityComment = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, message: "用户不存在" });
     }
 
-    const isNewUser = user.createdAt >= getStartOfDay();
+    const isNewUser = user.created_at >= getStartOfDay();
     const { hit } = await checkSensitiveWords(content);
     const status = isNewUser || hit ? 0 : 1;
 

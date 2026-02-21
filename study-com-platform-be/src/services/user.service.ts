@@ -14,7 +14,7 @@ export const createUser = async (userData: any) => {
 };
 
 export const getUserByEmail = async (email: string) => {
-  return await User.findOne({ where: { email } });
+  return await User.findOne({ where: { username: email } });
 };
 
 export const getUserByUsername = async (username: string) => {

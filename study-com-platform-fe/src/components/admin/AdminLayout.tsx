@@ -3,6 +3,7 @@ import { Layout, Menu, Button, Dropdown, Space, Typography, theme } from "antd";
 import {
   BarChartOutlined,
   UserOutlined,
+  TeamOutlined,
   FileSearchOutlined,
   MessageOutlined,
   WarningOutlined,
@@ -120,6 +121,11 @@ const baseMenuItems = (role: string | null) => [
     key: "/admin/users",
     icon: <UserOutlined />,
     label: <Link to="/admin/users">用户管理</Link>,
+  },
+  {
+    key: "/admin/user-management",
+    icon: <TeamOutlined />,
+    label: <Link to="/admin/user-management">用户管理</Link>,
   },
   {
     key: "rbac",

@@ -1,5 +1,5 @@
 import { LearningGoal } from "../models/learning-goal.model";
-import { User } from "../models/user.model";
+import User from "../models/user.model";
 
 // 学习目标数据类型
 export interface LearningGoalData {

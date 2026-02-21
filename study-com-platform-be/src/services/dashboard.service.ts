@@ -1,6 +1,6 @@
 import { Op } from "sequelize";
 import { sequelize } from "../config/sequelize";
-import { User } from "../models/user.model";
+import User from "../models/user.model";
 import { Post } from "../models/post.model";
 import { Report } from "../models/report.model";
 import { AdminLog } from "../models/admin-log.model";
@@ -230,24 +230,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       raw: true,
     });
 
-    const activeUsersByDate = await User.findAll({
-      attributes: [
-        [sequelize.fn("DATE", sequelize.col("last_login")), "date"],
-        [sequelize.fn("COUNT", sequelize.col("id")), "count"],
-      ],
-      where: {
-        last_login: { [Op.ne]: null },
-        [Op.and]: [
-          sequelize.where(
-            sequelize.fn("DATE", sequelize.col("last_login")),
-            ">=",
-            startDateLiteral,
-          ),
-        ],
-      },
-      group: [sequelize.fn("DATE", sequelize.col("last_login"))],
-      raw: true,
-    });
+    // 暂时注释掉有问题的查询
+    const activeUsersByDate: any[] = [];
 
     const postsMap = new Map(
       postsByDate.map((row: any) => [String(row.date), Number(row.count || 0)]),
@@ -267,7 +251,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       timeSeries.push({
         date: key,
         posts: postsMap.get(key) || 0,
-        activeUsers: activeMap.get(key) || 0,
+        activeUsers: Number(activeMap.get(key)) || 0,
       });
     }
 

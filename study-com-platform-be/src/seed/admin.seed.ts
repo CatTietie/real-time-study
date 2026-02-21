@@ -29,7 +29,7 @@ export const seedAdminUsers = async () => {
       username: admin.username,
       password: hashed,
       nickname: admin.nickname,
-      role: admin.role,
+      role: admin.role as 'admin' | 'student' | 'super_admin',
       status: 1,
       points: 0,
     });
