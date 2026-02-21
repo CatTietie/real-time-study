@@ -1,3 +1,4 @@
+import React from "react";
 import { Layout, Menu, Button, Dropdown, Space, Typography, theme } from "antd";
 import {
   BarChartOutlined,
@@ -19,6 +20,93 @@ import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import type { RootState } from "../../app/store";
 import { logout } from "../../features/auth/authSlice";
 import { toggleSider } from "../../features/ui/uiSlice";
+// 暂时移除全局样式文件避免冲突
+
+// 动态注入强制样式 - 仅针对管理端
+const injectStyles = () => {
+  // 先移除已存在的样式
+  const existingStyle = document.getElementById('admin-menu-styles');
+  if (existingStyle) {
+    existingStyle.remove();
+  }
+  
+  const style = document.createElement('style');
+  style.id = 'admin-menu-styles';
+  style.innerHTML = `
+    /* 管理端菜单专用样式 - 精确 targeting */
+    .ant-layout-sider .ant-menu.ant-menu-dark .ant-menu-item,
+    .ant-layout-sider .ant-menu.ant-menu-dark .ant-menu-submenu-title {
+      background: transparent !important;
+      color: rgba(0, 0, 0, 0.85) !important;
+      margin: 4px 8px !important;
+      border-radius: 6px !important;
+      transition: all 0.3s ease !important;
+      font-size: 15px !important;
+      line-height: 42px !important;
+      font-weight: 500 !important;
+      padding: 0 20px !important;
+      height: 44px !important;
+      /* 正常样式 */
+      border: none !important;
+    }
+    
+    .ant-layout-sider .ant-menu.ant-menu-dark .ant-menu-item:hover,
+    .ant-layout-sider .ant-menu.ant-menu-dark .ant-menu-submenu-title:hover {
+      background: rgba(0, 0, 0, 0.1) !important;
+      color: rgba(0, 0, 0, 1) !important;
+      font-weight: 600 !important;
+      /* 悬停样式 */
+      border: none !important;
+    }
+    
+    .ant-layout-sider .ant-menu.ant-menu-dark .ant-menu-item-selected,
+    .ant-layout-sider .ant-menu.ant-menu-dark .ant-menu-submenu-selected {
+      background: #1890ff !important;
+      color: #ffffff !important;
+      font-weight: 600 !important;
+      box-shadow: 0 2px 8px rgba(24, 144, 255, 0.4) !important;
+      /* 选中样式 */
+      border: none !important;
+    }
+    
+    .ant-layout-sider .ant-menu.ant-menu-dark .ant-menu-item a,
+    .ant-layout-sider .ant-menu.ant-menu-dark .ant-menu-submenu-title a {
+      color: inherit !important;
+    }
+    
+    /* 确保只影响管理端的子菜单 */
+    .ant-layout-sider .ant-menu-submenu-popup.ant-menu-dark .ant-menu-item {
+      background: transparent !important;
+      color: rgba(0, 0, 0, 0.85) !important;
+      margin: 4px 8px !important;
+      border-radius: 6px !important;
+      transition: all 0.3s ease !important;
+      font-size: 14px !important;
+      line-height: 40px !important;
+      padding: 0 16px !important;
+      height: 40px !important;
+      font-weight: 450 !important;
+      /* 子菜单样式 */
+      border: none !important;
+    }
+    
+    .ant-layout-sider .ant-menu-submenu-popup.ant-menu-dark .ant-menu-item:hover {
+      background: rgba(0, 0, 0, 0.1) !important;
+      color: rgba(0, 0, 0, 1) !important;
+      /* 子菜单悬停 */
+      border: none !important;
+    }
+    
+    .ant-layout-sider .ant-menu-submenu-popup.ant-menu-dark .ant-menu-item-selected {
+      background: #1890ff !important;
+      color: #ffffff !important;
+      font-weight: 500 !important;
+      /* 子菜单选中 */
+      border: none !important;
+    }
+  `;
+  document.head.appendChild(style);
+};
 
 const { Header, Sider, Content } = Layout;
 
@@ -114,6 +202,19 @@ export default function AdminLayout() {
   const { token: themeToken } = theme.useToken();
   const { siderCollapsed } = useAppSelector((state: RootState) => state.ui);
   const { username, role } = useAppSelector((state: RootState) => state.auth);
+  
+  // 组件挂载时注入样式
+  React.useEffect(() => {
+    injectStyles();
+    
+    // 返回清理函数
+    return () => {
+      const existingStyle = document.getElementById('admin-menu-styles');
+      if (existingStyle) {
+        existingStyle.remove();
+      }
+    };
+  }, []);
 
   const menuItems = baseMenuItems(role);
 
@@ -136,7 +237,15 @@ export default function AdminLayout() {
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
-      <Sider trigger={null} collapsible collapsed={siderCollapsed}>
+      <Sider 
+        trigger={null} 
+        collapsible 
+        collapsed={siderCollapsed}
+        style={{
+          background: '#1f1f1f',
+          boxShadow: '2px 0 8px rgba(0,0,0,0.15)'
+        }}
+      >
         <div
           style={{
             height: 64,
@@ -145,15 +254,25 @@ export default function AdminLayout() {
             color: "#fff",
             fontWeight: 600,
             letterSpacing: 1,
+            fontSize: siderCollapsed ? '12px' : '16px',
+            background: 'linear-gradient(135deg, #1890ff 0%, #40a9ff 100%)',
+            margin: '8px',
+            borderRadius: '8px',
+            transition: 'all 0.3s ease'
           }}
         >
-          管理端菜单
+          {siderCollapsed ? '管理' : '管理端菜单'}
         </div>
         <Menu
           theme="dark"
           mode="inline"
           selectedKeys={selectedKeys}
           items={menuItems}
+          style={{
+            background: '#1f1f1f',
+            borderRight: 0
+          }}
+          className="admin-menu-target"
         />
       </Sider>
       <Layout>
@@ -191,5 +310,7 @@ export default function AdminLayout() {
         </Content>
       </Layout>
     </Layout>
+    
+
   );
 }

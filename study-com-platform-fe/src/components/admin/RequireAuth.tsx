@@ -9,7 +9,7 @@ interface RequireAuthProps {
 
 export default function RequireAuth({ children }: RequireAuthProps) {
   const { token, role } = useAppSelector((state: RootState) => state.auth);
-
+  
   if (!token || (role !== "admin" && role !== "super_admin")) {
     return <Navigate to="/admin/login" replace />;
   }

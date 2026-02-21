@@ -1,0 +1,238 @@
+/* 管理端菜单样式 */
+
+/* 最高优先级选择器 - 确保样式生效 */
+.custom-admin-menu .ant-menu-item,
+.custom-admin-menu .ant-menu-submenu-title,
+.ant-menu.ant-menu-dark .ant-menu-item,
+.ant-menu.ant-menu-dark .ant-menu-submenu-title,
+.ant-layout-sider .ant-menu.ant-menu-dark .ant-menu-item,
+.ant-layout-sider .ant-menu.ant-menu-dark .ant-menu-submenu-title,
+body .custom-admin-menu .ant-menu-item,
+body .custom-admin-menu .ant-menu-submenu-title {
+  background: transparent !important;
+  /* 1. 提高文字不透明度，增强对比度 */
+  color: rgba(255, 255, 255, 0.9) !important;
+  margin: 4px 8px !important;
+  border-radius: 6px !important;
+  transition: all 0.3s ease !important;
+  /* 2. 增大字体，提升可读性 */
+  font-size: 15px !important;
+  /* 3. 优化行高，避免文字垂直挤压 */
+  line-height: 42px !important;
+  /* 4. 增加字体粗细，让文字更清晰 */
+  font-weight: 500 !important;
+  /* 5. 调整内边距，避免文字与图标重叠 */
+  padding: 0 20px !important;
+  height: 44px !important;
+}
+  background: transparent !important;
+  /* 1. 提高文字不透明度，增强对比度 */
+  color: rgba(255, 255, 255, 0.85) !important;
+  margin: 4px 8px !important;
+  border-radius: 6px !important;
+  transition: all 0.3s ease !important;
+  /* 2. 增大字体，提升可读性 */
+  font-size: 15px !important;
+  /* 3. 优化行高，避免文字垂直挤压 */
+  line-height: 42px !important;
+  /* 4. 增加字体粗细，让文字更清晰 */
+  font-weight: 450 !important;
+  /* 5. 调整内边距，避免文字与图标重叠 */
+  padding: 0 20px !important;
+  height: 44px !important;
+}
+
+/* 未选中菜单项悬停效果 */
+.custom-admin-menu .ant-menu-item:hover,
+.custom-admin-menu .ant-menu-submenu-title:hover,
+.ant-menu.ant-menu-dark .ant-menu-item:hover,
+.ant-menu.ant-menu-dark .ant-menu-submenu-title:hover,
+.ant-layout-sider .ant-menu.ant-menu-dark .ant-menu-item:hover,
+.ant-layout-sider .ant-menu.ant-menu-dark .ant-menu-submenu-title:hover,
+body .custom-admin-menu .ant-menu-item:hover,
+body .custom-admin-menu .ant-menu-submenu-title:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  /* 悬停时进一步提高对比度 */
+  color: rgba(255, 255, 255, 1) !important;
+  font-weight: 600 !important;
+}
+
+/* 选中菜单项样式 - 确保选中态文字高亮 */
+.custom-admin-menu .ant-menu-item-selected,
+.ant-menu.ant-menu-dark .ant-menu-item-selected,
+.ant-layout-sider .ant-menu.ant-menu-dark .ant-menu-item-selected,
+body .custom-admin-menu .ant-menu-item-selected {
+  background: #1890ff !important;
+  color: #ffffff !important;
+  font-weight: 600 !important; /* 选中态加粗，突出显示 */
+  font-size: 15px !important;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3) !important; /* 添加选中态阴影 */
+}
+
+/* 选中菜单项悬停效果 */
+.custom-admin-menu .ant-menu-item-selected:hover,
+.ant-menu.ant-menu-dark .ant-menu-item-selected:hover,
+.ant-layout-sider .ant-menu.ant-menu-dark .ant-menu-item-selected:hover,
+body .custom-admin-menu .ant-menu-item-selected:hover {
+  background: #40a9ff !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 12px rgba(64, 169, 255, 0.4) !important;
+}
+
+/* 子菜单项样式 - 保持子菜单文字清晰度 */
+.custom-admin-menu .ant-menu-submenu-popup,
+.ant-menu-dark .ant-menu-submenu-popup,
+.ant-menu-submenu-popup.ant-menu-dark,
+body .custom-admin-menu .ant-menu-submenu-popup {
+  background: #1f1f1f !important;
+  border-radius: 6px !important;
+  box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.32) !important;
+}
+
+.custom-admin-menu .ant-menu-submenu-popup .ant-menu-item,
+.ant-menu-dark .ant-menu-submenu-popup .ant-menu-item,
+.ant-menu-submenu-popup.ant-menu-dark .ant-menu-item,
+body .custom-admin-menu .ant-menu-submenu-popup .ant-menu-item {
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.9) !important; /* 子菜单文字提高对比度 */
+  margin: 4px 8px !important;
+  border-radius: 6px !important;
+  transition: all 0.3s ease !important;
+  font-size: 14px !important; /* 子菜单字体稍小，但仍清晰 */
+  line-height: 40px !important;
+  padding: 0 16px !important;
+  height: 40px !important;
+  font-weight: 450 !important;
+}
+
+.custom-admin-menu .ant-menu-submenu-popup .ant-menu-item:hover,
+.ant-menu-dark .ant-menu-submenu-popup .ant-menu-item:hover,
+.ant-menu-submenu-popup.ant-menu-dark .ant-menu-item:hover,
+body .custom-admin-menu .ant-menu-submenu-popup .ant-menu-item:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 1) !important;
+}
+
+.custom-admin-menu .ant-menu-submenu-popup .ant-menu-item-selected,
+.ant-menu-dark .ant-menu-submenu-popup .ant-menu-item-selected,
+.ant-menu-submenu-popup.ant-menu-dark .ant-menu-item-selected,
+body .custom-admin-menu .ant-menu-submenu-popup .ant-menu-item-selected {
+  background: #1890ff !important;
+  color: #ffffff !important;
+  font-weight: 500 !important;
+}
+
+/* 菜单图标样式 - 调整图标与文字间距，避免遮挡 */
+.custom-admin-menu .ant-menu-item .anticon,
+.custom-admin-menu .ant-menu-submenu-title .anticon,
+.ant-menu.ant-menu-dark .ant-menu-item .anticon,
+.ant-menu.ant-menu-dark .ant-menu-submenu-title .anticon,
+.ant-layout-sider .ant-menu.ant-menu-dark .ant-menu-item .anticon,
+.ant-layout-sider .ant-menu.ant-menu-dark .ant-menu-submenu-title .anticon,
+body .custom-admin-menu .ant-menu-item .anticon,
+body .custom-admin-menu .ant-menu-submenu-title .anticon {
+  color: inherit !important;
+  font-size: 18px !important; /* 图标稍大，与文字比例协调 */
+  margin-right: 14px !important; /* 增加图标与文字间距 */
+}
+
+/* 折叠菜单样式 - 确保折叠后文字/图标居中且清晰 */
+.ant-layout-sider-collapsed .custom-admin-menu .ant-menu-item,
+.ant-layout-sider-collapsed .custom-admin-menu .ant-menu-submenu-title,
+.ant-layout-sider-collapsed .ant-menu.ant-menu-dark .ant-menu-item,
+.ant-layout-sider-collapsed .ant-menu.ant-menu-dark .ant-menu-submenu-title,
+.ant-layout-sider-collapsed.ant-layout-sider .ant-menu.ant-menu-dark .ant-menu-item,
+.ant-layout-sider-collapsed.ant-layout-sider .ant-menu.ant-menu-dark .ant-menu-submenu-title,
+body .ant-layout-sider-collapsed .custom-admin-menu .ant-menu-item,
+body .ant-layout-sider-collapsed .custom-admin-menu .ant-menu-submenu-title {
+  margin: 4px 4px !important;
+  justify-content: center !important;
+  padding: 0 16px !important;
+  font-size: 14px !important; /* 折叠后字体稍小，适配空间 */
+}
+
+/* 链接文字样式 - 确保链接文字与菜单项文字一致 */
+.custom-admin-menu .ant-menu-item a,
+.custom-admin-menu .ant-menu-submenu-title span,
+.ant-menu.ant-menu-dark .ant-menu-item a,
+.ant-menu.ant-menu-dark .ant-menu-submenu-title span,
+body .custom-admin-menu .ant-menu-item a,
+body .custom-admin-menu .ant-menu-submenu-title span {
+  color: inherit !important;
+  text-decoration: none !important;
+  /* 确保链接文字不被浏览器默认样式覆盖 */
+  font-size: inherit !important;
+  font-weight: inherit !important;
+}
+
+/* 菜单分组标题样式 */
+.custom-admin-menu .ant-menu-submenu-title,
+.ant-menu.ant-menu-dark .ant-menu-submenu-title,
+body .custom-admin-menu .ant-menu-submenu-title {
+  font-weight: 500 !important;
+}
+
+/* 全局保障样式 - 防止样式被覆盖 */
+.ant-menu-dark:not(.ant-menu-horizontal) .ant-menu-item-selected,
+.custom-admin-menu .ant-menu-item-selected {
+  background: #1890ff !important;
+}
+
+body .ant-menu-dark .ant-menu-item,
+body .ant-layout-sider .ant-menu-dark .ant-menu-item,
+body .custom-admin-menu .ant-menu-item {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+body .ant-menu-dark .ant-menu-item:hover,
+body .ant-layout-sider .ant-menu-dark .ant-menu-item:hover,
+body .custom-admin-menu .ant-menu-item:hover {
+  color: rgba(255, 255, 255, 1) !important;
+}
+
+body .ant-menu-dark .ant-menu-item-selected,
+body .ant-layout-sider .ant-menu-dark .ant-menu-item-selected,
+body .custom-admin-menu .ant-menu-item-selected {
+  color: #ffffff !important;
+  background: #1890ff !important;
+  font-weight: 600 !important;
+}
+
+.ant-menu-item[data-menu-id],
+.custom-admin-menu .ant-menu-item[data-menu-id] {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.ant-menu-item[data-menu-id]:hover,
+.custom-admin-menu .ant-menu-item[data-menu-id]:hover {
+  color: rgba(255, 255, 255, 1) !important;
+}
+
+.ant-menu-item-selected[data-menu-id],
+.custom-admin-menu .ant-menu-item-selected[data-menu-id] {
+  color: #ffffff !important;
+  background: #1890ff !important;
+  font-weight: 600 !important;
+}
+
+/* 最终强制样式 - 使用 !important 确保生效 */
+.ant-menu-item,
+.ant-menu-submenu-title {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.ant-menu-item:hover,
+.ant-menu-submenu-title:hover {
+  color: rgba(255, 255, 255, 1) !important;
+}
+
+.ant-menu-item-selected {
+  color: #ffffff !important;
+  background: #1890ff !important;
+  font-weight: 600 !important;
+}
+
+/* 调试用样式 - 如果看到红色边框说明样式已应用 */
+/* .custom-admin-menu .ant-menu-item {
+  border: 2px solid red !important;
+} */
