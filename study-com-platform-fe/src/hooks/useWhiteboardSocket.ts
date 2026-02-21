@@ -32,6 +32,7 @@ export const useWhiteboardSocket = ({
 
     newSocket.on('connect', () => {
       setIsConnected(true);
+      console.log('📤 发送加入白板请求:', { whiteboardId, userId, username, roomId });
       newSocket.emit('join_whiteboard', { whiteboardId, userId, username, roomId });
     });
 
@@ -42,6 +43,13 @@ export const useWhiteboardSocket = ({
 
     // 接收白板更新
     newSocket.on('whiteboard_update', (action: WhiteboardAction) => {
+      console.log('📥 接收到白板更新:', {
+        actionType: action.type,
+        userId: action.userId,
+        username: action.username,
+        dataPreview: action.data ? JSON.stringify(action.data).substring(0, 100) + '...' : 'null',
+        timestamp: new Date().toISOString()
+      });
       setActions(prev => [...prev, action]);
     });
 

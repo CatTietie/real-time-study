@@ -19,9 +19,18 @@ export const initWhiteboardSockets = (io: Server) => {
     socket.on('join_whiteboard', async (data: { 
       whiteboardId: number; 
       userId: number; 
-      username: string 
+      username: string;
+      roomId?: number;
     }) => {
       try {
+        console.log('📥 用户加入白板:', {
+          whiteboardId: data.whiteboardId,
+          userId: data.userId,
+          username: data.username,
+          roomId: data.roomId,
+          socketId: socket.id
+        });
+        
         socket.join(`whiteboard_${data.whiteboardId}`);
         
         // 初始化客户端列表
@@ -48,8 +57,11 @@ export const initWhiteboardSockets = (io: Server) => {
         if (whiteboard) {
           socket.emit('whiteboard_state', whiteboard);
         }
+        
+        console.log('✅ 用户成功加入白板房间');
 
       } catch (error) {
+        console.error('❌ 加入白板失败:', error);
         socket.emit('error', { message: '加入白板失败' });
       }
     });
@@ -57,12 +69,20 @@ export const initWhiteboardSockets = (io: Server) => {
     // 白板操作同步
     socket.on('whiteboard_action', async (data: {
       whiteboardId: number;
-      actionType: 'draw' | 'erase' | 'text' | 'shape' | 'image' | 'clear' | 'undo' | 'redo';
+      actionType: 'draw' | 'erase' | 'text' | 'shape' | 'image' | 'clear' | 'undo' | 'redo' | 'tldraw_change';
       actionData: any;
     }) => {
       try {
         const clientInfo = whiteboardClients.get(data.whiteboardId)?.get(socket.id);
         if (!clientInfo) return;
+
+        console.log('📥 接收到白板操作:', {
+          whiteboardId: data.whiteboardId,
+          actionType: data.actionType,
+          userId: clientInfo.userId,
+          username: clientInfo.username,
+          dataPreview: data.actionData ? JSON.stringify(data.actionData).substring(0, 100) + '...' : 'null'
+        });
 
         // 保存操作记录
         await WhiteboardAction.create({
@@ -87,14 +107,18 @@ export const initWhiteboardSockets = (io: Server) => {
         }
 
         // 广播操作给其他白板用户
-        socket.to(`whiteboard_${data.whiteboardId}`).emit('whiteboard_update', {
+        const broadcastData = {
           userId: clientInfo.userId,
           username: clientInfo.username,
-          actionType: data.actionType,
-          actionData: data.actionData
-        });
+          type: data.actionType,
+          data: data.actionData
+        };
+        
+        console.log('📤 广播白板更新:', broadcastData);
+        socket.to(`whiteboard_${data.whiteboardId}`).emit('whiteboard_update', broadcastData);
 
       } catch (error) {
+        console.error('❌ 白板操作处理失败:', error);
         socket.emit('error', { message: '白板操作失败' });
       }
     });

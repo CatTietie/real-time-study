@@ -23,6 +23,7 @@ import ChatRoom from "./chat-room.model";
 import ChatMessage from "./chat-message.model";
 import Whiteboard from "./whiteboard.model";
 import WhiteboardAction from "./whiteboard-action.model";
+import WhiteboardSnapshot from "./whiteboard-snapshot.model";
 
 export const initAssociations = () => {
   // 用户与帖子/评论/点赞
@@ -136,4 +137,10 @@ export const initAssociations = () => {
   WhiteboardAction.belongsTo(Whiteboard, { foreignKey: "whiteboard_id" });
   User.hasMany(WhiteboardAction, { foreignKey: "user_id" });
   WhiteboardAction.belongsTo(User, { foreignKey: "user_id" });
+  
+  // 白板快照关联
+  Whiteboard.hasMany(WhiteboardSnapshot, { foreignKey: "whiteboard_id" });
+  WhiteboardSnapshot.belongsTo(Whiteboard, { foreignKey: "whiteboard_id" });
+  User.hasMany(WhiteboardSnapshot, { foreignKey: "user_id" });
+  WhiteboardSnapshot.belongsTo(User, { foreignKey: "user_id" });
 };

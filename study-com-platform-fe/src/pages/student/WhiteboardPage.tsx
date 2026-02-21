@@ -16,6 +16,8 @@ interface WhiteboardPageProps {
 const WhiteboardContent: React.FC<WhiteboardPageProps> = ({ whiteboardId }) => {
   const { user } = useAppSelector(state => state.auth);
   const [whiteboard, setWhiteboard] = useState<unknown>(null);
+  const [savedSnapshots, setSavedSnapshots] = useState<any[]>([]);
+  const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
   
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
@@ -46,6 +48,45 @@ const WhiteboardContent: React.FC<WhiteboardPageProps> = ({ whiteboardId }) => {
     loadInitialData();
   }, [whiteboardId, setWhiteboard]);
 
+  // 加载选定聊天室的保存快照
+  const loadRoomSnapshots = async (roomId: number) => {
+    try {
+      console.log('加载聊天室快照:', roomId);
+      const data = await getChatRoomWhiteboardSnapshots(roomId);
+      setSavedSnapshots(data.snapshots || []);
+      console.log('加载到快照:', data.snapshots?.length || 0, '个');
+    } catch (error) {
+      console.error('加载快照失败:', error);
+      setSavedSnapshots([]);
+    }
+  };
+
+  const handleJoinWhiteboard = async (roomId: number) => {
+    try {
+      console.log('Joining whiteboard for room:', roomId);
+      
+      // 先加载该聊天室的保存快照
+      await loadRoomSnapshots(roomId);
+      setSelectedRoomId(roomId);
+      
+      // 直接加入聊天室对应的白板，实现协作
+      const wb = await createWhiteboard({
+        roomId: Number(roomId),
+        name: `协作白板 - ${chatRooms.find(r => r.id === roomId)?.name || '聊天室'}`,
+        type: 'collaborative',
+        width: 1200,
+        height: 800,
+        backgroundColor: '#FFFFFF'
+      });
+      
+      setWhiteboard(wb);
+      message.success('已加入协作白板');
+    } catch (error) {
+      console.error('加入白板失败:', error);
+      message.error((error as Error).message || '加入白板失败');
+    }
+  };
+
   const handleCreateWhiteboard = async (values: unknown) => {
     try {
       console.log('Form values:', values);
@@ -70,7 +111,7 @@ const WhiteboardContent: React.FC<WhiteboardPageProps> = ({ whiteboardId }) => {
       setWhiteboard(newWb);
       setModalVisible(false);
       form.resetFields();
-      message.success('白板创建成功');
+      message.success('已加入协作白板');
     } catch (error) {
       console.error('创建白板失败:', error);
       message.error((error as Error).message || '创建白板失败');
@@ -112,12 +153,39 @@ const WhiteboardContent: React.FC<WhiteboardPageProps> = ({ whiteboardId }) => {
           title={`协作白板 - ${whiteboard?.name || '未命名'}`}
           extra={
             <Space>
-              <Button type="primary" onClick={() => setModalVisible(true)}>
+              <Select
+                placeholder="选择聊天室加入白板"
+                style={{ width: 200 }}
+                onChange={handleJoinWhiteboard}
+                disabled={!!whiteboard}
+              >
+                {chatRooms.map(room => (
+                  <Option key={room.id} value={room.id}>
+                    {room.name} ({room.type})
+                  </Option>
+                ))}
+              </Select>
+              <Button 
+                type="primary" 
+                onClick={() => setModalVisible(true)}
+                disabled={!!whiteboard}
+              >
                 新建白板
               </Button>
               {whiteboard && (
                 <Button onClick={handleExport}>
                   导出PNG
+                </Button>
+              )}
+              {whiteboard && (
+                <Button 
+                  danger 
+                  onClick={() => {
+                    setWhiteboard(null);
+                    message.success('已退出白板');
+                  }}
+                >
+                  退出白板
                 </Button>
               )}
             </Space>
@@ -142,12 +210,101 @@ const WhiteboardContent: React.FC<WhiteboardPageProps> = ({ whiteboardId }) => {
               />
             </div>
           ) : (
-            <div style={{ 
-              textAlign: 'center', 
-              padding: '40px',
-              color: '#666'
-            }}>
-              <p>请选择或创建一个白板开始协作</p>
+            <div>
+              {selectedRoomId && savedSnapshots.length > 0 ? (
+                // 显示保存的快照列表
+                <div style={{ padding: '20px' }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center', 
+                    marginBottom: '20px' 
+                  }}>
+                    <h3>💾 选择要继续编辑的白板</h3>
+                    <Button 
+                      onClick={() => {
+                        setSelectedRoomId(null);
+                        setSavedSnapshots([]);
+                      }}
+                    >
+                      返回选择聊天室
+                    </Button>
+                  </div>
+                  <List
+                    dataSource={savedSnapshots}
+                    renderItem={(snapshot) => (
+                      <List.Item
+                        actions={[
+                          <Button 
+                            type="primary" 
+                            onClick={async () => {
+                              try {
+                                // 先加入白板
+                                const wb = await createWhiteboard({
+                                  roomId: selectedRoomId,
+                                  name: `协作白板 - ${chatRooms.find(r => r.id === selectedRoomId)?.name || '聊天室'}`,
+                                  type: 'collaborative',
+                                  width: 1200,
+                                  height: 800,
+                                  backgroundColor: '#FFFFFF'
+                                });
+                                
+                                setWhiteboard(wb);
+                                message.success(`已加载白板: ${snapshot.name}`);
+                              } catch (error) {
+                                console.error('加载白板失败:', error);
+                                message.error('加载白板失败');
+                              }
+                            }}
+                          >
+                            继续编辑
+                          </Button>
+                        ]}
+                      >
+                        <List.Item.Meta
+                          title={snapshot.name}
+                          description={
+                            <div>
+                              <div>创建者: {snapshot.User?.nickname || snapshot.User?.username || '未知'}</div>
+                              <div>更新时间: {new Date(snapshot.updated_at).toLocaleString()}</div>
+                            </div>
+                          }
+                        />
+                      </List.Item>
+                    )}
+                    locale={{ emptyText: '该聊天室暂无保存的白板' }}
+                  />
+                </div>
+              ) : (
+                // 显示初始选择界面
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '60px 40px',
+                  color: '#666'
+                }}>
+                  <div style={{ fontSize: '48px', marginBottom: '20px' }}>🎨</div>
+                  <h2 style={{ marginBottom: '16px', color: '#333' }}>欢迎来到协作白板</h2>
+                  <p style={{ marginBottom: '24px', fontSize: '16px' }}>
+                    选择一个聊天室开始绘画吧！
+                  </p>
+                  <div style={{ 
+                    background: '#f0f8ff', 
+                    padding: '20px', 
+                    borderRadius: '8px', 
+                    maxWidth: '500px', 
+                    margin: '0 auto',
+                    textAlign: 'left'
+                  }}>
+                    <h4 style={{ color: '#1890ff', marginBottom: '12px' }}>💡 使用说明：</h4>
+                    <ul style={{ paddingLeft: '20px', margin: 0 }}>
+                      <li>选择聊天室后可查看该聊天室保存的历史白板</li>
+                      <li>可以选择继续编辑已保存的白板</li>
+                      <li>也可以创建全新的白板</li>
+                      <li>编辑完成后记得点击保存按钮</li>
+                    </ul>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </Card>

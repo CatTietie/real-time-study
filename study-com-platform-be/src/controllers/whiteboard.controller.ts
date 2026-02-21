@@ -1,7 +1,9 @@
 import { Request, Response } from "express";
 import Whiteboard from "../models/whiteboard.model";
 import WhiteboardAction from "../models/whiteboard-action.model";
+import WhiteboardSnapshot from "../models/whiteboard-snapshot.model";
 import ChatRoom from "../models/chat-room.model";
+import User from "../models/user.model";
 
 export const createWhiteboard = async (req: Request, res: Response) => {
   try {
@@ -50,9 +52,10 @@ export const createWhiteboard = async (req: Request, res: Response) => {
     
     if (whiteboard) {
       console.log('Whiteboard already exists:', whiteboard.toJSON());
+      // 如果白板已存在，直接返回现有白板，实现协作
       return res.json({
         success: true,
-        message: "白板已存在",
+        message: "已加入协作白板",
         data: whiteboard
       });
     }
@@ -322,6 +325,55 @@ export const exportWhiteboardToPng = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : "导出失败"
+    });
+  }
+};
+
+// 获取特定聊天室的所有白板快照
+export const getChatRoomWhiteboardSnapshots = async (req: Request, res: Response) => {
+  try {
+    const { roomId } = req.params;
+    
+    console.log('获取聊天室白板快照:', roomId);
+    
+    // 先找到该聊天室对应的白板
+    const whiteboard = await Whiteboard.findOne({
+      where: { room_id: roomId }
+    });
+    
+    if (!whiteboard) {
+      return res.status(404).json({
+        success: false,
+        message: "该聊天室尚未创建白板"
+      });
+    }
+    
+    // 获取该白板的所有快照
+    const snapshots = await WhiteboardSnapshot.findAll({
+      where: { whiteboard_id: whiteboard.id },
+      include: [{
+        model: User,
+        as: 'User',
+        attributes: ['username', 'nickname']
+      }],
+      order: [['updated_at', 'DESC']]
+    });
+    
+    console.log('找到快照数量:', snapshots.length);
+    
+    res.json({
+      success: true,
+      data: {
+        whiteboard: whiteboard.toJSON(),
+        snapshots: snapshots
+      }
+    });
+    
+  } catch (error) {
+    console.error('获取聊天室白板快照失败:', error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "获取快照失败"
     });
   }
 };

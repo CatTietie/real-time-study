@@ -1,8 +1,23 @@
 import { Tldraw, useEditor } from '@tldraw/tldraw'
 import '@tldraw/tldraw/tldraw.css'
 import '../../styles/tldraw-enhanced.css'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useTldrawSync } from '../../hooks/useTldrawSync'
+import { saveWhiteboardSnapshot, getWhiteboardSnapshots } from '../../services/whiteboard'
+import { Button, Modal, List, Input, message } from 'antd'
+import { SaveOutlined, HistoryOutlined, DeleteOutlined } from '@ant-design/icons'
+
+interface WhiteboardSnapshot {
+  id: number;
+  name: string;
+  data: string;
+  created_at: string;
+  updated_at: string;
+  User?: {
+    username: string;
+    nickname: string;
+  };
+}
 
 interface TldrawWhiteboardProps {
   whiteboardId: number
@@ -59,8 +74,20 @@ const TldrawInner = ({
     }
   }, [actions, editor, processRemoteActions])
 
-  // 返回一个透明的占位元素，不影响渲染
-  return <div style={{ width: 0, height: 0, overflow: 'hidden' }} />;
+  // 返回一个可见的元素，确保Tldraw正常渲染
+  return (
+    <div 
+      style={{ 
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        pointerEvents: 'none',
+        zIndex: 100
+      }} 
+    />
+  );
 }
 
 export const TldrawWhiteboard = ({
@@ -72,6 +99,12 @@ export const TldrawWhiteboard = ({
   const [isReady, setIsReady] = useState(false);
   const [currentTool, setCurrentTool] = useState('select');
   const [showHelp, setShowHelp] = useState(false);
+  const [snapshots, setSnapshots] = useState<WhiteboardSnapshot[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [snapshotName, setSnapshotName] = useState('');
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const editorRef = useRef<any>(null);
   
   // 工具说明
   const toolDescriptions = {
@@ -85,6 +118,65 @@ export const TldrawWhiteboard = ({
     line: '直线工具 - 绘制直线',
     highlight: '高亮工具 - 高亮标记',
     laser: '激光笔 - 临时指示'
+  };
+
+  // 保存白板快照
+  const handleSaveSnapshot = async () => {
+    if (!editorRef.current) return;
+    
+    try {
+      setSaving(true);
+      // 使用Tldraw v4的正确API
+      const snapshot = editorRef.current.getSnapshot();
+      const name = snapshotName || `白板快照 ${new Date().toLocaleString()}`;
+      
+      const result = await saveWhiteboardSnapshot(whiteboardId, snapshot, name);
+      if (result.success) {
+        message.success('白板保存成功');
+        setShowSaveModal(false);
+        setSnapshotName('');
+        // 刷新快照列表
+        loadSnapshots();
+      }
+    } catch (error) {
+      console.error('保存白板失败:', error);
+      message.error('保存失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // 加载快照列表
+  const loadSnapshots = async () => {
+    try {
+      const snapshotList = await getWhiteboardSnapshots(whiteboardId);
+      setSnapshots(snapshotList);
+      
+      // 如果有快照，自动加载最新的一个
+      if (snapshotList.length > 0) {
+        const latestSnapshot = snapshotList[0];
+        console.log('自动加载最新快照:', latestSnapshot.name);
+        loadSnapshot(latestSnapshot);
+      }
+    } catch (error) {
+      console.error('加载快照列表失败:', error);
+    }
+  };
+
+  // 加载快照到白板
+  const loadSnapshot = async (snapshot: WhiteboardSnapshot) => {
+    try {
+      if (!editorRef.current) return;
+      
+      const snapshotData = JSON.parse(snapshot.data);
+      // 使用Tldraw v4的正确API
+      editorRef.current.loadSnapshot(snapshotData);
+      message.success(`已加载快照: ${snapshot.name}`);
+      setShowHistory(false);
+    } catch (error) {
+      console.error('加载快照失败:', error);
+      message.error('加载快照失败');
+    }
   };
   
   return (
@@ -141,7 +233,7 @@ export const TldrawWhiteboard = ({
         <div>用户名: {username || '未登录'}</div>
       </div>
       
-      {/* 工具状态显示 */}
+      {/* 工具状态显示和操作按钮 */}
       <div style={{
         position: 'absolute',
         bottom: '10px',
@@ -152,13 +244,31 @@ export const TldrawWhiteboard = ({
         borderRadius: '6px',
         fontSize: '14px',
         color: '#333',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px'
       }}>
-        当前工具: {toolDescriptions[currentTool as keyof typeof toolDescriptions]?.split(' - ')[0] || '未知'}
+        <span>当前工具: {toolDescriptions[currentTool as keyof typeof toolDescriptions]?.split(' - ')[0] || '未知'}</span>
+        <Button 
+          type="primary" 
+          size="small"
+          icon={<SaveOutlined />}
+          onClick={() => setShowSaveModal(true)}
+          loading={saving}
+        >
+          保存
+        </Button>
+        <Button 
+          size="small"
+          icon={<HistoryOutlined />}
+          onClick={() => setShowHistory(true)}
+        >
+          历史
+        </Button>
         <button 
           onClick={() => setShowHelp(!showHelp)}
           style={{
-            marginLeft: '10px',
             background: '#1890ff',
             color: 'white',
             border: 'none',
@@ -200,6 +310,7 @@ export const TldrawWhiteboard = ({
         onMount={(editor) => {
           console.log('Tldraw mounted successfully', editor);
           setIsReady(true);
+          editorRef.current = editor;
           
           // 监听工具变化
           editor.addListener('tool-change', (tool: string) => {
@@ -209,6 +320,9 @@ export const TldrawWhiteboard = ({
           
           // 设置初始工具
           editor.setCurrentTool('draw');
+          
+          // 加载快照列表
+          loadSnapshots();
         }}
         components={{
           // 可自定义UI组件
@@ -221,6 +335,67 @@ export const TldrawWhiteboard = ({
           onSave={onSave}
         />
       </Tldraw>
+      
+      {/* 保存快照模态框 */}
+      <Modal
+        title="保存白板快照"
+        open={showSaveModal}
+        onCancel={() => {
+          setShowSaveModal(false);
+          setSnapshotName('');
+        }}
+        onOk={handleSaveSnapshot}
+        okText="保存"
+        cancelText="取消"
+        confirmLoading={saving}
+      >
+        <Input
+          placeholder="请输入快照名称（可选）"
+          value={snapshotName}
+          onChange={(e) => setSnapshotName(e.target.value)}
+          onPressEnter={handleSaveSnapshot}
+        />
+        <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
+          快照将保存当前白板的所有内容，方便后续恢复
+        </div>
+      </Modal>
+      
+      {/* 历史快照模态框 */}
+      <Modal
+        title="历史快照"
+        open={showHistory}
+        onCancel={() => setShowHistory(false)}
+        footer={null}
+        width={600}
+      >
+        <List
+          dataSource={snapshots}
+          renderItem={(snapshot) => (
+            <List.Item
+              actions={[
+                <Button 
+                  type="primary" 
+                  size="small"
+                  onClick={() => loadSnapshot(snapshot)}
+                >
+                  加载
+                </Button>
+              ]}
+            >
+              <List.Item.Meta
+                title={snapshot.name}
+                description={
+                  <div>
+                    <div>创建者: {snapshot.User?.nickname || snapshot.User?.username || '未知'}</div>
+                    <div>更新时间: {new Date(snapshot.updated_at).toLocaleString()}</div>
+                  </div>
+                }
+              />
+            </List.Item>
+          )}
+          locale={{ emptyText: '暂无历史快照' }}
+        />
+      </Modal>
       
       <style>
         {`
