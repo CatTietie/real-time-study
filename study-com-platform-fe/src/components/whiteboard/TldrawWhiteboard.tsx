@@ -97,7 +97,6 @@ export const TldrawWhiteboard = ({
   onSave
 }: TldrawWhiteboardProps) => {
   const [isReady, setIsReady] = useState(false);
-  const [currentTool, setCurrentTool] = useState('select');
   const [showHelp, setShowHelp] = useState(false);
   const [snapshots, setSnapshots] = useState<WhiteboardSnapshot[]>([]);
   const [showHistory, setShowHistory] = useState(false);
@@ -106,19 +105,8 @@ export const TldrawWhiteboard = ({
   const [showSaveModal, setShowSaveModal] = useState(false);
   const editorRef = useRef<any>(null);
   
-  // 工具说明
-  const toolDescriptions = {
-    select: '选择工具 - 选择和移动对象',
-    draw: '画笔工具 - 自由绘制线条',
-    erase: '橡皮擦 - 擦除绘制内容',
-    text: '文字工具 - 添加文本',
-    rectangle: '矩形工具 - 绘制矩形',
-    ellipse: '圆形工具 - 绘制圆形',
-    arrow: '箭头工具 - 绘制箭头',
-    line: '直线工具 - 绘制直线',
-    highlight: '高亮工具 - 高亮标记',
-    laser: '激光笔 - 临时指示'
-  };
+  // 定时刷新快照列表的引用
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // 保存白板快照
   const handleSaveSnapshot = async () => {
@@ -135,8 +123,9 @@ export const TldrawWhiteboard = ({
         message.success('白板保存成功');
         setShowSaveModal(false);
         setSnapshotName('');
-        // 刷新快照列表
-        loadSnapshots();
+        // 保存成功后立即刷新快照列表
+        console.log('保存成功，刷新快照列表');
+        await loadSnapshots();
       }
     } catch (error) {
       console.error('保存白板失败:', error);
@@ -149,17 +138,43 @@ export const TldrawWhiteboard = ({
   // 加载快照列表
   const loadSnapshots = async () => {
     try {
+      console.log('加载快照列表，白板ID:', whiteboardId);
       const snapshotList = await getWhiteboardSnapshots(whiteboardId);
+      console.log('获取到快照数量:', snapshotList.length);
+      console.log('快照数据:', snapshotList.map(s => ({
+        id: s.id,
+        name: s.name,
+        user: s.User?.nickname || s.User?.username,
+        updatedAt: s.updated_at || s.updatedAt
+      })));
+      
       setSnapshots(snapshotList);
       
-      // 如果有快照，自动加载最新的一个
-      if (snapshotList.length > 0) {
-        const latestSnapshot = snapshotList[0];
-        console.log('自动加载最新快照:', latestSnapshot.name);
-        loadSnapshot(latestSnapshot);
-      }
+      // 不再自动加载最新快照，让用户手动选择
+      console.log('快照列表已更新，等待用户选择');
     } catch (error) {
       console.error('加载快照列表失败:', error);
+    }
+  };
+  
+  // 启动定时刷新
+  const startAutoRefresh = () => {
+    if (refreshIntervalRef.current) {
+      clearInterval(refreshIntervalRef.current);
+    }
+    
+    // 每30秒刷新一次快照列表
+    refreshIntervalRef.current = setInterval(() => {
+      console.log('定时刷新快照列表');
+      loadSnapshots();
+    }, 30000);
+  };
+  
+  // 停止定时刷新
+  const stopAutoRefresh = () => {
+    if (refreshIntervalRef.current) {
+      clearInterval(refreshIntervalRef.current);
+      refreshIntervalRef.current = null;
     }
   };
 
@@ -178,6 +193,13 @@ export const TldrawWhiteboard = ({
       message.error('加载快照失败');
     }
   };
+  
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      stopAutoRefresh();
+    };
+  }, []);
   
   return (
     <div style={{ width: '100%', height: '800px', position: 'relative' }}>
@@ -216,70 +238,56 @@ export const TldrawWhiteboard = ({
             </button>
           </div>
           <div style={{ fontSize: '14px', color: '#555' }}>
-            {Object.entries(toolDescriptions).map(([tool, desc]) => (
-              <div key={tool} style={{ marginBottom: '8px' }}>
-                <strong>{desc.split(' - ')[0]}:</strong> {desc.split(' - ')[1]}
-              </div>
-            ))}
+            <div style={{ marginBottom: '8px' }}>
+              <strong>画笔工具:</strong> 自由绘制线条
+            </div>
+            <div style={{ marginBottom: '8px' }}>
+              <strong>选择工具:</strong> 选择和移动对象
+            </div>
+            <div style={{ marginBottom: '8px' }}>
+              <strong>橡皮擦:</strong> 擦除绘制内容
+            </div>
+            <div style={{ marginBottom: '8px' }}>
+              <strong>文字工具:</strong> 添加文本
+            </div>
           </div>
         </div>
       )}
       
-      {/* 调试信息显示 */}
-      <div className="tl-debug-info">
-        <div>状态: {isReady ? '已就绪' : '加载中'}</div>
-        <div>当前工具: {currentTool}</div>
-        <div>用户ID: {userId}</div>
-        <div>用户名: {username || '未登录'}</div>
-      </div>
+      {/* 移除了调试信息显示 */}
       
-      {/* 工具状态显示和操作按钮 */}
+      {/* 操作按钮区域 - 只保留三个按钮 */}
       <div style={{
         position: 'absolute',
         bottom: '10px',
         left: '10px',
         zIndex: 1500,
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
-        padding: '8px 12px',
-        borderRadius: '6px',
-        fontSize: '14px',
-        color: '#333',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
         display: 'flex',
         alignItems: 'center',
         gap: '10px'
       }}>
-        <span>当前工具: {toolDescriptions[currentTool as keyof typeof toolDescriptions]?.split(' - ')[0] || '未知'}</span>
         <Button 
           type="primary" 
           size="small"
           icon={<SaveOutlined />}
           onClick={() => setShowSaveModal(true)}
           loading={saving}
-        >
-          保存
-        </Button>
+        />
         <Button 
           size="small"
           icon={<HistoryOutlined />}
-          onClick={() => setShowHistory(true)}
-        >
-          历史
-        </Button>
-        <button 
-          onClick={() => setShowHelp(!showHelp)}
-          style={{
-            background: '#1890ff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            padding: '4px 8px',
-            fontSize: '12px',
-            cursor: 'pointer'
+          onClick={async () => {
+            console.log('点击历史按钮，刷新快照列表');
+            await loadSnapshots(); // 点击时立即刷新
+            setShowHistory(true);
           }}
+        />
+        <Button 
+          size="small"
+          onClick={() => setShowHelp(!showHelp)}
         >
-          ? 帮助
-        </button>
+          ?
+        </Button>
       </div>
       
       {!isReady && (
@@ -312,17 +320,14 @@ export const TldrawWhiteboard = ({
           setIsReady(true);
           editorRef.current = editor;
           
-          // 监听工具变化
-          editor.addListener('tool-change', (tool: string) => {
-            console.log('工具变更:', tool);
-            setCurrentTool(tool);
-          });
-          
-          // 设置初始工具
+          // 设置初始工具为画笔
           editor.setCurrentTool('draw');
           
           // 加载快照列表
           loadSnapshots();
+          
+          // 启动定时刷新
+          startAutoRefresh();
         }}
         components={{
           // 可自定义UI组件
@@ -387,7 +392,24 @@ export const TldrawWhiteboard = ({
                 description={
                   <div>
                     <div>创建者: {snapshot.User?.nickname || snapshot.User?.username || '未知'}</div>
-                    <div>更新时间: {new Date(snapshot.updated_at).toLocaleString()}</div>
+                    <div>更新时间: {
+                      (() => {
+                        try {
+                          // 尝试多种时间格式
+                          const updateTime = snapshot.updated_at || snapshot.updatedAt || snapshot.createdAt || snapshot.created_at;
+                          if (updateTime) {
+                            const date = new Date(updateTime);
+                            if (!isNaN(date.getTime())) {
+                              return date.toLocaleString();
+                            }
+                          }
+                          return '时间未知';
+                        } catch (e) {
+                          console.error('时间解析错误:', e);
+                          return '时间格式错误';
+                        }
+                      })()
+                    }</div>
                   </div>
                 }
               />
@@ -402,28 +424,6 @@ export const TldrawWhiteboard = ({
           @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
-          }
-          
-          /* 增强Tldraw工具栏样式 */
-          .tlui-toolbar {
-            background: rgba(255, 255, 255, 0.95) !important;
-            backdrop-filter: blur(10px);
-            border-radius: 12px !important;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15) !important;
-          }
-          
-          .tlui-button {
-            transition: all 0.2s ease !important;
-          }
-          
-          .tlui-button:hover {
-            transform: translateY(-2px) !important;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
-          }
-          
-          .tlui-button.selected {
-            background: #1890ff !important;
-            color: white !important;
           }
         `}
       </style>

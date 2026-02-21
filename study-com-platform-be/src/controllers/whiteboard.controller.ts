@@ -192,30 +192,20 @@ export const saveWhiteboardSnapshot = async (req: Request, res: Response) => {
       });
     }
     
-    // 创建或更新快照记录
-    let snapshotRecord = await WhiteboardSnapshot.findOne({
-      where: { 
-        whiteboard_id: whiteboardId,
-        user_id: userId
-      }
+    // 总是创建新的快照记录（保留历史版本）
+    const snapshotRecord = await WhiteboardSnapshot.create({
+      whiteboard_id: whiteboardId,
+      user_id: userId,
+      name: name || `白板快照 ${new Date().toLocaleString()}`,
+      data: JSON.stringify(snapshot)
     });
     
-    if (snapshotRecord) {
-      // 更新现有快照
-      await snapshotRecord.update({
-        name: name || snapshotRecord.name,
-        data: JSON.stringify(snapshot),
-        updated_at: new Date()
-      });
-    } else {
-      // 创建新快照
-      snapshotRecord = await WhiteboardSnapshot.create({
-        whiteboard_id: whiteboardId,
-        user_id: userId,
-        name: name || `白板快照 ${new Date().toLocaleString()}`,
-        data: JSON.stringify(snapshot)
-      });
-    }
+    console.log('创建新快照记录:', {
+      id: snapshotRecord.id,
+      whiteboard_id: snapshotRecord.whiteboard_id,
+      user_id: snapshotRecord.user_id,
+      name: snapshotRecord.name
+    });
     
     res.json({
       success: true,
@@ -237,14 +227,25 @@ export const getWhiteboardSnapshots = async (req: Request, res: Response) => {
   try {
     const { whiteboardId } = req.params;
     
+    console.log('获取白板快照列表:', whiteboardId);
+    
     const snapshots = await WhiteboardSnapshot.findAll({
       where: { whiteboard_id: whiteboardId },
       order: [['updated_at', 'DESC']],
       include: [{
         model: User,
+        as: 'User',
         attributes: ['username', 'nickname']
       }]
     });
+    
+    console.log('找到快照数量:', snapshots.length);
+    console.log('快照数据示例:', snapshots[0] ? {
+      id: snapshots[0].id,
+      name: snapshots[0].name,
+      created_at: snapshots[0].created_at,
+      updated_at: snapshots[0].updated_at
+    } : '无快照');
     
     res.json({
       success: true,

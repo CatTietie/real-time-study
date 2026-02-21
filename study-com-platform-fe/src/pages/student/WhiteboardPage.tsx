@@ -266,7 +266,24 @@ const WhiteboardContent: React.FC<WhiteboardPageProps> = ({ whiteboardId }) => {
                           description={
                             <div>
                               <div>创建者: {snapshot.User?.nickname || snapshot.User?.username || '未知'}</div>
-                              <div>更新时间: {new Date(snapshot.updated_at).toLocaleString()}</div>
+                              <div>更新时间: {
+                                (() => {
+                                  try {
+                                    // 尝试多种时间格式
+                                    const updateTime = snapshot.updated_at || snapshot.updatedAt || snapshot.createdAt || snapshot.created_at;
+                                    if (updateTime) {
+                                      const date = new Date(updateTime);
+                                      if (!isNaN(date.getTime())) {
+                                        return date.toLocaleString();
+                                      }
+                                    }
+                                    return '时间未知';
+                                  } catch (e) {
+                                    console.error('时间解析错误:', e);
+                                    return '时间格式错误';
+                                  }
+                                })()
+                              }</div>
                             </div>
                           }
                         />
