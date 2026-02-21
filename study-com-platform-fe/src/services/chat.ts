@@ -62,3 +62,48 @@ export const getAvailableUsers = async (roomId: number): Promise<any[]> => {
   const response = await api.get(`/chat/available-users/${roomId}`);
   return response.data.data;
 };
+
+// 获取聊天室历史消息（分页）
+export const getChatHistory = async (
+  roomId: number,
+  page: number = 1,
+  limit: number = 50,
+  beforeId?: number
+): Promise<{
+  messages: ChatMessage[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    hasNext: boolean;
+  };
+}> => {
+  const params: any = { page, limit };
+  if (beforeId) {
+    params.beforeId = beforeId;
+  }
+  
+  const response = await api.get(`/chat/history/${roomId}`, { params });
+  return response.data.data;
+};
+
+// 搜索聊天室消息
+export const searchChatMessages = async (
+  roomId: number,
+  keyword: string,
+  page: number = 1,
+  limit: number = 20
+): Promise<{
+  messages: ChatMessage[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+  };
+  keyword: string;
+}> => {
+  const response = await api.get(`/chat/search/${roomId}`, {
+    params: { keyword, page, limit }
+  });
+  return response.data.data;
+};

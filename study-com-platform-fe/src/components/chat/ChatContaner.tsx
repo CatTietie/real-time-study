@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Row, Col } from 'antd';
-import { MessageList } from './MessageList';
+import EnhancedMessageList from './EnhancedMessageList';
 import { MessageInput } from './MessageInput';
 import { OnlineUsers } from './OnlineUsers';
 import { ChatRoomSelector } from './ChatRoomSelector';
@@ -18,8 +18,8 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 }) => {
   const authState = useAppSelector(state => state.auth);
   
-  // 正确提取用户信息
-  const { token, role, username, userId, nickname } = authState;
+  // 提取用户信息
+  const { role, username, userId, nickname } = authState;
   
   // 构造user对象用于兼容性
   const user = username && userId ? {
@@ -29,29 +29,29 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     role: role || 'student'
   } : undefined;
   
-  // 强制调试输出
-  console.log('%c=== ChatContainer 调试信息 ===', 'color: blue; font-weight: bold');
-  console.log('完整auth state:', authState);
-  console.log('user对象:', user);
-  
-  // 更严格的用户信息验证
+  // 用户信息验证
   const isValidUser = user && 
                      typeof user.id === 'number' && 
                      user.id > 0 && 
                      typeof user.username === 'string' && 
                      user.username.length > 0;
   
-  console.log('用户信息是否有效:', isValidUser);
-  
-  // 只有在用户信息有效时才提取参数
+  // 提取参数
   const extractedUserId = isValidUser ? user.id : 0;
   const extractedUsername = isValidUser ? user.username : '';
   
-  console.log('最终使用的参数:', { roomId, userId: extractedUserId, username: extractedUsername });
+  // 初始化hooks（必须在所有条件判断之前）
+  const { isConnected, sendMessage, sendSystemMessage, socket } = useChatSocket({
+    roomId,
+    userId: extractedUserId,
+    username: extractedUsername,
+    nickname: user?.nickname
+  });
+
+  const [inputValue, setInputValue] = useState('');
   
   // 如果用户信息无效，显示错误信息而不是聊天界面
   if (!isValidUser) {
-    console.log('%c用户信息无效，显示错误界面', 'color: red; font-weight: bold');
     return (
       <Card title="聊天室">
         <div style={{ textAlign: 'center', padding: '40px', color: '#ff4d4f' }}>
@@ -61,15 +61,6 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
       </Card>
     );
   }
-  
-  const { messages, isConnected, sendMessage, sendSystemMessage, socket } = useChatSocket({
-    roomId,
-    userId: extractedUserId,
-    username: extractedUsername,
-    nickname: user?.nickname
-  });
-
-  const [inputValue, setInputValue] = useState('');
 
   const handleSend = () => {
     if (inputValue.trim() && isConnected) {
@@ -85,7 +76,14 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     >
       <Row gutter={16}>
         <Col span={18}>
-          <MessageList messages={messages} currentUserId={user?.id} />
+          <EnhancedMessageList 
+            roomId={roomId}
+            currentUserId={user?.id}
+            onNewMessage={(message) => {
+              // 这里可以处理新消息的通知或其他逻辑
+              console.log('收到新消息:', message);
+            }}
+          />
           <MessageInput 
             value={inputValue}
             onChange={setInputValue}

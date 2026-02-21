@@ -103,6 +103,142 @@ export const getOnlineUsers = async (req: Request, res: Response) => {
   }
 };
 
+// 获取聊天室历史消息（分页）
+export const getChatHistory = async (req: Request, res: Response) => {
+  try {
+    const { roomId } = req.params;
+    const { page = 1, limit = 50, beforeId } = req.query;
+    
+    // 验证房间是否存在
+    const room = await ChatRoom.findByPk(roomId);
+    if (!room) {
+      return res.status(404).json({
+        success: false,
+        message: "聊天室不存在"
+      });
+    }
+    
+    // 构建查询条件
+    const whereCondition: any = { room_id: roomId };
+    
+    // 如果提供了beforeId，则查询该ID之前的消息
+    if (beforeId) {
+      whereCondition.id = { [Op.lt]: Number(beforeId) };
+    }
+    
+    // 查询消息
+    const messages = await ChatMessage.findAndCountAll({
+      where: whereCondition,
+      include: [{
+        model: User,
+        attributes: ['id', 'username', 'nickname']
+      }],
+      order: [['created_at', 'DESC']],
+      limit: Number(limit),
+      offset: (Number(page) - 1) * Number(limit)
+    });
+    
+    // 处理消息数据
+    const processedMessages = messages.rows.map(msg => {
+      const msgJson: any = msg.toJSON();
+      const user = (msg as any).user;
+      return {
+        ...msgJson,
+        username: user?.nickname || user?.username || `用户${msgJson.user_id}`
+      };
+    });
+    
+    res.json({
+      success: true,
+      data: {
+        messages: processedMessages.reverse(), // 按时间正序返回
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total: messages.count,
+          hasNext: Number(page) * Number(limit) < messages.count
+        }
+      }
+    });
+  } catch (error) {
+    console.error('获取聊天历史失败:', error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "获取聊天历史失败"
+    });
+  }
+};
+
+// 搜索聊天室消息
+export const searchChatMessages = async (req: Request, res: Response) => {
+  try {
+    const { roomId } = req.params;
+    const { keyword, page = 1, limit = 20 } = req.query;
+    
+    if (!keyword || typeof keyword !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: "请提供搜索关键词"
+      });
+    }
+    
+    // 验证房间是否存在
+    const room = await ChatRoom.findByPk(roomId);
+    if (!room) {
+      return res.status(404).json({
+        success: false,
+        message: "聊天室不存在"
+      });
+    }
+    
+    // 搜索消息
+    const messages = await ChatMessage.findAndCountAll({
+      where: {
+        room_id: roomId,
+        content: {
+          [Op.like]: `%${keyword}%`
+        }
+      },
+      include: [{
+        model: User,
+        attributes: ['id', 'username', 'nickname']
+      }],
+      order: [['created_at', 'DESC']],
+      limit: Number(limit),
+      offset: (Number(page) - 1) * Number(limit)
+    });
+    
+    // 处理消息数据
+    const processedMessages = messages.rows.map(msg => {
+      const msgJson: any = msg.toJSON();
+      const user = (msg as any).user;
+      return {
+        ...msgJson,
+        username: user?.nickname || user?.username || `用户${msgJson.user_id}`
+      };
+    });
+    
+    res.json({
+      success: true,
+      data: {
+        messages: processedMessages.reverse(),
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total: messages.count
+        },
+        keyword
+      }
+    });
+  } catch (error) {
+    console.error('搜索聊天消息失败:', error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "搜索失败"
+    });
+  }
+};
+
 // 删除聊天室（仅创建者可以删除）
 export const deleteChatRoom = async (req: Request, res: Response) => {
   try {

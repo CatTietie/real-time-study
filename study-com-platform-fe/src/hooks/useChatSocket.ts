@@ -66,8 +66,15 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
 
     // 收到历史消息
     newSocket.on('chat_history', (historyMessages: ChatMessage[]) => {
-      console.log('收到历史消息:', historyMessages.length, '条');
+      console.log('📥 收到历史消息:', historyMessages.length, '条');
+      console.log('历史消息内容预览:', historyMessages.slice(0, 3).map(msg => ({
+        id: msg.id,
+        content: msg.content?.substring(0, 30) + '...',
+        username: msg.username,
+        createdAt: msg.created_at
+      })));
       setMessages(historyMessages);
+      console.log('✅ 历史消息已设置到状态中');
     });
 
     // 收到新消息
@@ -108,16 +115,21 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
     if (socket && isConnected && roomId && userId > 0 && username) {
       console.log('roomId变化，重新加入房间:', roomId);
       
-      // 清空旧消息
-      setMessages([]);
-      
-      // 离开当前房间（如果在房间中）
-      socket.emit('leave_chat_room', { roomId: userInfoRef.current.roomId });
+      // 先离开当前房间（如果在房间中）
+      const currentRoomId = userInfoRef.current.roomId;
+      if (currentRoomId && currentRoomId !== roomId) {
+        console.log('离开当前房间:', currentRoomId);
+        socket.emit('leave_chat_room', { roomId: currentRoomId });
+      }
       
       // 更新用户信息ref
-      userInfoRef.current = { roomId, userId, username };
+      userInfoRef.current = { roomId, userId, username, nickname };
+      
+      // 清空旧消息（在加入新房间之前）
+      setMessages([]);
       
       // 加入新房间
+      console.log('加入新房间:', roomId);
       socket.emit('join_chat_room', { 
         roomId, 
         userId, 
@@ -125,7 +137,7 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
         nickname
       });
     }
-  }, [roomId, socket, isConnected, userId, username]);
+  }, [roomId, socket, isConnected, userId, username, nickname]);
 
   // 发送普通消息
   const sendMessage = useCallback((content: string, messageType: string = 'text') => {

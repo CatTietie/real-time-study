@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import ChatMessage from '../models/chat-message.model';
 import ChatRoom from '../models/chat-room.model';
+import User from '../models/user.model';
 
 interface ClientInfo {
   userId: number;
@@ -58,28 +59,40 @@ export const initChatSockets = (io: Server) => {
         });
 
         // 发送历史消息（最近50条）
+        console.log('开始查询房间历史消息:', data.roomId);
         const recentMessages = await ChatMessage.findAll({
           where: { room_id: data.roomId },
           include: [{
-            association: 'user',
+            model: User,
             attributes: ['id', 'username', 'nickname']
           }],
           order: [['created_at', 'DESC']],
           limit: 50
         });
         
+        console.log(`查询到 ${recentMessages.length} 条历史消息`);
+        
         // 处理消息数据，确保包含正确的用户名
         const processedMessages = recentMessages.map(msg => {
           const msgJson: any = msg.toJSON();
           // 通过关联获取用户信息
           const user = (msg as any).user;
-          return {
+          const processedMsg = {
             ...msgJson,
             username: user?.nickname || user?.username || `用户${msgJson.user_id}`
           };
+          console.log('处理消息:', {
+            id: msgJson.id,
+            content: msgJson.content.substring(0, 50) + '...',
+            username: processedMsg.username,
+            createdAt: msgJson.created_at
+          });
+          return processedMsg;
         });
         
-        socket.emit('chat_history', processedMessages.reverse());
+        const reversedMessages = processedMessages.reverse();
+        console.log(`发送 ${reversedMessages.length} 条历史消息给客户端`);
+        socket.emit('chat_history', reversedMessages);
 
       } catch (error) {
         socket.emit('error', { message: '加入房间失败' });
