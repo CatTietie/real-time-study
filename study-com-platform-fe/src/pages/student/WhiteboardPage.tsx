@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Layout, Spin, message, Button, Modal, Form, Input, Select, Space } from 'antd';
-import { WhiteboardCanvas } from '../../components/whiteboard/WhileboardCanvas';
-import { Toolbar } from '../../components/whiteboard/Toolbar';
-import { WhiteboardProvider, useWhiteboard } from '../../components/whiteboard/WhiteboardProvider';
+import { WhiteboardWrapper } from '../../components/whiteboard/WhiteboardWrapper';
 import { createWhiteboard, getWhiteboard, exportWhiteboardToPng } from '../../services/whiteboard';
 import { getChatRooms } from '../../services/chat';
 import { useAppSelector } from '../../app/hooks';
@@ -17,24 +15,7 @@ interface WhiteboardPageProps {
 
 const WhiteboardContent: React.FC<WhiteboardPageProps> = ({ whiteboardId }) => {
   const { user } = useAppSelector(state => state.auth);
-  const { 
-    whiteboard, 
-    setWhiteboard,
-    currentTool, 
-    setCurrentTool,
-    currentColor, 
-    setCurrentColor,
-    lineWidth, 
-    setLineWidth,
-    fontSize,
-    setFontSize,
-    fontFamily,
-    setFontFamily,
-    shapeType,
-    setShapeType,
-    fillColor,
-    setFillColor
-  } = useWhiteboard();
+  const [whiteboard, setWhiteboard] = useState<unknown>(null);
   
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
@@ -65,40 +46,46 @@ const WhiteboardContent: React.FC<WhiteboardPageProps> = ({ whiteboardId }) => {
     loadInitialData();
   }, [whiteboardId, setWhiteboard]);
 
-  const handleCreateWhiteboard = async (values: any) => {
+  const handleCreateWhiteboard = async (values: unknown) => {
     try {
       console.log('Form values:', values);
+      // 类型断言来访问表单值
+      const formValues = values as {
+        roomId: number;
+        name: string;
+        type: string;
+        width: number;
+        height: number;
+        backgroundColor: string;
+      };
+      
       const newWb = await createWhiteboard({
-        roomId: Number(values.roomId), // 确保roomId是数字类型
-        name: values.name,
-        type: values.type || 'general',
-        width: Number(values.width) || 1200,
-        height: Number(values.height) || 800,
-        backgroundColor: values.backgroundColor || '#FFFFFF'
+        roomId: Number(formValues.roomId),
+        name: formValues.name,
+        type: formValues.type || 'general',
+        width: Number(formValues.width) || 1200,
+        height: Number(formValues.height) || 800,
+        backgroundColor: formValues.backgroundColor || '#FFFFFF'
       });
       setWhiteboard(newWb);
       setModalVisible(false);
       form.resetFields();
       message.success('白板创建成功');
-    } catch (error: any) {
+    } catch (error) {
       console.error('创建白板失败:', error);
-      message.error(error.response?.data?.message || '创建白板失败');
+      message.error((error as Error).message || '创建白板失败');
     }
-  };
-
-  const handleClear = () => {
-    // 清空白板逻辑将在WhiteboardCanvas中处理
-    console.log('清空白板');
   };
 
   const handleExport = async () => {
     if (!whiteboard) return;
     
     try {
-      const exportData = await exportWhiteboardToPng(whiteboard.id);
+      // 类型断言来访问白板ID
+      const wb = whiteboard as { id: number };
+      const exportData = await exportWhiteboardToPng(wb.id);
       message.success('白板数据导出成功');
       console.log('导出数据:', exportData);
-      // 这里可以添加实际的PNG生成逻辑
     } catch (error) {
       console.error('导出失败:', error);
       message.error('导出失败');
@@ -113,7 +100,7 @@ const WhiteboardContent: React.FC<WhiteboardPageProps> = ({ whiteboardId }) => {
         alignItems: 'center', 
         height: '100vh' 
       }}>
-        <Spin size="large" tip="加载白板中..." />
+        <Spin size="large" />
       </div>
     );
   }
@@ -143,47 +130,17 @@ const WhiteboardContent: React.FC<WhiteboardPageProps> = ({ whiteboardId }) => {
           }}
         >
           {whiteboard ? (
-            <>
-              <Toolbar
-                currentTool={currentTool}
-                onToolChange={setCurrentTool}
-                currentColor={currentColor}
-                onColorChange={setCurrentColor}
-                lineWidth={lineWidth}
-                onLineWidthChange={setLineWidth}
-                onClear={handleClear}
-                fontSize={fontSize}
-                onFontSizeChange={setFontSize}
-                fontFamily={fontFamily}
-                onFontFamilyChange={setFontFamily}
-                shapeType={shapeType}
-                onShapeTypeChange={setShapeType}
-                fillColor={fillColor}
-                onFillColorChange={setFillColor}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              padding: '20px' 
+            }}>
+              <WhiteboardWrapper
+                whiteboardId={whiteboard.id}
+                userId={user?.id || 0}
+                username={user?.username || ''}
               />
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'center', 
-                padding: '20px' 
-              }}>
-                <WhiteboardCanvas
-                  whiteboardId={whiteboard.id}
-                  userId={user?.id || 0}
-                  username={user?.username || ''}
-                  roomId={whiteboard.room_id}
-                  width={whiteboard.width}
-                  height={whiteboard.height}
-                  currentTool={currentTool}
-                  currentColor={currentColor}
-                  lineWidth={lineWidth}
-                  fontSize={fontSize}
-                  fontFamily={fontFamily}
-                  shapeType={shapeType}
-                  fillColor={fillColor}
-                  onClear={handleClear}
-                />
-              </div>
-            </>
+            </div>
           ) : (
             <div style={{ 
               textAlign: 'center', 
@@ -282,11 +239,7 @@ const WhiteboardContent: React.FC<WhiteboardPageProps> = ({ whiteboardId }) => {
 };
 
 const WhiteboardPage: React.FC<WhiteboardPageProps> = (props) => {
-  return (
-    <WhiteboardProvider>
-      <WhiteboardContent {...props} />
-    </WhiteboardProvider>
-  );
+  return <WhiteboardContent {...props} />;
 };
 
 export default WhiteboardPage;

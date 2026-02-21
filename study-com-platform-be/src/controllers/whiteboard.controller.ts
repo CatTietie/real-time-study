@@ -42,6 +42,21 @@ export const createWhiteboard = async (req: Request, res: Response) => {
       });
     }
 
+    // 检查是否已存在该房间的白板
+    console.log('Checking if whiteboard already exists for room:', roomId);
+    let whiteboard = await Whiteboard.findOne({
+      where: { room_id: roomId }
+    });
+    
+    if (whiteboard) {
+      console.log('Whiteboard already exists:', whiteboard.toJSON());
+      return res.json({
+        success: true,
+        message: "白板已存在",
+        data: whiteboard
+      });
+    }
+
     console.log('Creating whiteboard with data:', {
       room_id: roomId,
       name: name || '协作白板',
@@ -51,7 +66,7 @@ export const createWhiteboard = async (req: Request, res: Response) => {
       background_color: backgroundColor || '#FFFFFF'
     });
 
-    const whiteboard = await Whiteboard.create({
+    whiteboard = await Whiteboard.create({
       room_id: roomId,
       name: name || '协作白板',
       type: type || 'general',
@@ -156,6 +171,125 @@ export const clearWhiteboard = async (req: Request, res: Response) => {
 };
 
 // 导出白板为PNG图片
+// 保存白板快照数据
+export const saveWhiteboardSnapshot = async (req: Request, res: Response) => {
+  try {
+    const { whiteboardId } = req.params;
+    const { snapshot, name } = req.body;
+    const userId = req.user?.id;
+    
+    console.log('保存白板快照:', { whiteboardId, userId, name });
+    
+    // 验证白板存在
+    const whiteboard = await Whiteboard.findByPk(whiteboardId);
+    if (!whiteboard) {
+      return res.status(404).json({
+        success: false,
+        message: "白板不存在"
+      });
+    }
+    
+    // 创建或更新快照记录
+    let snapshotRecord = await WhiteboardSnapshot.findOne({
+      where: { 
+        whiteboard_id: whiteboardId,
+        user_id: userId
+      }
+    });
+    
+    if (snapshotRecord) {
+      // 更新现有快照
+      await snapshotRecord.update({
+        name: name || snapshotRecord.name,
+        data: JSON.stringify(snapshot),
+        updated_at: new Date()
+      });
+    } else {
+      // 创建新快照
+      snapshotRecord = await WhiteboardSnapshot.create({
+        whiteboard_id: whiteboardId,
+        user_id: userId,
+        name: name || `白板快照 ${new Date().toLocaleString()}`,
+        data: JSON.stringify(snapshot)
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: "白板快照保存成功",
+      data: snapshotRecord
+    });
+    
+  } catch (error) {
+    console.error('保存白板快照失败:', error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "保存失败"
+    });
+  }
+};
+
+// 获取白板快照列表
+export const getWhiteboardSnapshots = async (req: Request, res: Response) => {
+  try {
+    const { whiteboardId } = req.params;
+    
+    const snapshots = await WhiteboardSnapshot.findAll({
+      where: { whiteboard_id: whiteboardId },
+      order: [['updated_at', 'DESC']],
+      include: [{
+        model: User,
+        attributes: ['username', 'nickname']
+      }]
+    });
+    
+    res.json({
+      success: true,
+      data: snapshots
+    });
+    
+  } catch (error) {
+    console.error('获取白板快照列表失败:', error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "获取失败"
+    });
+  }
+};
+
+// 加载白板快照
+export const loadWhiteboardSnapshot = async (req: Request, res: Response) => {
+  try {
+    const { snapshotId } = req.params;
+    
+    const snapshot = await WhiteboardSnapshot.findByPk(snapshotId, {
+      include: [{
+        model: User,
+        attributes: ['username', 'nickname']
+      }]
+    });
+    
+    if (!snapshot) {
+      return res.status(404).json({
+        success: false,
+        message: "快照不存在"
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: snapshot
+    });
+    
+  } catch (error) {
+    console.error('加载白板快照失败:', error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "加载失败"
+    });
+  }
+};
+
 export const exportWhiteboardToPng = async (req: Request, res: Response) => {
   try {
     const { whiteboardId } = req.params;
