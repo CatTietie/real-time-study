@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Row, Col } from 'antd';
-import EnhancedMessageList from './EnhancedMessageList';
+import CompactMessageList from './CompactMessageList';
 import { MessageInput } from './MessageInput';
 import { OnlineUsers } from './OnlineUsers';
 import { ChatRoomSelector } from './ChatRoomSelector';
@@ -76,9 +76,11 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     >
       <Row gutter={16}>
         <Col span={18}>
-          <EnhancedMessageList 
+          <CompactMessageList 
             roomId={roomId}
             currentUserId={user?.id}
+            username={user?.username || ''}
+            nickname={user?.nickname}
             onNewMessage={(message) => {
               // 这里可以处理新消息的通知或其他逻辑
               console.log('收到新消息:', message);

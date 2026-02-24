@@ -141,10 +141,13 @@ export const getChatHistory = async (req: Request, res: Response) => {
     // 处理消息数据
     const processedMessages = messages.rows.map(msg => {
       const msgJson: any = msg.toJSON();
-      const user = (msg as any).user;
+      const user = msgJson.User; // 注意：Sequelize关联查询返回的字段名是User（首字母大写）
+      console.log('处理单条消息:', { msgJson, user });
       return {
         ...msgJson,
-        username: user?.nickname || user?.username || `用户${msgJson.user_id}`
+        username: user?.username || `用户${msgJson.user_id}`,
+        nickname: user?.nickname || null,
+        created_at: msgJson.createdAt || msgJson.created_at
       };
     });
     
@@ -211,10 +214,13 @@ export const searchChatMessages = async (req: Request, res: Response) => {
     // 处理消息数据
     const processedMessages = messages.rows.map(msg => {
       const msgJson: any = msg.toJSON();
-      const user = (msg as any).user;
+      const user = msgJson.User; // 注意：Sequelize关联查询返回的字段名是User（首字母大写）
+      console.log('处理单条消息:', { msgJson, user });
       return {
         ...msgJson,
-        username: user?.nickname || user?.username || `用户${msgJson.user_id}`
+        username: user?.username || `用户${msgJson.user_id}`,
+        nickname: user?.nickname || null,
+        created_at: msgJson.createdAt || msgJson.created_at
       };
     });
     

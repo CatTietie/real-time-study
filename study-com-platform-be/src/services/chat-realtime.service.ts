@@ -76,10 +76,13 @@ export const initChatSockets = (io: Server) => {
         const processedMessages = recentMessages.map(msg => {
           const msgJson: any = msg.toJSON();
           // 通过关联获取用户信息
-          const user = (msg as any).user;
+          const user = msgJson.User; // 注意：Sequelize关联查询返回的字段名是User（首字母大写）
+          console.log('实时服务处理消息:', { msgJson, user });
           const processedMsg = {
             ...msgJson,
-            username: user?.nickname || user?.username || `用户${msgJson.user_id}`
+            username: user?.username || `用户${msgJson.user_id}`,
+            nickname: user?.nickname || null,
+            created_at: msgJson.createdAt || msgJson.created_at
           };
           console.log('处理消息:', {
             id: msgJson.id,

@@ -1,11 +1,12 @@
-import { Tldraw, useEditor } from '@tldraw/tldraw'
+import { Tldraw, useEditor, Editor as TLEditor } from '@tldraw/tldraw'
 import '@tldraw/tldraw/tldraw.css'
 import '../../styles/tldraw-enhanced.css'
 import { useEffect, useState, useRef } from 'react'
 import { useTldrawSync } from '../../hooks/useTldrawSync'
 import { saveWhiteboardSnapshot, getWhiteboardSnapshots } from '../../services/whiteboard'
 import { Button, Modal, List, Input, message } from 'antd'
-import { SaveOutlined, HistoryOutlined, DeleteOutlined } from '@ant-design/icons'
+import { SaveOutlined, HistoryOutlined, DownloadOutlined } from '@ant-design/icons'
+
 
 interface WhiteboardSnapshot {
   id: number;
@@ -103,7 +104,8 @@ export const TldrawWhiteboard = ({
   const [saving, setSaving] = useState(false);
   const [snapshotName, setSnapshotName] = useState('');
   const [showSaveModal, setShowSaveModal] = useState(false);
-  const editorRef = useRef<any>(null);
+  const [exporting, setExporting] = useState(false);
+  const editorRef = useRef<TLEditor | null>(null);
   
   // 定时刷新快照列表的引用
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -175,6 +177,76 @@ export const TldrawWhiteboard = ({
     if (refreshIntervalRef.current) {
       clearInterval(refreshIntervalRef.current);
       refreshIntervalRef.current = null;
+    }
+  };
+
+  // 导出白板为PNG
+  const handleExportPng = async () => {
+    if (!editorRef.current) return;
+    
+    try {
+      setExporting(true);
+      message.loading('正在导出白板为PNG...');
+      
+      // 使用HTML to Canvas的方式导出
+      // 首先获取Tldraw容器
+      const tldrawContainer = document.querySelector('.tl-container') as HTMLElement;
+      if (!tldrawContainer) {
+        throw new Error('无法找到白板容器');
+      }
+      
+      // 创建临时canvas
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('无法创建canvas上下文');
+      }
+      
+      // 设置canvas尺寸
+      const rect = tldrawContainer.getBoundingClientRect();
+      canvas.width = rect.width * 2; // 2倍分辨率
+      canvas.height = rect.height * 2;
+      
+      // 设置背景色
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // 使用html2canvas库截图
+      const html2canvas = (await import('html2canvas')).default;
+      const screenshotCanvas = await html2canvas(tldrawContainer, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        logging: false
+      });
+      
+      // 将截图绘制到我们的canvas上
+      ctx.drawImage(screenshotCanvas, 0, 0, canvas.width, canvas.height);
+      
+      // 转换为blob并下载
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.download = `白板_${new Date().toLocaleString('zh-CN', { 
+            year: 'numeric', 
+            month: '2-digit', 
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          }).replace(/[/:]/g, '-')}.png`;
+          link.href = url;
+          link.click();
+          URL.revokeObjectURL(url);
+          message.success('白板导出成功！');
+        }
+      }, 'image/png', 0.95);
+      
+    } catch (error) {
+      console.error('导出PNG失败:', error);
+      message.error('导出失败，请重试');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -256,7 +328,7 @@ export const TldrawWhiteboard = ({
       
       {/* 移除了调试信息显示 */}
       
-      {/* 操作按钮区域 - 只保留三个按钮 */}
+      {/* 操作按钮区域 - 四个按钮 */}
       <div style={{
         position: 'absolute',
         bottom: '10px',
@@ -272,6 +344,12 @@ export const TldrawWhiteboard = ({
           icon={<SaveOutlined />}
           onClick={() => setShowSaveModal(true)}
           loading={saving}
+        />
+        <Button 
+          size="small"
+          icon={<DownloadOutlined />}
+          onClick={handleExportPng}
+          loading={exporting}
         />
         <Button 
           size="small"
