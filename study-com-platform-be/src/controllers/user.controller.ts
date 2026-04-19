@@ -11,9 +11,17 @@ import { LearningGoal } from "../models/learning-goal.model";
 import { Op, Sequelize } from "sequelize";
 import { comparePassword, hashPassword } from "../utils/password";
 import { generateToken } from "../services/auth.service";
+import { 
+  checkAccountLock, 
+  recordFailedLogin, 
+  resetFailedLoginAttempts 
+} from "../services/auth.service";
 import { PERMISSION_CODES } from "../constants/permissions";
 import { calculateLevel, getStartOfDay, getStartOfWeek } from "../utils/helper";
 import { getUserHotPostsCount } from "../services/hot-posts.service";
+
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCK_DURATION_MINUTES = 15;
 
 export const register = async (req: Request, res: Response) => {
   try {
@@ -102,6 +110,15 @@ export const login = async (req: Request, res: Response) => {
       return res.status(403).json({ success: false, message: "账户已被封禁" });
     }
 
+    // 检查账号是否被锁定
+    const lockStatus = checkAccountLock(user);
+    if (lockStatus.isLocked) {
+      return res.status(403).json({ 
+        success: false, 
+        message: `账号已被临时锁定，请 ${lockStatus.remainingMinutes} 分钟后重试` 
+      });
+    }
+
     if (user.role !== "student") {
       return res
         .status(403)
@@ -110,10 +127,23 @@ export const login = async (req: Request, res: Response) => {
 
     const ok = await comparePassword(password, user.password);
     if (!ok) {
+      const failedInfo = await recordFailedLogin(user);
+      if (failedInfo.isLocked) {
+        return res.status(403).json({ 
+          success: false, 
+          message: `登录失败次数过多，账号已被临时锁定 ${LOCK_DURATION_MINUTES} 分钟` 
+        });
+      }
       return res
         .status(401)
-        .json({ success: false, message: "账号或密码错误" });
+        .json({ 
+          success: false, 
+          message: `账号或密码错误（剩余尝试次数：${failedInfo.remainingAttempts} 次）` 
+        });
     }
+
+    // 登录成功，重置失败次数
+    await resetFailedLoginAttempts(user);
 
     await user.update({ last_login: new Date() });
 
