@@ -13,12 +13,14 @@ interface UserAttributes {
   status: number;
   last_login?: Date;
   study_duration?: number;
+  failed_login_attempts: number;
+  lock_until?: Date;
   created_at: Date;
   updated_at: Date;
 }
 
 // 创建用户时的可选属性
-interface UserCreationAttributes extends Optional<UserAttributes, 'id' | 'created_at' | 'updated_at'> {}
+interface UserCreationAttributes extends Optional<UserAttributes, 'id' | 'created_at' | 'updated_at' | 'failed_login_attempts' | 'lock_until'> {}
 
 // 用户模型类
 class User extends Model<UserAttributes, UserCreationAttributes> implements UserAttributes {
@@ -32,6 +34,8 @@ class User extends Model<UserAttributes, UserCreationAttributes> implements User
   public status!: number;
   public last_login?: Date;
   public study_duration?: number;
+  public failed_login_attempts!: number;
+  public lock_until?: Date;
   public readonly created_at!: Date;
   public readonly updated_at!: Date;
 }
@@ -92,6 +96,17 @@ User.init({
     type: DataTypes.INTEGER,
     allowNull: true,
     comment: '学习时长'
+  },
+  failed_login_attempts: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    allowNull: false,
+    comment: '登录失败次数'
+  },
+  lock_until: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    comment: '账号锁定截止时间'
   },
   created_at: {
     type: DataTypes.DATE,
