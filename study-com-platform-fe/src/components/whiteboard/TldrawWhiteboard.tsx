@@ -1,7 +1,7 @@
 import { Tldraw, useEditor, Editor as TLEditor } from '@tldraw/tldraw'
 import '@tldraw/tldraw/tldraw.css'
 import '../../styles/tldraw-enhanced.css'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, forwardRef, useImperativeHandle } from 'react'
 import { useTldrawSync } from '../../hooks/useTldrawSync'
 import { saveWhiteboardSnapshot, getWhiteboardSnapshots } from '../../services/whiteboard'
 import { Button, Modal, List, Input, message } from 'antd'
@@ -25,6 +25,11 @@ interface TldrawWhiteboardProps {
   userId: number
   username: string
   onSave?: (data: unknown) => void
+  roomId?: number
+}
+
+interface TldrawWhiteboardHandle {
+  handleExport: () => Promise<void>
 }
 
 const TldrawInner = ({
@@ -91,12 +96,13 @@ const TldrawInner = ({
   );
 }
 
-export const TldrawWhiteboard = ({
+export const TldrawWhiteboard = forwardRef<TldrawWhiteboardHandle, TldrawWhiteboardProps>(({
   whiteboardId,
   userId,
   username,
-  onSave
-}: TldrawWhiteboardProps) => {
+  onSave,
+  roomId
+}, ref) => {
   const [isReady, setIsReady] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [snapshots, setSnapshots] = useState<WhiteboardSnapshot[]>([]);
@@ -109,6 +115,11 @@ export const TldrawWhiteboard = ({
   
   // 定时刷新快照列表的引用
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 暴露导出方法给父组件
+  useImperativeHandle(ref, () => ({
+    handleExport: handleExportPng
+  }));
 
   // 保存白板快照
   const handleSaveSnapshot = async () => {
@@ -182,7 +193,13 @@ export const TldrawWhiteboard = ({
 
   // 导出白板为PNG
   const handleExportPng = async () => {
-    if (!editorRef.current) return;
+    console.log('TldrawWhiteboard handleExportPng 被调用');
+    console.log('editorRef.current:', editorRef.current);
+    
+    if (!editorRef.current) {
+      console.log('编辑器未就绪');
+      return;
+    }
     
     try {
       setExporting(true);
@@ -191,6 +208,8 @@ export const TldrawWhiteboard = ({
       // 使用HTML to Canvas的方式导出
       // 首先获取Tldraw容器
       const tldrawContainer = document.querySelector('.tl-container') as HTMLElement;
+      console.log('tldrawContainer:', tldrawContainer);
+      
       if (!tldrawContainer) {
         throw new Error('无法找到白板容器');
       }
@@ -507,4 +526,4 @@ export const TldrawWhiteboard = ({
       </style>
     </div>
   )
-}
+})

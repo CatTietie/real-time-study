@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Layout, Spin, message, Button, Modal, Form, Input, Select, Space } from 'antd';
+import React, { useState, useEffect, useRef } from 'react';
+import { Card, Layout, Spin, message, Button, Modal, Form, Input, Select, Space, List } from 'antd';
 import { WhiteboardWrapper } from '../../components/whiteboard/WhiteboardWrapper';
-import { createWhiteboard, getWhiteboard, exportWhiteboardToPng } from '../../services/whiteboard';
+import type { WhiteboardWrapperRef } from '../../components/whiteboard/WhiteboardWrapper';
+import { createWhiteboard, getWhiteboard, getChatRoomWhiteboardSnapshots } from '../../services/whiteboard';
 import { getChatRooms } from '../../services/chat';
 import { useAppSelector } from '../../app/hooks';
 import type { ChatRoom } from '../../types/chat';
@@ -16,13 +17,14 @@ interface WhiteboardPageProps {
 const WhiteboardContent: React.FC<WhiteboardPageProps> = ({ whiteboardId }) => {
   const { user } = useAppSelector(state => state.auth);
   const [whiteboard, setWhiteboard] = useState<unknown>(null);
-  const [savedSnapshots, setSavedSnapshots] = useState<any[]>([]);
+  const [savedSnapshots, setSavedSnapshots] = useState<unknown[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
   
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [form] = Form.useForm();
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
+  const whiteboardRef = useRef<WhiteboardWrapperRef>(null);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -119,14 +121,24 @@ const WhiteboardContent: React.FC<WhiteboardPageProps> = ({ whiteboardId }) => {
   };
 
   const handleExport = async () => {
-    if (!whiteboard) return;
+    console.log('导出按钮被点击');
+    console.log('whiteboard:', whiteboard);
+    console.log('whiteboardRef.current:', whiteboardRef.current);
+    
+    if (!whiteboard) {
+      console.log('白板不存在');
+      return;
+    }
     
     try {
-      // 类型断言来访问白板ID
-      const wb = whiteboard as { id: number };
-      const exportData = await exportWhiteboardToPng(wb.id);
-      message.success('白板数据导出成功');
-      console.log('导出数据:', exportData);
+      // 调用子组件的导出方法
+      if (whiteboardRef.current) {
+        console.log('调用子组件导出方法');
+        await whiteboardRef.current.handleExport();
+      } else {
+        console.log('白板组件未准备好');
+        message.error('白板组件未准备好');
+      }
     } catch (error) {
       console.error('导出失败:', error);
       message.error('导出失败');
@@ -204,6 +216,7 @@ const WhiteboardContent: React.FC<WhiteboardPageProps> = ({ whiteboardId }) => {
               padding: '20px' 
             }}>
               <WhiteboardWrapper
+                ref={whiteboardRef}
                 whiteboardId={whiteboard.id}
                 userId={user?.id || 0}
                 username={user?.username || ''}
