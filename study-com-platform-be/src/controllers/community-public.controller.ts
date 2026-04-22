@@ -78,9 +78,19 @@ const canDeletePost = async (user: { id: number; role: string }) => {
   return Boolean(permission);
 };
 
+type ViewMode = "latest" | "hot" | "zeroReply";
+
 export const getCommunityPosts = async (req: Request, res: Response) => {
   try {
-    const { page = 1, pageSize = 10, category, keyword, order, userId } = req.query;
+    const { page = 1, pageSize = 10, category, keyword, order, userId, viewMode } = req.query;
+
+    console.log('getCommunityPosts - 接收到的参数:', {
+      viewMode,
+      order,
+      category,
+      keyword,
+      userId
+    });
 
     const where: any = {
       status: 1,
@@ -92,7 +102,16 @@ export const getCommunityPosts = async (req: Request, res: Response) => {
       where.user_id = Number(userId);
     }
 
-    if (category) {
+    // 处理视图模式
+    const mode = (viewMode as ViewMode) || "latest";
+    console.log('getCommunityPosts - 确定的视图模式:', mode);
+    
+    // 零回复模式：仅显示"问题求助"分类且评论数为0的帖子
+    if (mode === "zeroReply") {
+      where.category = "问题求助";
+      where.comment_count = 0;
+    } else if (category) {
+      // 非零回复模式时，才应用用户选择的分类
       where.category = category;
     }
 
@@ -103,14 +122,36 @@ export const getCommunityPosts = async (req: Request, res: Response) => {
       ];
     }
 
-    const orderBy: any =
-      order === "hot"
-        ? [
-            [Sequelize.col("like_count"), "DESC"],
-            [Sequelize.col("comment_count"), "DESC"],
-            [Sequelize.col("created_at"), "DESC"],
-          ]
-        : [[Sequelize.col("created_at"), "DESC"]];
+    // 根据视图模式确定排序
+    let orderBy: any;
+    
+    if (mode === "hot") {
+      // 热门推荐：综合算法排序 - 点赞(权重3) + 评论(权重2) + 浏览量(权重1)
+      console.log('getCommunityPosts - 使用热门排序');
+      orderBy = [
+        [Sequelize.literal(`(like_count * 3 + comment_count * 2 + view_count)`), "DESC"],
+        ["created_at", "DESC"],
+      ];
+    } else if (mode === "zeroReply") {
+      // 零回复模式：按创建时间倒序，最新的问题优先
+      console.log('getCommunityPosts - 使用零回复排序');
+      orderBy = [["created_at", "DESC"]];
+    } else {
+      // 最新发布（默认）：按创建时间倒序
+      // 同时支持旧的 order 参数（兼容历史代码）
+      console.log('getCommunityPosts - 使用最新发布排序');
+      orderBy =
+        order === "hot"
+          ? [
+              ["like_count", "DESC"],
+              ["comment_count", "DESC"],
+              ["created_at", "DESC"],
+            ]
+          : [["created_at", "DESC"]];
+    }
+
+    console.log('getCommunityPosts - 最终 orderBy:', JSON.stringify(orderBy));
+    console.log('getCommunityPosts - 最终 where:', JSON.stringify(where));
 
     const result = await Post.findAndCountAll({
       where,
@@ -124,6 +165,19 @@ export const getCommunityPosts = async (req: Request, res: Response) => {
       offset: (Number(page) - 1) * Number(pageSize),
       limit: Number(pageSize),
     });
+
+    console.log('getCommunityPosts - 查询结果数量:', result.count);
+    if (result.rows.length > 0) {
+      const firstPost = result.rows[0] as any;
+      console.log('getCommunityPosts - 第一条帖子:', {
+        id: firstPost.id,
+        title: firstPost.title,
+        like_count: firstPost.like_count,
+        comment_count: firstPost.comment_count,
+        view_count: firstPost.view_count,
+        created_at: firstPost.created_at
+      });
+    }
 
     const data = result.rows.map((post) => {
       const raw = post.toJSON() as any;
