@@ -109,17 +109,37 @@ export const getCommunityPosts = async (req: Request, res: Response) => {
     // 零回复模式：仅显示"问题求助"分类且评论数为0的帖子
     if (mode === "zeroReply") {
       where.category = "问题求助";
-      where.comment_count = 0;
+      // 处理 comment_count 可能为 null 或 0 的情况
+      where[Op.or] = [
+        { comment_count: 0 },
+        { comment_count: null },
+      ];
     } else if (category) {
       // 非零回复模式时，才应用用户选择的分类
       where.category = category;
     }
 
     if (keyword) {
-      where[Op.or] = [
-        { title: { [Op.like]: `%${keyword}%` } },
-        { content: { [Op.like]: `%${keyword}%` } },
-      ];
+      // 如果已有 where[Op.or]（来自零回复模式），需要合并
+      if (where[Op.or]) {
+        // 零回复模式下的 keyword 搜索：在 comment_count 为 0/null 且 category="问题求助" 的基础上，添加 keyword 条件
+        const existingOr = where[Op.or];
+        delete where[Op.or];
+        where[Op.and] = [
+          { [Op.or]: existingOr },
+          {
+            [Op.or]: [
+              { title: { [Op.like]: `%${keyword}%` } },
+              { content: { [Op.like]: `%${keyword}%` } },
+            ],
+          },
+        ];
+      } else {
+        where[Op.or] = [
+          { title: { [Op.like]: `%${keyword}%` } },
+          { content: { [Op.like]: `%${keyword}%` } },
+        ];
+      }
     }
 
     // 根据视图模式确定排序

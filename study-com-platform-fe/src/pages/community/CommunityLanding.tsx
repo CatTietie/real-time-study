@@ -107,7 +107,7 @@ export default function CommunityLanding() {
     };
 
     const loadData = useCallback(
-        async (pageNo = page, append = false) => {
+        async (pageNo: number, append = false) => {
             setLoading(true);
             try {
                 const res = await fetchCommunityPosts({
@@ -129,7 +129,7 @@ export default function CommunityLanding() {
                 fetchingMoreRef.current = false;
             }
         },
-        [category, keyword, order, page, pageSize, viewMode],
+        [category, keyword, order, pageSize, viewMode],
     );
 
     useEffect(() => {
@@ -137,7 +137,13 @@ export default function CommunityLanding() {
         loadData(1);
         loadHotPosts();
         loadTodayStats();
-    }, [loadData, token]);
+    }, [token]);
+
+    useEffect(() => {
+        console.log('分类或视图模式变化, 重新加载数据');
+        setPage(1);
+        loadData(1);
+    }, [category, viewMode]);
 
     // 监听热榜数据变化
     useEffect(() => {
@@ -159,7 +165,7 @@ export default function CommunityLanding() {
         };
         window.addEventListener("scroll", onScroll);
         return () => window.removeEventListener("scroll", onScroll);
-    }, [data.length, loadData, loading, page, total]);
+    }, [data.length, loading, page, total]);
 
     useEffect(() => {
         if (token) {
@@ -191,6 +197,7 @@ export default function CommunityLanding() {
             window.clearTimeout(searchTimerRef.current);
         }
         searchTimerRef.current = window.setTimeout(() => {
+            setPage(1);
             loadData(1);
         }, 300);
         return () => {
@@ -198,7 +205,7 @@ export default function CommunityLanding() {
                 window.clearTimeout(searchTimerRef.current);
             }
         };
-    }, [category, keyword, loadData, order, viewMode]);
+    }, [keyword]);
 
     useEffect(() => {
         if (!token) {
