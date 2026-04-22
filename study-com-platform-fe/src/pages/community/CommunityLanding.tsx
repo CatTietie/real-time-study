@@ -85,7 +85,7 @@ export default function CommunityLanding() {
     const [pageSize] = useState(10);
     const [total, setTotal] = useState(0);
     const [order, /* setOrder */] = useState<"latest" | "hot">("latest");
-    const [viewMode, setViewMode] = useState<"latest" | "hot" | "zeroReply">("latest");
+    const [viewMode, setViewMode] = useState<"latest" | "hot">("latest");
     const [profile, setProfile] = useState<ProfileSummary | null>(null);
     const [profileLoading, setProfileLoading] = useState(false);
     // const [onlineCount, setOnlineCount] = useState<number | null>(null); // 暂时注释，后续可能需要
@@ -430,10 +430,14 @@ export default function CommunityLanding() {
                     style={{width: "100%"}}
                     size="middle"
                 >
-                    <Space
-                        align="center"
-                        style={{width: "100%", justifyContent: "space-between"}}
-                    >
+                    <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        width: "100%",
+                        flexWrap: "wrap",
+                        gap: 16,
+                    }}>
                         <Space align="center">
                             <svg
                                 k1="1770195626963"
@@ -476,7 +480,31 @@ export default function CommunityLanding() {
                                 学习社区
                             </Title>
                         </Space>
-                        <Space align="center" style={{gap: 16}}>
+
+                        <Tabs
+                            activeKey={viewMode}
+                            onChange={(key) => {
+                                setViewMode(key as "latest" | "hot");
+                                setPage(1);
+                            }}
+                            style={{
+                                flex: 1,
+                                maxWidth: 600,
+                                minWidth: 200,
+                            }}
+                            items={[
+                                {
+                                    key: "latest",
+                                    label: "最新发布",
+                                },
+                                {
+                                    key: "hot",
+                                    label: "热门推荐",
+                                },
+                            ]}
+                        />
+
+                        <Space align="center" style={{gap: 16, flexWrap: "wrap"}}>
                             <Input.Search
                                 placeholder="搜索标题/内容"
                                 allowClear
@@ -519,32 +547,7 @@ export default function CommunityLanding() {
                                 }
                             />
                         </Space>
-                    </Space>
-                    
-                    <Tabs
-                        activeKey={viewMode}
-                        onChange={(key) => {
-                            setViewMode(key as "latest" | "hot" | "zeroReply");
-                            setPage(1);
-                        }}
-                        style={{
-                            borderBottom: "1px solid #f0f0f0",
-                        }}
-                        items={[
-                            {
-                                key: "latest",
-                                label: "最新发布",
-                            },
-                            {
-                                key: "hot",
-                                label: "热门推荐",
-                            },
-                            {
-                                key: "zeroReply",
-                                label: "零回复求助",
-                            },
-                        ]}
-                    />
+                    </div>
                 </Space>
             </Card>
 
