@@ -19,6 +19,7 @@ import {
 import { PERMISSION_CODES } from "../constants/permissions";
 import { calculateLevel, getStartOfDay, getStartOfWeek } from "../utils/helper";
 import { getUserHotPostsCount } from "../services/hot-posts.service";
+import { validatePasswordStrength } from "../utils/validator";
 
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCK_DURATION_MINUTES = 15;
@@ -35,6 +36,13 @@ export const register = async (req: Request, res: Response) => {
       return res
         .status(400)
         .json({ success: false, message: "账号和密码不能为空" });
+    }
+
+    const passwordStrength = validatePasswordStrength(password);
+    if (!passwordStrength.isValid) {
+      return res
+        .status(400)
+        .json({ success: false, message: passwordStrength.message });
     }
 
     const existing = await User.findOne({ where: { username } });
