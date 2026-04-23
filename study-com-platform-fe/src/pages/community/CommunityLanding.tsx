@@ -425,11 +425,6 @@ export default function CommunityLanding() {
         }
     };
 
-    // 处理评论点击逻辑
-    const handleCommentClick = (postId: number) => {
-        navigate(`/community/posts/${postId}`);
-    };
-
     // 处理收藏逻辑
     const handleFavoriteClick = async (postId: number, currentFavoriteCount?: number) => {
         if (!token) {
