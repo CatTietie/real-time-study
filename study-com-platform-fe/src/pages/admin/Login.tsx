@@ -428,7 +428,7 @@ export default function Login() {
               }}>
                 {passwordStrength.requirements.map((req, index) => (
                   <div 
-                    key={index}
+                    key={`req-${index}-${req.met ? 'met' : 'unmet'}`}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -437,12 +437,14 @@ export default function Login() {
                       color: req.met ? "#52c41a" : "#94a3b8"
                     }}
                   >
-                    {req.met ? (
-                      <SafetyOutlined style={{ fontSize: "12px" }} />
-                    ) : (
-                      <WarningOutlined style={{ fontSize: "12px" }} />
-                    )}
-                    {req.text}
+                    <span style={{ fontSize: "12px" }}>
+                      {req.met ? (
+                        <SafetyOutlined />
+                      ) : (
+                        <WarningOutlined />
+                      )}
+                    </span>
+                    <span>{req.text}</span>
                   </div>
                 ))}
               </div>

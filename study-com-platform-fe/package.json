@@ -19,6 +19,7 @@
     "@tldraw/tldraw": "^4.4.0",
     "antd": "^5.11.2",
     "axios": "^1.12.2",
+    "echarts": "^6.0.0",
     "file-saver": "^2.0.5",
     "html2canvas": "^1.4.1",
     "react": "^18.2.0",

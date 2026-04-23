@@ -9,7 +9,7 @@ import {
   message,
 } from "antd";
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAppSelector } from "../../app/hooks";
 import { fetchCommunityPosts } from "../../services/communityPublic";
 import CommunityFooter from "../../components/community/CommunityFooter";
@@ -277,11 +277,15 @@ export default function PostsList() {
                         {item.category && (
                           <Tag color="blue">{item.category}</Tag>
                         )}
-                        <Link to={`/community/posts/${item.id}`}>
-                          <Typography.Text strong style={{ fontSize: 16, color: "#1F2937" }}>
-                            {item.title}
-                          </Typography.Text>
-                        </Link>
+                        <Typography.Text 
+                          strong 
+                          style={{ fontSize: 16, color: "#1890ff", cursor: "pointer" }}
+                          onClick={() => navigate(`/community?postId=${item.id}`)}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = "#40a9ff"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = "#1890ff"; }}
+                        >
+                          {item.title}
+                        </Typography.Text>
                         {item.status === 1 && item.publish_status === 1 && (
                           <Tag color="green">已发布</Tag>
                         )}
