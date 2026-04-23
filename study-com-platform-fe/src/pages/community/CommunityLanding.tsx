@@ -4,14 +4,15 @@ import {
     Card,
     Input,
     List,
+    Modal,
     Space,
     Tabs,
     Tag,
     Typography,
     message,
 } from "antd";
-import {useCallback, useEffect, useRef, useState} from "react";
-import {useNavigate} from "react-router-dom";
+import {Suspense, lazy, useCallback, useEffect, useRef, useState} from "react";
+import {useNavigate, useSearchParams} from "react-router-dom";
 import {
     fetchCommunityPosts,
     fetchCommunityProfileSummary,
@@ -25,6 +26,14 @@ import {
 import {useAppSelector} from "../../app/hooks";
 import type {RootState} from "../../app/store";
 import CommunityFooter from "../../components/community/CommunityFooter";
+
+const PostDetail = lazy(() => import("./PostDetail"));
+
+const PostDetailLoading = () => (
+    <div style={{ padding: 40, textAlign: "center" }}>
+        <Typography.Text>加载中...</Typography.Text>
+    </div>
+);
 
 const {Title, Paragraph, Text} = Typography;
 const API_BASE = (
@@ -74,6 +83,7 @@ type ProfileSummary = {
 
 export default function CommunityLanding() {
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const {token, username, role} = useAppSelector(
         (state: RootState) => state.auth,
     );
@@ -101,6 +111,52 @@ export default function CommunityLanding() {
     const [statsLoading, setStatsLoading] = useState(false); // 恢复今日统计状态
     const fetchingMoreRef = useRef(false);
     const searchTimerRef = useRef<number | null>(null);
+
+    // 帖子详情弹窗状态
+    const [postDetailVisible, setPostDetailVisible] = useState(false);
+    const [currentPostId, setCurrentPostId] = useState<number | null>(null);
+    const [modalKey, setModalKey] = useState(0);
+
+    // 从 URL 参数读取 postId 并同步弹窗状态
+    useEffect(() => {
+        const postIdFromUrl = searchParams.get("postId");
+        if (postIdFromUrl && !isNaN(Number(postIdFromUrl))) {
+            const postId = Number(postIdFromUrl);
+            setCurrentPostId(postId);
+            setPostDetailVisible(true);
+            setModalKey(prev => prev + 1);
+        } else {
+            setPostDetailVisible(false);
+            setCurrentPostId(null);
+        }
+    }, [searchParams]);
+
+    // 打开帖子详情弹窗
+    const openPostDetail = useCallback((postId: number) => {
+        setCurrentPostId(postId);
+        setPostDetailVisible(true);
+        setModalKey(prev => prev + 1);
+        setSearchParams(prev => {
+            const newParams = new URLSearchParams(prev);
+            newParams.set("postId", String(postId));
+            return newParams;
+        }, { replace: true });
+    }, [setSearchParams]);
+
+    // 关闭帖子详情弹窗
+    const closePostDetail = useCallback(() => {
+        setPostDetailVisible(false);
+        setSearchParams(prev => {
+            const newParams = new URLSearchParams(prev);
+            newParams.delete("postId");
+            return newParams;
+        }, { replace: true });
+    }, [setSearchParams]);
+
+    // 处理评论点击
+    const handleCommentClick = (postId: number) => {
+        openPostDetail(postId);
+    };
 
     const handleSearch = () => {
         loadData(1);
@@ -679,7 +735,7 @@ export default function CommunityLanding() {
                                         backgroundColor: '#fff',
                                         marginBottom: '8px'
                                     }}
-                                    onClick={() => navigate(`/community/posts/${post.id}`)}
+                                    onClick={() => openPostDetail(post.id)}
                                     onMouseEnter={(e) => {
                                         e.currentTarget.style.backgroundColor = '#f8f8f8';
                                         e.currentTarget.style.boxShadow = '0 3px 6px rgba(0,0,0,0.08)';
@@ -787,7 +843,7 @@ export default function CommunityLanding() {
                                             boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
                                             cursor: "pointer"
                                         }}
-                                        onClick={() => navigate(`/community/posts/${item.id}`)}
+                                        onClick={() => openPostDetail(item.id)}
                                     >
                                         <div
                                             style={{
@@ -1463,6 +1519,32 @@ export default function CommunityLanding() {
                 </div>
             </div>
             <CommunityFooter/>
+
+            {/* 帖子详情弹窗 */}
+            <Modal
+                key={modalKey}
+                title={null}
+                open={postDetailVisible}
+                onCancel={closePostDetail}
+                footer={null}
+                width="800px"
+                destroyOnClose={true}
+                className="post-detail-modal"
+                styles={{
+                    mask: {
+                        backdropFilter: "blur(4px)"
+                    }
+                }}
+            >
+                {currentPostId && (
+                    <Suspense fallback={<PostDetailLoading />}>
+                        <PostDetail
+                            postId={currentPostId}
+                            onClose={closePostDetail}
+                        />
+                    </Suspense>
+                )}
+            </Modal>
         </div>
     );
 }

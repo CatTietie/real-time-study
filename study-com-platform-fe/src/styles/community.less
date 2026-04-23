@@ -340,3 +340,29 @@
     opacity: 1;
   }
 }
+
+/* 隐藏滚动条样式 */
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* 防滚动穿透 - Modal 打开时禁止背景滚动 */
+.modal-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+}
+
+/* 帖子详情弹窗自定义样式 */
+.post-detail-modal {
+  .ant-modal-body {
+    padding: 0 !important;
+    max-height: 85vh;
+    overflow: hidden;
+  }
+}
