@@ -115,7 +115,6 @@ export default function CommunityLanding() {
     // 帖子详情弹窗状态
     const [postDetailVisible, setPostDetailVisible] = useState(false);
     const [currentPostId, setCurrentPostId] = useState<number | null>(null);
-    const [modalKey, setModalKey] = useState(0);
 
     // 从 URL 参数读取 postId 并同步弹窗状态
     useEffect(() => {
@@ -124,7 +123,6 @@ export default function CommunityLanding() {
             const postId = Number(postIdFromUrl);
             setCurrentPostId(postId);
             setPostDetailVisible(true);
-            setModalKey(prev => prev + 1);
         } else {
             setPostDetailVisible(false);
             setCurrentPostId(null);
@@ -135,7 +133,6 @@ export default function CommunityLanding() {
     const openPostDetail = useCallback((postId: number) => {
         setCurrentPostId(postId);
         setPostDetailVisible(true);
-        setModalKey(prev => prev + 1);
         setSearchParams(prev => {
             const newParams = new URLSearchParams(prev);
             newParams.set("postId", String(postId));
@@ -1530,7 +1527,6 @@ export default function CommunityLanding() {
 
             {/* 帖子详情弹窗 */}
             <Modal
-                key={modalKey}
                 title={null}
                 open={postDetailVisible}
                 onCancel={closePostDetail}

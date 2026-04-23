@@ -137,6 +137,14 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
 
   useEffect(() => {
     loadData();
+    
+    const scrollContainer = document.querySelector('.post-detail-scroll-container');
+    if (scrollContainer) {
+      scrollContainer.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    }
   }, [postId]);
 
   const handleCreateComment = async (values: { content: string }) => {

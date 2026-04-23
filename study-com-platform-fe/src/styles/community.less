@@ -362,7 +362,7 @@
 .post-detail-modal {
   /* Modal 外层容器 - 添加 padding 来容纳关闭按钮 */
   .ant-modal {
-    padding: 32px;
+    padding: 48px;
     margin: 0 auto;
   }
 
@@ -373,35 +373,47 @@
     max-height: 90vh;
     height: 90vh;
     overflow: hidden;
-    border-radius: 8px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    border-radius: 12px;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.2);
+    position: relative;
   }
 
   /* Modal 关闭按钮 - 定位到 Modal 外部右上角 */
   .ant-modal-close {
     position: absolute;
-    top: 4px;
-    right: -32px;
-    width: 28px;
-    height: 28px;
-    line-height: 28px;
-    color: #fff;
-    background: rgba(0, 0, 0, 0.4);
+    top: -48px;
+    right: -48px;
+    width: 36px;
+    height: 36px;
+    line-height: 36px;
+    color: rgba(255, 255, 255);
+    background: rgba(0, 0, 0, 0.7);
     border-radius: 50%;
     transition: all 0.2s ease;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     
     &:hover {
-      background: rgba(0, 0, 0, 0.6);
+      background: rgba(255, 77, 79, 0.9);
       color: #fff;
+      transform: scale(1.1);
+      border-color: rgba(255, 255, 255, 0.5);
+      box-shadow: 0 4px 12px rgba(255, 77, 79, 0.4);
     }
   }
 
   /* Modal 关闭按钮图标 */
   .ant-modal-close-x {
-    width: 28px;
-    height: 28px;
-    line-height: 28px;
-    font-size: 14px;
+    width: 36px;
+    height: 36px;
+    line-height: 36px;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   /* Modal body */
