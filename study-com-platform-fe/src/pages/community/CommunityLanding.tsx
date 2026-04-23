@@ -206,6 +206,19 @@ export default function CommunityLanding() {
         console.log('热榜数据发生变化:', hotPosts);
     }, [hotPosts]);
 
+    // 监听弹窗状态，控制背景滚动
+    useEffect(() => {
+        if (postDetailVisible) {
+            document.body.classList.add('post-detail-modal-open');
+        } else {
+            document.body.classList.remove('post-detail-modal-open');
+        }
+        
+        return () => {
+            document.body.classList.remove('post-detail-modal-open');
+        };
+    }, [postDetailVisible]);
+
     useEffect(() => {
         const onScroll = () => {
             if (loading || fetchingMoreRef.current) return;
@@ -1533,8 +1546,8 @@ export default function CommunityLanding() {
                     },
                     body: {
                         padding: 0,
-                        maxHeight: "calc(90vh - 56px)",
-                        height: "calc(90vh - 56px)",
+                        maxHeight: "90vh",
+                        height: "90vh",
                         overflow: "hidden",
                         display: "flex",
                         flexDirection: "column"
@@ -1543,12 +1556,8 @@ export default function CommunityLanding() {
                         maxHeight: "90vh",
                         height: "90vh",
                         display: "flex",
-                        flexDirection: "column"
-                    },
-                    header: {
-                        padding: "12px 16px",
-                        borderBottom: "1px solid #f0f0f0",
-                        flexShrink: 0
+                        flexDirection: "column",
+                        overflow: "hidden"
                     }
                 }}
             >

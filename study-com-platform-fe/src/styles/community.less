@@ -360,6 +360,12 @@
 
 /* 帖子详情弹窗自定义样式 */
 .post-detail-modal {
+  /* Modal 外层容器 - 添加 padding 来容纳关闭按钮 */
+  .ant-modal {
+    padding: 32px;
+    margin: 0 auto;
+  }
+
   /* Modal 内容容器 */
   .ant-modal-content {
     display: flex;
@@ -367,20 +373,35 @@
     max-height: 90vh;
     height: 90vh;
     overflow: hidden;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
   }
 
-  /* Modal 头部 */
-  .ant-modal-header {
-    flex-shrink: 0;
-    padding: 12px 16px;
-    border-bottom: 1px solid #f0f0f0;
-    margin: 0;
-  }
-
-  /* Modal 关闭按钮 */
+  /* Modal 关闭按钮 - 定位到 Modal 外部右上角 */
   .ant-modal-close {
-    top: 12px;
-    right: 16px;
+    position: absolute;
+    top: 4px;
+    right: -32px;
+    width: 28px;
+    height: 28px;
+    line-height: 28px;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    
+    &:hover {
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+    }
+  }
+
+  /* Modal 关闭按钮图标 */
+  .ant-modal-close-x {
+    width: 28px;
+    height: 28px;
+    line-height: 28px;
+    font-size: 14px;
   }
 
   /* Modal body */
@@ -393,15 +414,18 @@
   }
 }
 
-/* Modal 打开时禁用背景滚动 */
-body:has(.ant-modal-wrap.post-detail-modal) {
+/* Modal 打开时禁用背景滚动 - 兼容旧浏览器 */
+.post-detail-modal-open {
   overflow: hidden !important;
+  position: fixed;
+  width: 100%;
 }
 
 /* 确保 Modal 遮罩层正确 */
 .post-detail-modal {
   .ant-modal-wrap {
     overflow: hidden;
+    overflow-y: auto;
   }
 }
 
