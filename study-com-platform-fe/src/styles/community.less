@@ -362,7 +362,39 @@
 .post-detail-modal {
   .ant-modal-body {
     padding: 0 !important;
-    max-height: 85vh;
+    max-height: 90vh;
     overflow: hidden;
+  }
+}
+
+/* 帖子详情滚动容器 - 自定义滚动条 */
+.post-detail-scroll-container {
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.3) rgba(0, 0, 0, 0.05);
+
+  /* Chrome, Safari, Edge */
+  &::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 4px;
+    transition: background 0.2s ease;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.4);
+  }
+
+  &::-webkit-scrollbar-thumb:active {
+    background: rgba(0, 0, 0, 0.5);
   }
 }

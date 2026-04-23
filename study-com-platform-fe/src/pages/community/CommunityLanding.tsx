@@ -1528,6 +1528,18 @@ export default function CommunityLanding() {
                 styles={{
                     mask: {
                         backdropFilter: "blur(4px)"
+                    },
+                    body: {
+                        padding: 0,
+                        maxHeight: "90vh",
+                        height: "90vh",
+                        overflow: "hidden",
+                        display: "flex",
+                        flexDirection: "column"
+                    },
+                    content: {
+                        maxHeight: "90vh",
+                        height: "90vh"
                     }
                 }}
             >

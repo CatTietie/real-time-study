@@ -327,14 +327,14 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
       }}
     >
       <div 
+        className="post-detail-scroll-container"
         style={{ 
           flex: 1,
           overflowY: "auto",
-          paddingRight: 8,
-          paddingLeft: 8,
-          paddingBottom: 70
+          paddingRight: 16,
+          paddingLeft: 16,
+          paddingBottom: 80
         }}
-        className="hide-scrollbar"
       >
         <Card loading={loading} style={{ backgroundColor: "#fff", border: "none", boxShadow: "none" }}>
           <Space direction="vertical" style={{ width: "100%" }} size={16}>
