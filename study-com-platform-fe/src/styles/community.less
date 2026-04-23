@@ -360,9 +360,47 @@
 
 /* 帖子详情弹窗自定义样式 */
 .post-detail-modal {
-  .ant-modal-body {
-    padding: 0 !important;
+  /* Modal 内容容器 */
+  .ant-modal-content {
+    display: flex;
+    flex-direction: column;
     max-height: 90vh;
+    height: 90vh;
+    overflow: hidden;
+  }
+
+  /* Modal 头部 */
+  .ant-modal-header {
+    flex-shrink: 0;
+    padding: 12px 16px;
+    border-bottom: 1px solid #f0f0f0;
+    margin: 0;
+  }
+
+  /* Modal 关闭按钮 */
+  .ant-modal-close {
+    top: 12px;
+    right: 16px;
+  }
+
+  /* Modal body */
+  .ant-modal-body {
+    flex: 1;
+    padding: 0 !important;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+/* Modal 打开时禁用背景滚动 */
+body:has(.ant-modal-wrap.post-detail-modal) {
+  overflow: hidden !important;
+}
+
+/* 确保 Modal 遮罩层正确 */
+.post-detail-modal {
+  .ant-modal-wrap {
     overflow: hidden;
   }
 }

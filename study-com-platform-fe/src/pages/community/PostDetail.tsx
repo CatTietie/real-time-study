@@ -333,7 +333,7 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
           overflowY: "auto",
           paddingRight: 16,
           paddingLeft: 16,
-          paddingBottom: 80
+          paddingBottom: 16
         }}
       >
         <Card loading={loading} style={{ backgroundColor: "#fff", border: "none", boxShadow: "none" }}>
@@ -575,12 +575,9 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
 
       <div
         style={{
-          position: 'sticky',
-          bottom: 0,
-          left: 0,
-          right: 0,
+          flexShrink: 0,
           padding: '12px 16px',
-          background: 'linear-gradient(transparent, rgba(255,255,255,0.95) 20%, #fff)',
+          background: '#fff',
           borderTop: '1px solid #f0f0f0',
           zIndex: 10
         }}

@@ -1524,6 +1524,8 @@ export default function CommunityLanding() {
                 footer={null}
                 width="800px"
                 destroyOnClose={true}
+                closable={true}
+                maskClosable={true}
                 className="post-detail-modal"
                 styles={{
                     mask: {
@@ -1531,15 +1533,22 @@ export default function CommunityLanding() {
                     },
                     body: {
                         padding: 0,
-                        maxHeight: "90vh",
-                        height: "90vh",
+                        maxHeight: "calc(90vh - 56px)",
+                        height: "calc(90vh - 56px)",
                         overflow: "hidden",
                         display: "flex",
                         flexDirection: "column"
                     },
                     content: {
                         maxHeight: "90vh",
-                        height: "90vh"
+                        height: "90vh",
+                        display: "flex",
+                        flexDirection: "column"
+                    },
+                    header: {
+                        padding: "12px 16px",
+                        borderBottom: "1px solid #f0f0f0",
+                        flexShrink: 0
                     }
                 }}
             >
