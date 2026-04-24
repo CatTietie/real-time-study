@@ -30,6 +30,13 @@ export const initAssociations = () => {
   User.hasMany(Post, { foreignKey: "user_id" });
   Post.belongsTo(User, { foreignKey: "user_id" });
 
+  // 转发关联：帖子自关联（原帖）
+  Post.belongsTo(Post, { foreignKey: "forward_post_id", as: "ForwardPost" });
+  Post.hasMany(Post, { foreignKey: "forward_post_id", as: "ForwardedPosts" });
+
+  // 转发关联：被转发的原作者
+  Post.belongsTo(User, { foreignKey: "forward_user_id", as: "ForwardUser" });
+
   User.hasMany(Comment, { foreignKey: "user_id" });
   Comment.belongsTo(User, { foreignKey: "user_id" });
 
