@@ -340,3 +340,135 @@
     opacity: 1;
   }
 }
+
+/* 隐藏滚动条样式 */
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* 防滚动穿透 - Modal 打开时禁止背景滚动 */
+.modal-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+}
+
+/* 帖子详情弹窗自定义样式 */
+.post-detail-modal {
+  /* Modal 外层容器 - 添加 padding 来容纳关闭按钮 */
+  .ant-modal {
+    padding: 48px;
+    margin: 0 auto;
+  }
+
+  /* Modal 内容容器 */
+  .ant-modal-content {
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+    height: 90vh;
+    overflow: hidden;
+    border-radius: 12px;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.2);
+    position: relative;
+  }
+
+  /* Modal 关闭按钮 - 定位到 Modal 外部右上角 */
+  .ant-modal-close {
+    position: absolute;
+    top: -48px;
+    right: -48px;
+    width: 36px;
+    height: 36px;
+    line-height: 36px;
+    color: rgba(255, 255, 255);
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    &:hover {
+      background: rgba(255, 77, 79, 0.9);
+      color: #fff;
+      transform: scale(1.1);
+      border-color: rgba(255, 255, 255, 0.5);
+      box-shadow: 0 4px 12px rgba(255, 77, 79, 0.4);
+    }
+  }
+
+  /* Modal 关闭按钮图标 */
+  .ant-modal-close-x {
+    width: 36px;
+    height: 36px;
+    line-height: 36px;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Modal body */
+  .ant-modal-body {
+    flex: 1;
+    padding: 0 !important;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+/* Modal 打开时禁用背景滚动 - 兼容旧浏览器 */
+.post-detail-modal-open {
+  overflow: hidden !important;
+  position: fixed;
+  width: 100%;
+}
+
+/* 确保 Modal 遮罩层正确 */
+.post-detail-modal {
+  .ant-modal-wrap {
+    overflow: hidden;
+    overflow-y: auto;
+  }
+}
+
+/* 帖子详情滚动容器 - 自定义滚动条 */
+.post-detail-scroll-container {
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.3) rgba(0, 0, 0, 0.05);
+
+  /* Chrome, Safari, Edge */
+  &::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 4px;
+    transition: background 0.2s ease;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.4);
+  }
+
+  &::-webkit-scrollbar-thumb:active {
+    background: rgba(0, 0, 0, 0.5);
+  }
+}
