@@ -65,6 +65,20 @@ type PostRow = {
     like_count?: number;
     view_count?: number;
     User?: { nickname?: string; username?: string };
+    forward_post_id?: number;
+    forward_user_id?: number;
+    ForwardPost?: {
+        id: number;
+        title: string;
+        content: string;
+        like_count: number;
+        comment_count: number;
+        user_id: number;
+        User?: { nickname?: string; username?: string };
+    };
+    ForwardUser?: { nickname?: string; username?: string };
+    created_at?: string;
+    updated_at?: string;
 };
 
 type ProfileSummary = {
@@ -115,6 +129,21 @@ export default function CommunityLanding() {
     // 帖子详情弹窗状态
     const [postDetailVisible, setPostDetailVisible] = useState(false);
     const [currentPostId, setCurrentPostId] = useState<number | null>(null);
+
+    // 转发内容展开状态
+    const [expandedForwardPosts, setExpandedForwardPosts] = useState<Set<number>>(new Set());
+
+    const toggleForwardExpand = (postId: number) => {
+        setExpandedForwardPosts(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(postId)) {
+                newSet.delete(postId);
+            } else {
+                newSet.add(postId);
+            }
+            return newSet;
+        });
+    };
 
     // 从 URL 参数读取 postId 并同步弹窗状态
     useEffect(() => {
@@ -836,6 +865,9 @@ export default function CommunityLanding() {
                             renderItem={(item) => {
                                 const summary = stripText(item.content).slice(0, 120);
                                 const cover = resolveImageUrl(item.images?.[0]);
+                                const isForwardPost = item.forward_post_id && item.ForwardPost;
+                                const isExpanded = expandedForwardPosts.has(item.id);
+
                                 return (
                                     <List.Item
                                         style={{
@@ -885,12 +917,138 @@ export default function CommunityLanding() {
                                                     </Text>
                                                 </Space>
 
+                                                {/* 转发帖引用卡片 */}
+                                                {isForwardPost && item.ForwardPost && (
+                                                    <div
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        style={{
+                                                            backgroundColor: "#fafafa",
+                                                            border: "1px solid #e8e8e8",
+                                                            borderRadius: "8px",
+                                                            padding: "12px 16px",
+                                                            width: "100%",
+                                                        }}
+                                                    >
+                                                        {/* 转发头部：@原作者昵称：原帖标题 */}
+                                                        <div style={{
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            flexWrap: "wrap",
+                                                            gap: 4,
+                                                            marginBottom: 8,
+                                                        }}>
+                                                            <Text
+                                                                style={{
+                                                                    color: "#52c41a",
+                                                                    fontWeight: "bold",
+                                                                    cursor: "pointer",
+                                                                }}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                }}
+                                                            >
+                                                                @{item.ForwardPost.User?.nickname || item.ForwardPost.User?.username || "用户"}：
+                                                            </Text>
+                                                            <Text
+                                                                style={{
+                                                                    color: "#374151",
+                                                                    cursor: "pointer",
+                                                                    fontWeight: 500,
+                                                                }}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    openPostDetail(item.ForwardPost!.id);
+                                                                }}
+                                                                onMouseEnter={(e) => {
+                                                                    e.currentTarget.style.color = "#1890ff";
+                                                                }}
+                                                                onMouseLeave={(e) => {
+                                                                    e.currentTarget.style.color = "#374151";
+                                                                }}
+                                                            >
+                                                                {item.ForwardPost.title}
+                                                            </Text>
+                                                        </div>
+
+                                                        {/* 原帖内容 */}
+                                                        <div style={{
+                                                            whiteSpace: "pre-wrap",
+                                                            wordBreak: "break-word",
+                                                            color: "#666",
+                                                            fontSize: 14,
+                                                            lineHeight: 1.6,
+                                                        }}>
+                                                            {isExpanded ? (
+                                                                <>
+                                                                    {item.ForwardPost.content}
+                                                                    <Text
+                                                                        style={{
+                                                                            color: "#1890ff",
+                                                                            cursor: "pointer",
+                                                                            marginLeft: 8,
+                                                                        }}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            toggleForwardExpand(item.id);
+                                                                        }}
+                                                                    >
+                                                                        收起
+                                                                    </Text>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    {item.ForwardPost.content.length > 100
+                                                                        ? `${item.ForwardPost.content.slice(0, 100)}...`
+                                                                        : item.ForwardPost.content
+                                                                    }
+                                                                    {item.ForwardPost.content.length > 100 && (
+                                                                        <Text
+                                                                            style={{
+                                                                                color: "#1890ff",
+                                                                                cursor: "pointer",
+                                                                                marginLeft: 8,
+                                                                            }}
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                toggleForwardExpand(item.id);
+                                                                            }}
+                                                                        >
+                                                                            查看更多
+                                                                        </Text>
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                        </div>
+
+                                                        {/* 原帖互动数据 */}
+                                                        <div style={{
+                                                            marginTop: 12,
+                                                            paddingTop: 8,
+                                                            borderTop: "1px solid #f0f0f0",
+                                                            display: "flex",
+                                                            gap: 16,
+                                                        }}>
+                                                            <Text type="secondary" style={{ fontSize: 12 }}>
+                                                                👍 {item.ForwardPost.like_count || 0}
+                                                            </Text>
+                                                            <Text type="secondary" style={{ fontSize: 12 }}>
+                                                                |
+                                                            </Text>
+                                                            <Text type="secondary" style={{ fontSize: 12 }}>
+                                                                💬 {item.ForwardPost.comment_count || 0}
+                                                            </Text>
+                                                        </div>
+                                                    </div>
+                                                )}
+
                                                 {/* 分类标签 */}
                                                 {item.category && (
                                                     <Tag color="blue" style={{marginBottom: 4}}>
                                                         {item.category}
                                                     </Tag>
                                                 )}
+
+                                                {/* 标题 - 如果是转发帖，可能标题是"转发: xxx"，但我们已经通过引用卡片展示了，所以可以简化或保留 */}
                                                 <Text strong style={{fontSize: 18, display: "block"}}>
                                                     {item.title}
                                                 </Text>

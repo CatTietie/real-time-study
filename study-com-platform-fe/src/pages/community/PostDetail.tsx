@@ -262,6 +262,7 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
             title: forwardTitle,
             content: forwardContent,
             category: "聊天交友",
+            forwardPostId: Number(postId),
           });
 
           message.success("评论已转发到我的动态");

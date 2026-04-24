@@ -27,9 +27,22 @@ type PostRow = {
   images?: string[];
   publish_status?: number;
   createdAt?: string;
+  created_at?: string;
   comment_count?: number;
   like_count?: number;
   User?: { nickname?: string; username?: string };
+  forward_post_id?: number;
+  forward_user_id?: number;
+  ForwardPost?: {
+    id: number;
+    title: string;
+    content: string;
+    like_count: number;
+    comment_count: number;
+    user_id: number;
+    User?: { nickname?: string; username?: string };
+  };
+  ForwardUser?: { nickname?: string; username?: string };
 };
 
 export default function PostsList() {
@@ -41,6 +54,20 @@ export default function PostsList() {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
   const [total, setTotal] = useState(0);
+
+  const [expandedForwardPosts, setExpandedForwardPosts] = useState<Set<number>>(new Set());
+
+  const toggleForwardExpand = (postId: number) => {
+    setExpandedForwardPosts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(postId)) {
+        newSet.delete(postId);
+      } else {
+        newSet.add(postId);
+      }
+      return newSet;
+    });
+  };
 
   const loadData = useCallback(
     async (pageNo = page) => {
@@ -253,6 +280,9 @@ export default function PostsList() {
             }}
             renderItem={(item) => {
               const cover = item.images?.[0];
+              const isForwardPost = item.forward_post_id && item.ForwardPost;
+              const isExpanded = expandedForwardPosts.has(item.id);
+
               return (
                 <List.Item>
                   <div
@@ -260,7 +290,7 @@ export default function PostsList() {
                       display: "grid",
                       gridTemplateColumns: cover ? "1fr 120px" : "1fr",
                       gap: 16,
-                      alignItems: "center",
+                      alignItems: "flex-start",
                       padding: "20px 24px",
                       transition: "all 0.3s ease",
                       borderBottom: "1px solid #F3F4F6"
@@ -296,6 +326,127 @@ export default function PostsList() {
                           <Tag color="gray">草稿</Tag>
                         )}
                       </Space>
+
+                      {/* 转发帖引用卡片 */}
+                      {isForwardPost && item.ForwardPost && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            backgroundColor: "#fafafa",
+                            border: "1px solid #e8e8e8",
+                            borderRadius: "8px",
+                            padding: "12px 16px",
+                            width: "100%",
+                          }}
+                        >
+                          {/* 转发头部：@原作者昵称：原帖标题 */}
+                          <div style={{
+                            display: "flex",
+                            alignItems: "center",
+                            flexWrap: "wrap",
+                            gap: 4,
+                            marginBottom: 8,
+                          }}>
+                            <Typography.Text
+                              style={{
+                                color: "#52c41a",
+                                fontWeight: "bold",
+                                cursor: "pointer",
+                              }}
+                            >
+                              @{item.ForwardPost.User?.nickname || item.ForwardPost.User?.username || "用户"}：
+                            </Typography.Text>
+                            <Typography.Text
+                              style={{
+                                color: "#374151",
+                                cursor: "pointer",
+                                fontWeight: 500,
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/community?postId=${item.ForwardPost!.id}`);
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.color = "#1890ff";
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.color = "#374151";
+                              }}
+                            >
+                              {item.ForwardPost.title}
+                            </Typography.Text>
+                          </div>
+
+                          {/* 原帖内容 */}
+                          <div style={{
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-word",
+                            color: "#666",
+                            fontSize: 14,
+                            lineHeight: 1.6,
+                          }}>
+                            {isExpanded ? (
+                              <>
+                                {item.ForwardPost.content}
+                                <Typography.Text
+                                  style={{
+                                    color: "#1890ff",
+                                    cursor: "pointer",
+                                    marginLeft: 8,
+                                  }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleForwardExpand(item.id);
+                                  }}
+                                >
+                                  收起
+                                </Typography.Text>
+                              </>
+                            ) : (
+                              <>
+                                {item.ForwardPost.content.length > 100
+                                  ? `${item.ForwardPost.content.slice(0, 100)}...`
+                                  : item.ForwardPost.content
+                                }
+                                {item.ForwardPost.content.length > 100 && (
+                                  <Typography.Text
+                                    style={{
+                                      color: "#1890ff",
+                                      cursor: "pointer",
+                                      marginLeft: 8,
+                                    }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleForwardExpand(item.id);
+                                    }}
+                                  >
+                                    查看更多
+                                  </Typography.Text>
+                                )}
+                              </>
+                            )}
+                          </div>
+
+                          {/* 原帖互动数据 */}
+                          <div style={{
+                            marginTop: 12,
+                            paddingTop: 8,
+                            borderTop: "1px solid #f0f0f0",
+                            display: "flex",
+                            gap: 16,
+                          }}>
+                            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                              👍 {item.ForwardPost.like_count || 0}
+                            </Typography.Text>
+                            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                              |
+                            </Typography.Text>
+                            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                              💬 {item.ForwardPost.comment_count || 0}
+                            </Typography.Text>
+                          </div>
+                        </div>
+                      )}
                       
                       <Typography.Paragraph 
                         ellipsis={{ rows: 2 }} 
@@ -307,8 +458,8 @@ export default function PostsList() {
                       <Space wrap size="small">
                         <Typography.Text type="secondary">
                           发布时间：
-                          {item.createdAt
-                            ? new Date(item.createdAt).toLocaleString()
+                          {item.createdAt || item.created_at
+                            ? new Date(item.createdAt || item.created_at).toLocaleString()
                             : "-"}
                         </Typography.Text>
                         <Typography.Text type="secondary">·</Typography.Text>

@@ -180,6 +180,22 @@ export const getCommunityPosts = async (req: Request, res: Response) => {
           model: User,
           attributes: ["id", "username", "nickname"],
         },
+        {
+          model: Post,
+          as: "ForwardPost",
+          attributes: ["id", "title", "content", "like_count", "comment_count", "user_id"],
+          include: [
+            {
+              model: User,
+              attributes: ["id", "username", "nickname"],
+            },
+          ],
+        },
+        {
+          model: User,
+          as: "ForwardUser",
+          attributes: ["id", "username", "nickname"],
+        },
       ],
       order: orderBy,
       offset: (Number(page) - 1) * Number(pageSize),
@@ -367,12 +383,13 @@ export const createCommunityPost = async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, message: "未授权访问" });
     }
 
-    const { title, content, category, tags, isDraft } = req.body as {
+    const { title, content, category, tags, isDraft, forwardPostId } = req.body as {
       title?: string;
       content?: string;
       category?: string;
       tags?: string[] | string;
       isDraft?: string | boolean;
+      forwardPostId?: number;
     };
 
     if (!title || !content) {
@@ -442,6 +459,13 @@ export const createCommunityPost = async (req: Request, res: Response) => {
       ? `包含敏感词：${matches.slice(0, 10).join("、")}`
       : undefined;
 
+    let forwardPost: any = null;
+    if (forwardPostId) {
+      forwardPost = await Post.findOne({
+        where: { id: forwardPostId, status: 1, publish_status: 1 },
+      });
+    }
+
     const post = await Post.create({
       user_id: req.user.id,
       title,
@@ -455,6 +479,8 @@ export const createCommunityPost = async (req: Request, res: Response) => {
       comment_count: 0,
       is_top: 0,
       edit_count: 0,
+      forward_post_id: forwardPost ? forwardPost.id : null,
+      forward_user_id: forwardPost ? forwardPost.user_id : null,
       ...(auditReason
         ? { audit_reason: auditReason, audit_at: new Date() }
         : {}),
