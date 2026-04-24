@@ -190,7 +190,6 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
 
   const insertEmoji = (emoji: string) => {
     insertTextToInput(emoji);
-    setEmojiVisible(false);
   };
 
   const insertTopic = (topic: string) => {
@@ -761,73 +760,77 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
                     </Button>
                   </Popover>
 
-                  <Dropdown
-                    menu={{
-                      items: [
-                        {
-                          key: 'emoji-panel',
-                          label: (
-                            <div style={{ width: 300, padding: 8 }}>
-                              <Tabs
-                              activeKey={currentEmojiTab}
-                              onChange={(key) => {
-                                setCurrentEmojiTab(key);
-                                setEmojiPage(1);
-                              }}
-                              items={emojiCategories.map((category) => ({
-                                key: category.key,
-                                label: category.label,
-                                children: (
-                                  <div>
-                                    <div style={{
-                                      display: 'grid',
-                                      gridTemplateColumns: 'repeat(5, 1fr)',
-                                      gap: 8,
-                                      padding: 8
-                                    }}>
-                                      {getCurrentEmojis().map((emoji, index) => (
-                                        <span
-                                          key={index}
-                                          style={{
-                                            fontSize: 24,
-                                            cursor: 'pointer',
-                                            textAlign: 'center',
-                                            padding: 4,
-                                            borderRadius: 4
-                                          }}
-                                          onClick={() => insertEmoji(emoji)}
-                                        >
-                                          {emoji}
-                                        </span>
-                                      ))}
-                                    </div>
-                                    {getEmojiTotalPages() > 1 && (
-                                      <div style={{
-                                        display: 'flex',
-                                        justifyContent: 'center',
-                                        padding: '8px 0',
-                                        borderTop: '1px solid #f0f0f0'
-                                      }}>
-                                        <Pagination
-                                          simple
-                                          current={emojiPage}
-                                          total={getEmojiTotalPages() * 20}
-                                          pageSize={20}
-                                          onChange={(page) => setEmojiPage(page)}
-                                          size="small"
-                                        />
-                                      </div>
-                                    )}
+                  <Popover
+                    content={
+                      <div style={{ width: 320 }}>
+                        <Tabs
+                          activeKey={currentEmojiTab}
+                          onChange={(key) => {
+                            setCurrentEmojiTab(key);
+                            setEmojiPage(1);
+                          }}
+                          items={emojiCategories.map((category) => ({
+                            key: category.key,
+                            label: category.label,
+                            children: (
+                              <div>
+                                <div style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: 'repeat(6, 1fr)',
+                                  gap: 8,
+                                  padding: 8
+                                }}>
+                                  {getCurrentEmojis().map((emoji, index) => (
+                                    <span
+                                      key={index}
+                                      style={{
+                                        fontSize: 24,
+                                        cursor: 'pointer',
+                                        textAlign: 'center',
+                                        padding: 4,
+                                        borderRadius: 4,
+                                        transition: 'all 0.2s'
+                                      }}
+                                      onClick={() => insertEmoji(emoji)}
+                                      onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = '#f0f0f0';
+                                        e.currentTarget.style.transform = 'scale(1.2)';
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = 'transparent';
+                                        e.currentTarget.style.transform = 'scale(1)';
+                                      }}
+                                    >
+                                      {emoji}
+                                    </span>
+                                  ))}
+                                </div>
+                                {getEmojiTotalPages() > 1 && (
+                                  <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    padding: '8px 0',
+                                    borderTop: '1px solid #f0f0f0',
+                                    marginTop: 8
+                                  }}>
+                                    <Pagination
+                                      simple
+                                      current={emojiPage}
+                                      total={getEmojiTotalPages() * 20}
+                                      pageSize={20}
+                                      onChange={(page) => setEmojiPage(page)}
+                                      size="small"
+                                    />
                                   </div>
-                                )
-                              }))}
-                            />
-                            </div>
-                          )
-                        }
-                      ]
-                    }}
-                    trigger={['click']}
+                                )}
+                              </div>
+                            )
+                          }))}
+                        />
+                      </div>
+                    }
+                    title="选择表情"
+                    trigger="click"
                     open={emojiVisible}
                     onOpenChange={setEmojiVisible}
                   >
@@ -838,7 +841,7 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
                     >
                       表情
                     </Button>
-                  </Dropdown>
+                  </Popover>
                 </Space>
 
                 <Space size={[16, 8]} wrap style={{ alignItems: 'center' }}>
