@@ -115,6 +115,7 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
   const [favorited, setFavorited] = useState(false);
   const [favoriteId, setFavoriteId] = useState<number | null>(null);
   const [commentForm] = Form.useForm();
+  const watchContent = Form.useWatch('content', commentForm);
   const [reportVisible, setReportVisible] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [canDelete, setCanDelete] = useState(false);
@@ -856,7 +857,7 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
                       type="primary"
                       htmlType="submit"
                       loading={commentSubmitting}
-                      disabled={!commentForm.getFieldValue('content')}
+                      disabled={!watchContent?.trim()}
                       style={{
                         borderRadius: 20,
                         paddingLeft: 24,
