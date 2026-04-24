@@ -11,8 +11,18 @@ import {
   Typography,
   message,
   Tag,
+  Upload,
+  Checkbox,
+  Popover,
+  Dropdown,
+  Tabs,
+  Pagination,
+  Divider,
+  Tooltip,
+  Flex,
 } from "antd";
-import type { InputRef } from "antd";
+import type { InputRef, UploadProps } from "antd";
+import type { UploadFile } from "antd/es/upload/interface";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppSelector } from "../../app/hooks";
@@ -82,6 +92,18 @@ interface PostDetailProps {
   onClose?: () => void;
 }
 
+const quickTags = ["楼主说得对！", "学到了", "感谢分享", "支持一下", "一起加油", "说得好", "我也这么想", "太棒了", "期待后续", "加油"];
+
+const quickEmojis = ["👍", "❤️", "😂", "🎉", "🔥", "👏", "😊", "🙏", "💪", "😎"];
+
+const emojiCategories = [
+  { key: "emotion", label: "表情", emojis: ["😀", "😁", "😂", "🤣", "😃", "😄", "😅", "😆", "😉", "😊", "😋", "😎", "😍", "😘", "🥰", "😗", "😙", "😚", "🙂", "🤗", "🤩", "🤔", "🤨", "😐", "😑", "😶", "🙄", "😏", "😣", "😥", "😮", "🤐", "😯", "😪", "😫", "😴", "😌", "😛", "😜", "😝", "🤤", "😒", "😓", "😔", "😕", "🙃", "🤑", "😲", "☹️", "🙁", "😖", "😞", "😟", "😤", "😢", "😭", "😦", "😧", "😨", "😩", "🤯", "😬", "😰", "😱"] },
+  { key: "gesture", label: "手势", emojis: ["👍", "👎", "👌", "✌️", "🤞", "🤟", "🤘", "👈", "👉", "👆", "👇", "☝️", "✋", "🖐️", "🖖", "👋", "🤚", "🖐", "✍️", "💅", "🤳", "💪", "🦾", "🦿", "🦵", "🦶", "👂", "🦻", "👃", "🧠", "🦷", "🦴", "👀", "👁️", "👅", "👄", "🫀", "🫁", "🧠", "🦷", "🦴"] },
+  { key: "object", label: "物品", emojis: ["⌚", "📱", "💻", "⌨️", "🖥️", "🖨️", "🖱️", "🖲️", "🕹️", "🗜️", "💽", "💾", "💿", "📀", "📼", "📷", "📸", "📹", "🎥", "📽️", "🎞️", "📞", "☎️", "📟", "📠", "📺", "📻", "🎙️", "🎚️", "🎛️", "🧭", "⏱️", "⏲️", "⏰", "🕰️", "⌛", "⏳", "📡", "🔋", "🔌", "💡", "🔦", "🕯️", "🧯", "🛢️", "💸", "💵", "💴", "💶", "💷", "💰", "💳", "💎", "⚖️", "🧰", "🔧", "🔨", "⚒️", "🛠️", "⛏️", "🔩", "⚙️", "🧱", "⛓️", "🧲", "🔫", "💣", "🧨", "🪓", "🏹", "🛡️", "📦", "📫", "📪", "📬", "📭", "📮", "📯", "📜", "📃", "📄", "📑", "📊", "📈", "📉", "📰", "🗞️", "📎", "📐", "📍", "📌", "🏷️", "✂️", "🗃️", "🗳️", "🗄️", "📋", "📁", "📂", "🗂️", "🗃️", "🗄️"] }
+];
+
+const topics = ["#学习分享", "#日常打卡", "#求助问答", "#经验交流", "#资源分享", "#技术讨论", "#求职就业", "#考研考公", "#编程学习", "#英语学习", "#读书笔记", "#生活随想"];
+
 export default function PostDetail({ postId, onClose }: PostDetailProps) {
   const navigate = useNavigate();
   const { token, username, role } = useAppSelector(
@@ -101,6 +123,14 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
   const commentInputRef = useRef<InputRef>(null);
   const contentContainerRef = useRef<HTMLDivElement>(null);
   const commentSectionRef = useRef<HTMLDivElement>(null);
+
+  const [uploadedImages, setUploadedImages] = useState<UploadFile[]>([]);
+  const [forwardToPost, setForwardToPost] = useState(false);
+  const [topicSearch, setTopicSearch] = useState("");
+  const [currentEmojiTab, setCurrentEmojiTab] = useState("emotion");
+  const [emojiPage, setEmojiPage] = useState(1);
+  const [topicVisible, setTopicVisible] = useState(false);
+  const [emojiVisible, setEmojiVisible] = useState(false);
 
   const isOwner = Boolean(
     post?.User?.username && username === post.User.username,
@@ -147,6 +177,69 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
     }
   }, [postId]);
 
+  const insertTextToInput = (text: string) => {
+    const currentContent = commentForm.getFieldValue("content") || "";
+    const newContent = currentContent ? `${currentContent}${text}` : text;
+    commentForm.setFieldsValue({ content: newContent });
+    setTimeout(() => commentInputRef.current?.focus(), 0);
+  };
+
+  const insertQuickTag = (tag: string) => {
+    insertTextToInput(tag);
+  };
+
+  const insertEmoji = (emoji: string) => {
+    insertTextToInput(emoji);
+    setEmojiVisible(false);
+  };
+
+  const insertTopic = (topic: string) => {
+    insertTextToInput(`${topic} `);
+    setTopicVisible(false);
+  };
+
+  const filteredTopics = topicSearch
+    ? topics.filter(topic => topic.toLowerCase().includes(topicSearch.toLowerCase()))
+    : topics;
+
+  const uploadProps: UploadProps = {
+    multiple: true,
+    listType: "picture",
+    fileList: uploadedImages,
+    maxCount: 9,
+    onChange(info) {
+      const { fileList } = info;
+      setUploadedImages(fileList);
+    },
+    beforeUpload(file) {
+      const isImage = file.type.startsWith("image/");
+      if (!isImage) {
+        message.error("只能上传图片文件！");
+        return false;
+      }
+      const isLt5M = file.size / 1024 / 1024 < 5;
+      if (!isLt5M) {
+        message.error("图片大小不能超过 5MB！");
+        return false;
+      }
+      return false;
+    },
+  };
+
+  const getCurrentEmojis = () => {
+    const category = emojiCategories.find(c => c.key === currentEmojiTab);
+    if (!category) return [];
+    const pageSize = 20;
+    const startIndex = (emojiPage - 1) * pageSize;
+    return category.emojis.slice(startIndex, startIndex + pageSize);
+  };
+
+  const getEmojiTotalPages = () => {
+    const category = emojiCategories.find(c => c.key === currentEmojiTab);
+    if (!category) return 1;
+    return Math.ceil(category.emojis.length / 20);
+  };
+
   const handleCreateComment = async (values: { content: string }) => {
     if (!token) {
       message.warning("请先登录再评论");
@@ -159,6 +252,8 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
       const res = await createCommunityComment(Number(postId), values);
       message.success(res?.message || "评论成功");
       commentForm.resetFields();
+      setUploadedImages([]);
+      setForwardToPost(false);
       loadData();
     } catch (err) {
       message.error(err instanceof Error ? err.message : "评论失败");
@@ -488,33 +583,290 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
           style={{ marginTop: 16, backgroundColor: '#fff' }}
           ref={commentSectionRef}
         >
-          <Space align="start" style={{ width: "100%" }}>
-            <Avatar size={32}>{(username || "U").slice(0, 1)}</Avatar>
-            <Form
-              form={commentForm}
-              layout="vertical"
-              onFinish={handleCreateComment}
-              style={{ width: "100%" }}
-            >
-              <Form.Item
-                name="content"
-                rules={[{ required: true, message: "请输入评论内容" }]}
-              >
-                <Input.TextArea
-                  rows={3}
-                  placeholder="输入评论内容..."
-                  ref={commentInputRef}
-                />
-              </Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={commentSubmitting}
-              >
-                发布评论
-              </Button>
-            </Form>
-          </Space>
+          <Form
+            form={commentForm}
+            layout="vertical"
+            onFinish={handleCreateComment}
+            style={{ width: "100%" }}
+          >
+            <div style={{
+              backgroundColor: '#f5f5f5',
+              borderRadius: 12,
+              padding: 16,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12
+            }}>
+              
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8
+              }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>一键发评</Text>
+                <div style={{
+                  overflowX: 'auto',
+                  whiteSpace: 'nowrap',
+                  paddingBottom: 4,
+                  scrollbarWidth: 'thin'
+                }}>
+                  <Space size={[8, 8]} wrap>
+                    {quickTags.map((tag, index) => (
+                      <Tag
+                        key={index}
+                        style={{
+                          borderColor: '#52c41a',
+                          color: '#52c41a',
+                          cursor: 'pointer',
+                          margin: 0
+                        }}
+                        onClick={() => insertQuickTag(tag)}
+                      >
+                        {tag}
+                      </Tag>
+                    ))}
+                  </Space>
+                </div>
+              </div>
+
+              <Divider style={{ margin: '8px 0' }} />
+
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8
+              }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>表情</Text>
+                <Space size={[12, 12]} wrap>
+                  {quickEmojis.map((emoji, index) => (
+                    <span
+                      key={index}
+                      style={{
+                        fontSize: 24,
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s',
+                        lineHeight: 1
+                      }}
+                      onClick={() => insertEmoji(emoji)}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'scale(1.2)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'scale(1)';
+                      }}
+                    >
+                      {emoji}
+                    </span>
+                  ))}
+                </Space>
+              </div>
+
+              <Divider style={{ margin: '8px 0' }} />
+
+              <div style={{
+                backgroundColor: '#fff',
+                borderRadius: 8,
+                padding: 12,
+                minHeight: 100
+              }}>
+                <Form.Item
+                  name="content"
+                  rules={[{ required: true, message: "请输入评论内容" }]}
+                  style={{ marginBottom: 0 }}
+                >
+                  <Input.TextArea
+                    placeholder="畅所欲言吧～"
+                    ref={commentInputRef}
+                    bordered={false}
+                    autoSize={{ minRows: 3, maxRows: 6 }}
+                    style={{
+                      resize: 'none',
+                      fontSize: 14,
+                      lineHeight: 1.6
+                    }}
+                  />
+                </Form.Item>
+              </div>
+
+              {uploadedImages.length > 0 && (
+                <div style={{
+                  backgroundColor: '#fff',
+                  borderRadius: 8,
+                  padding: 12,
+                  marginTop: 8
+                }}>
+                  <Upload {...uploadProps} />
+                </div>
+              )}
+
+              <Divider style={{ margin: '8px 0' }} />
+
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 12
+              }}>
+                <Space size={[16, 8]} wrap>
+                  <Upload {...uploadProps}>
+                    <Tooltip title="上传图片 (最多9张)">
+                      <Button
+                        type="text"
+                        icon={<span style={{ fontSize: 18 }}>📷</span>}
+                        style={{ padding: '4px 8px' }}
+                      >
+                        图片
+                      </Button>
+                    </Tooltip>
+                  </Upload>
+
+                  <Popover
+                    content={
+                      <div style={{ width: 280 }}>
+                        <Input.Search
+                          placeholder="搜索话题"
+                          allowClear
+                          value={topicSearch}
+                          onChange={(e) => setTopicSearch(e.target.value)}
+                          style={{ marginBottom: 12 }}
+                        />
+                        <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+                          <Space size={[8, 8]} wrap>
+                            {filteredTopics.map((topic, index) => (
+                              <Tag
+                                key={index}
+                                color="blue"
+                                style={{ cursor: 'pointer' }}
+                                onClick={() => insertTopic(topic)}
+                              >
+                                {topic}
+                              </Tag>
+                            ))}
+                          </Space>
+                        </div>
+                      </div>
+                    }
+                    title="选择话题"
+                    trigger="click"
+                    open={topicVisible}
+                    onOpenChange={setTopicVisible}
+                  >
+                    <Button
+                      type="text"
+                      icon={<span style={{ fontSize: 18 }}>#</span>}
+                      style={{ padding: '4px 8px' }}
+                    >
+                      话题
+                    </Button>
+                  </Popover>
+
+                  <Dropdown
+                    menu={{
+                      items: [
+                        {
+                          key: 'emoji-panel',
+                          label: (
+                            <div style={{ width: 300, padding: 8 }}>
+                              <Tabs
+                              activeKey={currentEmojiTab}
+                              onChange={(key) => {
+                                setCurrentEmojiTab(key);
+                                setEmojiPage(1);
+                              }}
+                              items={emojiCategories.map((category) => ({
+                                key: category.key,
+                                label: category.label,
+                                children: (
+                                  <div>
+                                    <div style={{
+                                      display: 'grid',
+                                      gridTemplateColumns: 'repeat(5, 1fr)',
+                                      gap: 8,
+                                      padding: 8
+                                    }}>
+                                      {getCurrentEmojis().map((emoji, index) => (
+                                        <span
+                                          key={index}
+                                          style={{
+                                            fontSize: 24,
+                                            cursor: 'pointer',
+                                            textAlign: 'center',
+                                            padding: 4,
+                                            borderRadius: 4
+                                          }}
+                                          onClick={() => insertEmoji(emoji)}
+                                        >
+                                          {emoji}
+                                        </span>
+                                      ))}
+                                    </div>
+                                    {getEmojiTotalPages() > 1 && (
+                                      <div style={{
+                                        display: 'flex',
+                                        justifyContent: 'center',
+                                        padding: '8px 0',
+                                        borderTop: '1px solid #f0f0f0'
+                                      }}>
+                                        <Pagination
+                                          simple
+                                          current={emojiPage}
+                                          total={getEmojiTotalPages() * 20}
+                                          pageSize={20}
+                                          onChange={(page) => setEmojiPage(page)}
+                                          size="small"
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              }))}
+                            />
+                            </div>
+                          )
+                        }
+                      ]
+                    }}
+                    trigger={['click']}
+                    open={emojiVisible}
+                    onOpenChange={setEmojiVisible}
+                  >
+                    <Button
+                      type="text"
+                      icon={<span style={{ fontSize: 18 }}>😊</span>}
+                      style={{ padding: '4px 8px' }}
+                    >
+                      表情
+                    </Button>
+                  </Dropdown>
+                </Space>
+
+                <Space size={[16, 8]} wrap style={{ alignItems: 'center' }}>
+                  <Checkbox
+                    checked={forwardToPost}
+                    onChange={(e) => setForwardToPost(e.target.checked)}
+                  >
+                    同时转发到我的动态
+                  </Checkbox>
+                  <Form.Item style={{ marginBottom: 0 }}>
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      loading={commentSubmitting}
+                      disabled={!commentForm.getFieldValue('content')}
+                      style={{
+                        borderRadius: 20,
+                        paddingLeft: 24,
+                        paddingRight: 24
+                      }}
+                    >
+                      评论
+                    </Button>
+                  </Form.Item>
+                </Space>
+              </div>
+            </div>
+          </Form>
         </Card>
 
         <Card
