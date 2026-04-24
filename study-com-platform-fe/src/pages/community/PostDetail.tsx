@@ -250,14 +250,6 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
           
           {/* 评论正文 */}
           <div className={`comment-text ${isPending ? 'pending-comment' : ''}`}>
-            {/* 如果是子评论且有父评论，显示"回复 某某" */}
-            {isReply && comment.ParentComment && (
-              <span className="reply-to">
-                回复 <Text type="secondary" className="reply-to-user">
-                  {getCommentUserNickname(comment.ParentComment)}
-                </Text>：
-              </span>
-            )}
             {comment.content}
           </div>
           
@@ -294,8 +286,8 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
             </Space>
           </div>
           
-          {/* 回复输入框（仅在主评论下方显示，或者是回复子评论时在主评论下方显示） */}
-          {!isReply && isReplyingToThis && (
+          {/* 回复输入框 - 显示在任何被回复的评论下方 */}
+          {isReplyingToThis && (
             <div className="reply-input-container">
               <div className="reply-input-wrapper">
                 <Input.TextArea
@@ -382,7 +374,7 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
             </div>
           )}
           
-          {/* 楼中楼回复区 - 包裹在浅灰色背景块中 */}
+          {/* 楼中楼回复区 - 包裹在浅灰色背景块中（仅主评论有） */}
           {!isReply && hasReplies && (
             <div className="replies-container">
               <div className="replies-list">
@@ -403,94 +395,6 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
                       <>查看全部 {replies.length} 条回复 ↓</>
                     )}
                   </Button>
-                </div>
-              )}
-              
-              {/* 如果是回复子评论，输入框显示在这里 */}
-              {isReply && isReplyingToThis && replyingTo?.isReplyToReply && (
-                <div className="reply-input-container">
-                  <div className="reply-input-wrapper">
-                    <Input.TextArea
-                      placeholder={`回复 @${replyingTo?.userName}...`}
-                      ref={replyInputRef}
-                      value={replyContent}
-                      onChange={(e) => setReplyContent(e.target.value)}
-                      autoSize={{ minRows: 2, maxRows: 4 }}
-                      style={{
-                        resize: 'none',
-                        fontSize: 14,
-                        lineHeight: 1.6,
-                        marginBottom: 12
-                      }}
-                    />
-                    
-                    {/* 快捷回复标签 */}
-                    <div style={{ marginBottom: 12 }}>
-                      <Text type="secondary" style={{ fontSize: 12, marginBottom: 8, display: 'block' }}>快捷回复</Text>
-                      <Space size={[8, 8]} wrap>
-                        {quickTags.map((tag, index) => (
-                          <Tag
-                            key={index}
-                            style={{
-                              borderColor: '#52c41a',
-                              color: '#52c41a',
-                              cursor: 'pointer',
-                              margin: 0
-                            }}
-                            onClick={() => setReplyContent(prev => `${prev}${tag}`)}
-                          >
-                            {tag}
-                          </Tag>
-                        ))}
-                      </Space>
-                    </div>
-                    
-                    {/* 快捷表情 */}
-                    <div style={{ marginBottom: 12 }}>
-                      <Text type="secondary" style={{ fontSize: 12, marginBottom: 8, display: 'block' }}>表情</Text>
-                      <Space size={[12, 12]} wrap>
-                        {quickEmojis.map((emoji, index) => (
-                          <span
-                            key={index}
-                            style={{
-                              fontSize: 20,
-                              cursor: 'pointer',
-                              transition: 'transform 0.2s',
-                              lineHeight: 1
-                            }}
-                            onClick={() => setReplyContent(prev => `${prev}${emoji}`)}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.transform = 'scale(1.2)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.transform = 'scale(1)';
-                            }}
-                          >
-                            {emoji}
-                          </span>
-                        ))}
-                      </Space>
-                    </div>
-                    
-                    {/* 按钮区域 */}
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-                      <Button
-                        onClick={handleCancelReply}
-                        style={{ borderRadius: 20 }}
-                      >
-                        取消
-                      </Button>
-                      <Button
-                        type="primary"
-                        onClick={handleSubmitReply}
-                        loading={replySubmitting}
-                        disabled={!replyContent.trim()}
-                        style={{ borderRadius: 20 }}
-                      >
-                        回复
-                      </Button>
-                    </div>
-                  </div>
                 </div>
               )}
             </div>
@@ -727,20 +631,20 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
     try {
       setReplySubmitting(true);
       
-      // 移除 @用户名 前缀，获取实际内容
-      let actualContent = replyContent.trim();
+      // 检查内容是否有效
+      const trimmedContent = replyContent.trim();
       const prefix = `@${replyingTo.userName} `;
-      if (actualContent.startsWith(prefix)) {
-        actualContent = actualContent.slice(prefix.length).trim();
-      }
       
-      if (!actualContent) {
+      // 如果只有 @用户名 前缀，没有实际内容
+      if (trimmedContent === prefix.trim()) {
         message.warning("请输入回复内容");
         return;
       }
       
+      // 提交回复 - parentId 始终指向主评论（保持同级）
+      // 回复内容保留 @用户名 前缀，通过 @符号 区别评论层级
       const res = await createCommunityComment(Number(postId), {
-        content: actualContent,
+        content: trimmedContent,
         parentId: replyingTo.parentCommentId || replyingTo.commentId,
       });
       
