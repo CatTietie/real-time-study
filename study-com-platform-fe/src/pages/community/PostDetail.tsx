@@ -29,6 +29,7 @@ import { useAppSelector } from "../../app/hooks";
 import type { RootState } from "../../app/store";
 import {
   createCommunityComment,
+  createCommunityPost,
   createFavorite,
   deleteFavorite,
   deleteCommunityPost,
@@ -251,6 +252,24 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
       setCommentSubmitting(true);
       const res = await createCommunityComment(Number(postId), values);
       message.success(res?.message || "评论成功");
+
+      if (forwardToPost && post) {
+        try {
+          const forwardContent = values.content;
+          const forwardTitle = post.title ? `转发: ${post.title}` : "转发帖子";
+
+          await createCommunityPost({
+            title: forwardTitle,
+            content: forwardContent,
+            category: "聊天交友",
+          });
+
+          message.success("评论已转发到我的动态");
+        } catch (forwardErr) {
+          message.warning("评论成功，但转发到动态失败");
+        }
+      }
+
       commentForm.resetFields();
       setUploadedImages([]);
       setForwardToPost(false);
