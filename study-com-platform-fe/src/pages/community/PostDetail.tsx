@@ -140,6 +140,17 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
   
   // 楼中楼折叠/展开状态
   const [expandedReplies, setExpandedReplies] = useState<Set<number>>(new Set());
+  
+  // 楼中楼回复状态
+  const [replyingTo, setReplyingTo] = useState<{
+    commentId: number;
+    userName: string;
+    isReplyToReply?: boolean;
+    parentCommentId?: number;
+  } | null>(null);
+  const [replyContent, setReplyContent] = useState("");
+  const [replySubmitting, setReplySubmitting] = useState(false);
+  const replyInputRef = useRef<InputRef>(null);
 
   // 格式化时间显示
   const formatTime = (dateStr?: string) => {
@@ -204,6 +215,9 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
     
     // 判断是否是审核中
     const isPending = comment.status === 0;
+    
+    // 判断是否正在回复该评论
+    const isReplyingToThis = replyingTo && replyingTo.commentId === comment.id;
     
     return (
       <div 
@@ -272,7 +286,7 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
                 type="text"
                 size="small"
                 disabled={isPending}
-                onClick={() => handleReply(getCommentUserNickname(comment))}
+                onClick={() => handleReply(comment, isReply)}
                 className="action-btn"
               >
                 <span className="action-text">回复</span>
@@ -280,7 +294,95 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
             </Space>
           </div>
           
-          {/* 楼中楼回复区 */}
+          {/* 回复输入框（仅在主评论下方显示，或者是回复子评论时在主评论下方显示） */}
+          {!isReply && isReplyingToThis && (
+            <div className="reply-input-container">
+              <div className="reply-input-wrapper">
+                <Input.TextArea
+                  placeholder={`回复 @${replyingTo?.userName}...`}
+                  ref={replyInputRef}
+                  value={replyContent}
+                  onChange={(e) => setReplyContent(e.target.value)}
+                  autoSize={{ minRows: 2, maxRows: 4 }}
+                  style={{
+                    resize: 'none',
+                    fontSize: 14,
+                    lineHeight: 1.6,
+                    marginBottom: 12
+                  }}
+                />
+                
+                {/* 快捷回复标签 */}
+                <div style={{ marginBottom: 12 }}>
+                  <Text type="secondary" style={{ fontSize: 12, marginBottom: 8, display: 'block' }}>快捷回复</Text>
+                  <Space size={[8, 8]} wrap>
+                    {quickTags.map((tag, index) => (
+                      <Tag
+                        key={index}
+                        style={{
+                          borderColor: '#52c41a',
+                          color: '#52c41a',
+                          cursor: 'pointer',
+                          margin: 0
+                        }}
+                        onClick={() => setReplyContent(prev => `${prev}${tag}`)}
+                      >
+                        {tag}
+                      </Tag>
+                    ))}
+                  </Space>
+                </div>
+                
+                {/* 快捷表情 */}
+                <div style={{ marginBottom: 12 }}>
+                  <Text type="secondary" style={{ fontSize: 12, marginBottom: 8, display: 'block' }}>表情</Text>
+                  <Space size={[12, 12]} wrap>
+                    {quickEmojis.map((emoji, index) => (
+                      <span
+                        key={index}
+                        style={{
+                          fontSize: 20,
+                          cursor: 'pointer',
+                          transition: 'transform 0.2s',
+                          lineHeight: 1
+                        }}
+                        onClick={() => setReplyContent(prev => `${prev}${emoji}`)}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'scale(1.2)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'scale(1)';
+                        }}
+                      >
+                        {emoji}
+                      </span>
+                    ))}
+                  </Space>
+                </div>
+                
+                {/* 按钮区域 */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                  <Button
+                    onClick={handleCancelReply}
+                    style={{ borderRadius: 20 }}
+                  >
+                    取消
+                  </Button>
+                  <Button
+                    type="primary"
+                    onClick={handleSubmitReply}
+                    loading={replySubmitting}
+                    disabled={!replyContent.trim()}
+                    style={{ borderRadius: 20 }}
+                  >
+                    回复
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* 楼中楼回复区 - 包裹在浅灰色背景块中 */}
           {!isReply && hasReplies && (
             <div className="replies-container">
               <div className="replies-list">
@@ -301,6 +403,94 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
                       <>查看全部 {replies.length} 条回复 ↓</>
                     )}
                   </Button>
+                </div>
+              )}
+              
+              {/* 如果是回复子评论，输入框显示在这里 */}
+              {isReply && isReplyingToThis && replyingTo?.isReplyToReply && (
+                <div className="reply-input-container">
+                  <div className="reply-input-wrapper">
+                    <Input.TextArea
+                      placeholder={`回复 @${replyingTo?.userName}...`}
+                      ref={replyInputRef}
+                      value={replyContent}
+                      onChange={(e) => setReplyContent(e.target.value)}
+                      autoSize={{ minRows: 2, maxRows: 4 }}
+                      style={{
+                        resize: 'none',
+                        fontSize: 14,
+                        lineHeight: 1.6,
+                        marginBottom: 12
+                      }}
+                    />
+                    
+                    {/* 快捷回复标签 */}
+                    <div style={{ marginBottom: 12 }}>
+                      <Text type="secondary" style={{ fontSize: 12, marginBottom: 8, display: 'block' }}>快捷回复</Text>
+                      <Space size={[8, 8]} wrap>
+                        {quickTags.map((tag, index) => (
+                          <Tag
+                            key={index}
+                            style={{
+                              borderColor: '#52c41a',
+                              color: '#52c41a',
+                              cursor: 'pointer',
+                              margin: 0
+                            }}
+                            onClick={() => setReplyContent(prev => `${prev}${tag}`)}
+                          >
+                            {tag}
+                          </Tag>
+                        ))}
+                      </Space>
+                    </div>
+                    
+                    {/* 快捷表情 */}
+                    <div style={{ marginBottom: 12 }}>
+                      <Text type="secondary" style={{ fontSize: 12, marginBottom: 8, display: 'block' }}>表情</Text>
+                      <Space size={[12, 12]} wrap>
+                        {quickEmojis.map((emoji, index) => (
+                          <span
+                            key={index}
+                            style={{
+                              fontSize: 20,
+                              cursor: 'pointer',
+                              transition: 'transform 0.2s',
+                              lineHeight: 1
+                            }}
+                            onClick={() => setReplyContent(prev => `${prev}${emoji}`)}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'scale(1.2)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'scale(1)';
+                            }}
+                          >
+                            {emoji}
+                          </span>
+                        ))}
+                      </Space>
+                    </div>
+                    
+                    {/* 按钮区域 */}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                      <Button
+                        onClick={handleCancelReply}
+                        style={{ borderRadius: 20 }}
+                      >
+                        取消
+                      </Button>
+                      <Button
+                        type="primary"
+                        onClick={handleSubmitReply}
+                        loading={replySubmitting}
+                        disabled={!replyContent.trim()}
+                        style={{ borderRadius: 20 }}
+                      >
+                        回复
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -491,13 +681,98 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
     }
   };
 
-  const handleReply = (targetName: string) => {
-    const content = commentForm.getFieldValue("content") || "";
-    const prefix = `@${targetName} `;
-    if (!content.includes(prefix)) {
-      commentForm.setFieldsValue({ content: `${prefix}${content}`.trim() });
+  // 处理回复评论（在评论下方弹出输入框）
+  const handleReply = (targetComment: CommentRow, isReplyToReply: boolean = false) => {
+    if (!token) {
+      message.warning("请先登录再回复");
+      navigate("/admin/login");
+      return;
     }
-    window.setTimeout(() => commentInputRef.current?.focus(), 0);
+    
+    // 确定父评论ID（如果是回复子评论，则父评论是主评论）
+    let parentCommentId = targetComment.id;
+    if (isReplyToReply && targetComment.parent_id) {
+      parentCommentId = targetComment.parent_id;
+    }
+    
+    setReplyingTo({
+      commentId: targetComment.id,
+      userName: getCommentUserNickname(targetComment),
+      isReplyToReply,
+      parentCommentId,
+    });
+    setReplyContent(`@${getCommentUserNickname(targetComment)} `);
+    window.setTimeout(() => replyInputRef.current?.focus(), 100);
+  };
+
+  // 取消回复
+  const handleCancelReply = () => {
+    setReplyingTo(null);
+    setReplyContent("");
+  };
+
+  // 提交回复
+  const handleSubmitReply = async () => {
+    if (!token) {
+      message.warning("请先登录再回复");
+      navigate("/admin/login");
+      return;
+    }
+    if (!replyingTo || !replyContent.trim()) {
+      message.warning("请输入回复内容");
+      return;
+    }
+    if (!postId) return;
+    
+    try {
+      setReplySubmitting(true);
+      
+      // 移除 @用户名 前缀，获取实际内容
+      let actualContent = replyContent.trim();
+      const prefix = `@${replyingTo.userName} `;
+      if (actualContent.startsWith(prefix)) {
+        actualContent = actualContent.slice(prefix.length).trim();
+      }
+      
+      if (!actualContent) {
+        message.warning("请输入回复内容");
+        return;
+      }
+      
+      const res = await createCommunityComment(Number(postId), {
+        content: actualContent,
+        parentId: replyingTo.parentCommentId || replyingTo.commentId,
+      });
+      
+      message.success(res?.message || "回复成功");
+      
+      // 重置回复状态
+      setReplyingTo(null);
+      setReplyContent("");
+      
+      // 刷新评论列表
+      await loadData();
+      
+      // 自动展开该评论的回复区
+      if (replyingTo.parentCommentId) {
+        setExpandedReplies(prev => {
+          const newSet = new Set(prev);
+          newSet.add(replyingTo.parentCommentId!);
+          return newSet;
+        });
+      } else {
+        setExpandedReplies(prev => {
+          const newSet = new Set(prev);
+          newSet.add(replyingTo.commentId);
+          return newSet;
+        });
+      }
+      
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : "回复失败");
+    } finally {
+      setReplySubmitting(false);
+    }
   };
 
   const handleToggleFavorite = async () => {
