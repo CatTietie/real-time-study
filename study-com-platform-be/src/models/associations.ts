@@ -43,6 +43,10 @@ export const initAssociations = () => {
   Post.hasMany(Comment, { foreignKey: "post_id" });
   Comment.belongsTo(Post, { foreignKey: "post_id" });
 
+  // 评论自关联（楼中楼）
+  Comment.belongsTo(Comment, { foreignKey: "parent_id", as: "ParentComment" });
+  Comment.hasMany(Comment, { foreignKey: "parent_id", as: "Replies" });
+
   User.hasMany(PostLike, { foreignKey: "user_id" });
   PostLike.belongsTo(User, { foreignKey: "user_id" });
 

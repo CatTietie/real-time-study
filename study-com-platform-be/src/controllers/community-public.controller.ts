@@ -695,19 +695,50 @@ export const getCommunityPostComments = async (req: Request, res: Response) => {
     const decoded = token ? verifyToken(token) : null;
     const viewerId = decoded?.id;
 
-    const where: any = { post_id: postId };
+    // 获取主评论的条件
+    const mainCommentWhere: any = { 
+      post_id: postId, 
+      parent_id: null 
+    };
     if (viewerId) {
-      where[Op.or] = [{ status: 1 }, { status: 0, user_id: viewerId }];
+      mainCommentWhere[Op.or] = [{ status: 1 }, { status: 0, user_id: viewerId }];
     } else {
-      where.status = 1;
+      mainCommentWhere.status = 1;
     }
 
+    // 获取主评论的总数（用于分页）
+    const totalMainComments = await Comment.count({
+      where: mainCommentWhere,
+    });
+
+    // 获取主评论及其子评论
     const result = await Comment.findAndCountAll({
-      where,
+      where: mainCommentWhere,
       include: [
         {
           model: User,
-          attributes: ["id", "username", "nickname"],
+          attributes: ["id", "username", "nickname", "avatar"],
+        },
+        {
+          model: Comment,
+          as: "Replies",
+          include: [
+            {
+              model: User,
+              attributes: ["id", "username", "nickname", "avatar"],
+            },
+            {
+              model: Comment,
+              as: "ParentComment",
+              include: [
+                {
+                  model: User,
+                  attributes: ["id", "username", "nickname", "avatar"],
+                },
+              ],
+            },
+          ],
+          order: [["created_at", "ASC"]],
         },
       ],
       order: orderBy,
@@ -718,8 +749,19 @@ export const getCommunityPostComments = async (req: Request, res: Response) => {
     const rows = result.rows.map((item) => {
       const raw = item.toJSON() as any;
       if (raw.is_deleted) {
-        return { ...raw, content: "该评论已被删除" };
+        return { ...raw, content: "该评论已被删除", Replies: [] };
       }
+      
+      // 处理子评论
+      if (raw.Replies && raw.Replies.length > 0) {
+        raw.Replies = raw.Replies.map((reply: any) => {
+          if (reply.is_deleted) {
+            return { ...reply, content: "该评论已被删除" };
+          }
+          return reply;
+        });
+      }
+      
       return raw;
     });
 
@@ -730,7 +772,7 @@ export const getCommunityPostComments = async (req: Request, res: Response) => {
       pagination: {
         page: Number(page),
         pageSize: Number(pageSize),
-        total: result.count,
+        total: totalMainComments,
       },
     });
   } catch (error) {

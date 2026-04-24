@@ -81,11 +81,15 @@ type PostDetailData = {
 type CommentRow = {
   id: number;
   content: string;
+  created_at?: string;
   createdAt?: string;
-  User?: { nickname?: string; username?: string };
+  parent_id?: number;
+  User?: { nickname?: string; username?: string; avatar?: string };
   like_count?: number;
   status?: number;
   is_deleted?: number;
+  Replies?: CommentRow[];
+  ParentComment?: CommentRow;
 };
 
 interface PostDetailProps {
@@ -133,6 +137,178 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
   const [emojiPage, setEmojiPage] = useState(1);
   const [topicVisible, setTopicVisible] = useState(false);
   const [emojiVisible, setEmojiVisible] = useState(false);
+  
+  // 楼中楼折叠/展开状态
+  const [expandedReplies, setExpandedReplies] = useState<Set<number>>(new Set());
+
+  // 格式化时间显示
+  const formatTime = (dateStr?: string) => {
+    if (!dateStr) return "-";
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    
+    // 小于1分钟
+    if (diff < 60 * 1000) {
+      return "刚刚";
+    }
+    // 小于1小时
+    if (diff < 60 * 60 * 1000) {
+      return `${Math.floor(diff / (60 * 1000))}分钟前`;
+    }
+    // 小于1天
+    if (diff < 24 * 60 * 60 * 1000) {
+      return `${Math.floor(diff / (60 * 60 * 1000))}小时前`;
+    }
+    // 小于7天
+    if (diff < 7 * 24 * 60 * 60 * 1000) {
+      return `${Math.floor(diff / (24 * 60 * 60 * 1000))}天前`;
+    }
+    // 超过7天，显示完整日期
+    return date.toLocaleDateString("zh-CN", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+  };
+
+  // 切换楼中楼展开/折叠
+  const toggleRepliesExpand = (commentId: number) => {
+    setExpandedReplies(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(commentId)) {
+        newSet.delete(commentId);
+      } else {
+        newSet.add(commentId);
+      }
+      return newSet;
+    });
+  };
+
+  // 获取评论的用户昵称
+  const getCommentUserNickname = (comment?: CommentRow) => {
+    if (!comment) return "匿名";
+    return comment.User?.nickname || comment.User?.username || "匿名";
+  };
+
+  // 渲染单个评论（主评论或子评论）
+  const renderCommentItem = (comment: CommentRow, isReply: boolean = false) => {
+    const isExpanded = expandedReplies.has(comment.id);
+    const replies = comment.Replies || [];
+    const hasReplies = replies.length > 0;
+    const showExpandButton = hasReplies && replies.length > 3;
+    const visibleReplies = isExpanded ? replies : replies.slice(0, 3);
+    
+    // 获取时间
+    const timeStr = comment.created_at || comment.createdAt;
+    
+    // 判断是否是审核中
+    const isPending = comment.status === 0;
+    
+    return (
+      <div 
+        key={comment.id} 
+        className={`comment-item ${isReply ? 'reply-item' : 'main-comment-item'}`}
+      >
+        {/* 左侧头像 */}
+        <div className="comment-avatar">
+          <Avatar size={isReply ? 28 : 40}>
+            {(comment.User?.nickname || comment.User?.username || "U")[0]}
+          </Avatar>
+        </div>
+        
+        {/* 右侧内容 */}
+        <div className="comment-content">
+          {/* 用户信息行 */}
+          <div className="comment-user-info">
+            <Space wrap size={8}>
+              <Text strong className="comment-username">
+                {getCommentUserNickname(comment)}
+              </Text>
+              
+              {/* 等级标签 */}
+              <Tag color="orange" className="level-tag">Lv.1</Tag>
+              
+              {/* 审核中标签 */}
+              {isPending && <Tag color="orange">审核中</Tag>}
+            </Space>
+          </div>
+          
+          {/* 评论正文 */}
+          <div className={`comment-text ${isPending ? 'pending-comment' : ''}`}>
+            {/* 如果是子评论且有父评论，显示"回复 某某" */}
+            {isReply && comment.ParentComment && (
+              <span className="reply-to">
+                回复 <Text type="secondary" className="reply-to-user">
+                  {getCommentUserNickname(comment.ParentComment)}
+                </Text>：
+              </span>
+            )}
+            {comment.content}
+          </div>
+          
+          {/* 底部操作栏 */}
+          <div className="comment-actions">
+            <Space size={16}>
+              {/* 时间 */}
+              <Text type="secondary" className="comment-time">
+                {formatTime(timeStr)}
+              </Text>
+              
+              {/* 点赞 */}
+              <Button
+                type="text"
+                size="small"
+                disabled={isPending}
+                onClick={() => handleToggleCommentLike(comment.id)}
+                className="action-btn"
+              >
+                <span className="action-icon">👍</span>
+                <span className="action-text">{comment.like_count || 0}</span>
+              </Button>
+              
+              {/* 回复 */}
+              <Button
+                type="text"
+                size="small"
+                disabled={isPending}
+                onClick={() => handleReply(getCommentUserNickname(comment))}
+                className="action-btn"
+              >
+                <span className="action-text">回复</span>
+              </Button>
+            </Space>
+          </div>
+          
+          {/* 楼中楼回复区 */}
+          {!isReply && hasReplies && (
+            <div className="replies-container">
+              <div className="replies-list">
+                {visibleReplies.map(reply => renderCommentItem(reply, true))}
+              </div>
+              
+              {/* 展开/折叠按钮 */}
+              {showExpandButton && (
+                <div className="expand-replies-btn">
+                  <Button
+                    type="text"
+                    onClick={() => toggleRepliesExpand(comment.id)}
+                    className="expand-btn"
+                  >
+                    {isExpanded ? (
+                      <>收起回复 ↑</>
+                    ) : (
+                      <>查看全部 {replies.length} 条回复 ↓</>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const isOwner = Boolean(
     post?.User?.username && username === post.User.username,
@@ -896,64 +1072,17 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
         <Card
           title={`评论列表（${post?.comment_count || comments.length || 0}）`}
           style={{ marginTop: 16, backgroundColor: '#fff', marginBottom: 16 }}
+          className="comments-card"
         >
-          <List
-            rowKey="id"
-            dataSource={comments}
-            renderItem={(item) => (
-              <List.Item>
-                <List.Item.Meta
-                  avatar={
-                    <Avatar size={32}>
-                      {(item.User?.nickname || item.User?.username || "U")[0]}
-                    </Avatar>
-                  }
-                  title={
-                    <Space wrap>
-                      <Text>
-                        {item.User?.nickname || item.User?.username || "匿名"}
-                      </Text>
-                      {item.status === 0 ? (
-                        <Tag color="orange">审核中</Tag>
-                      ) : null}
-                      <Text type="secondary">
-                        {item.createdAt
-                          ? new Date(item.createdAt).toLocaleString()
-                          : "-"}
-                      </Text>
-                    </Space>
-                  }
-                  description={
-                    <Paragraph
-                      type={item.status === 0 ? "secondary" : undefined}
-                    >
-                      {item.content}
-                    </Paragraph>
-                  }
-                />
-                <Space>
-                  <Button
-                    size="small"
-                    disabled={item.status === 0}
-                    onClick={() => handleToggleCommentLike(item.id)}
-                  >
-                    👍 {item.like_count || 0}
-                  </Button>
-                  <Button
-                    size="small"
-                    disabled={item.status === 0}
-                    onClick={() =>
-                      handleReply(
-                        item.User?.nickname || item.User?.username || "匿名",
-                      )
-                    }
-                  >
-                    回复
-                  </Button>
-                </Space>
-              </List.Item>
+          <div className="comments-list">
+            {comments.length > 0 ? (
+              comments.map(comment => renderCommentItem(comment, false))
+            ) : (
+              <div className="no-comments">
+                <Text type="secondary">暂无评论，快来抢沙发吧～</Text>
+              </div>
             )}
-          />
+          </div>
         </Card>
       </div>
 

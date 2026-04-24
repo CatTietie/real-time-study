@@ -472,3 +472,272 @@
     background: rgba(0, 0, 0, 0.5);
   }
 }
+
+/* ==================== 评论列表样式 ==================== */
+
+/* 评论列表容器 */
+.comments-card {
+  .ant-card-head {
+    border-bottom: 1px solid #f0f0f0;
+  }
+  
+  .ant-card-head-title {
+    font-weight: bold;
+    font-size: 16px;
+    color: var(--text-primary);
+  }
+}
+
+/* 评论列表 */
+.comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* 无评论提示 */
+.no-comments {
+  text-align: center;
+  padding: 40px 0;
+  color: var(--text-secondary);
+}
+
+/* ==================== 单个评论项样式 ==================== */
+
+/* 评论项容器 */
+.comment-item {
+  display: flex;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid #f5f5f5;
+  
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+/* 主评论项 */
+.main-comment-item {
+  .comment-avatar {
+    flex-shrink: 0;
+  }
+  
+  .comment-content {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* 子评论项 */
+.reply-item {
+  padding: 12px 0 0 0;
+  border-bottom: none;
+  
+  &:last-child {
+    padding-bottom: 0;
+  }
+  
+  .comment-avatar {
+    flex-shrink: 0;
+  }
+  
+  .comment-content {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* 评论头像 */
+.comment-avatar {
+  .ant-avatar {
+    background: var(--primary-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+  }
+}
+
+/* 评论内容 */
+.comment-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 用户信息行 */
+.comment-user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  
+  .comment-username {
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    
+    &:hover {
+      color: var(--primary-color);
+    }
+  }
+  
+  .level-tag {
+    font-size: 12px;
+    padding: 0 6px;
+    height: 20px;
+    line-height: 18px;
+    border-radius: 4px;
+    margin: 0;
+  }
+}
+
+/* 评论文本 */
+.comment-text {
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.6;
+  word-break: break-word;
+  white-space: pre-wrap;
+  
+  &.pending-comment {
+    color: var(--text-secondary);
+  }
+  
+  /* 回复标记 */
+  .reply-to {
+    color: var(--text-secondary);
+    font-size: 14px;
+    
+    .reply-to-user {
+      color: var(--primary-color);
+      font-weight: 500;
+    }
+  }
+}
+
+/* 评论操作栏 */
+.comment-actions {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  
+  .comment-time {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  
+  .action-btn {
+    padding: 4px 8px;
+    height: auto;
+    border: none;
+    box-shadow: none;
+    color: var(--text-secondary);
+    font-size: 12px;
+    transition: all 0.2s ease;
+    
+    &:hover {
+      color: var(--primary-color);
+      background: transparent;
+    }
+    
+    .action-icon {
+      margin-right: 4px;
+      font-size: 14px;
+    }
+    
+    .action-text {
+      font-size: 12px;
+    }
+  }
+}
+
+/* ==================== 楼中楼回复区样式 ==================== */
+
+/* 回复区容器 */
+.replies-container {
+  margin-top: 12px;
+  background: var(--card-background);
+  border-radius: 8px;
+  padding: 12px 16px;
+  border: 1px solid #e8e8e8;
+}
+
+/* 回复列表 */
+.replies-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* 展开/折叠按钮 */
+.expand-replies-btn {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e8e8e8;
+  
+  .expand-btn {
+    padding: 0;
+    height: auto;
+    border: none;
+    box-shadow: none;
+    color: var(--primary-color);
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    
+    &:hover {
+      color: var(--primary-dark);
+      background: transparent;
+    }
+  }
+}
+
+/* ==================== 响应式适配 ==================== */
+
+@media (max-width: 768px) {
+  .comment-item {
+    padding: 12px 0;
+  }
+  
+  .main-comment-item {
+    .comment-avatar {
+      .ant-avatar {
+        width: 36px !important;
+        height: 36px !important;
+        line-height: 36px !important;
+        font-size: 14px !important;
+      }
+    }
+  }
+  
+  .reply-item {
+    .comment-avatar {
+      .ant-avatar {
+        width: 24px !important;
+        height: 24px !important;
+        line-height: 24px !important;
+        font-size: 12px !important;
+      }
+    }
+  }
+  
+  .replies-container {
+    padding: 8px 12px;
+    margin-top: 8px;
+  }
+  
+  .comment-actions {
+    .action-btn {
+      padding: 2px 6px;
+      
+      .action-icon {
+        font-size: 12px;
+      }
+      
+      .action-text {
+        font-size: 11px;
+      }
+    }
+  }
+}
