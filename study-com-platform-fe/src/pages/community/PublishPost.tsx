@@ -120,7 +120,7 @@ export default function PublishPost() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-50">
       {contextHolder}
       
       <div className="max-w-4xl mx-auto px-4 py-6">
@@ -147,160 +147,185 @@ export default function PublishPost() {
           </Button>
         </div>
 
-        {/* 主编辑区域 - 纯白背景，无缝衔接 */}
-        <div className="bg-white rounded-none shadow-none border-none">
+        {/* 主编辑区域 - 白色卡片，与灰色背景形成对比 */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
           <Form form={form} layout="vertical" onFinish={handleSubmit}>
-            {/* 标题输入框 - 无边框、大字号加粗 */}
-            <Form.Item
-              name="title"
-              rules={[
-                { required: true, message: "请输入标题" },
-                { min: 2, max: 100, message: "标题长度为2-100字符" },
-              ]}
-              className="mb-0"
-            >
-              <Input
-                placeholder="请输入标题"
-                maxLength={100}
-                className="text-3xl font-bold border-none shadow-none outline-none focus:ring-0 px-0 py-4 text-gray-900 placeholder:text-gray-300"
-                style={{
-                  fontSize: '28px',
-                  fontWeight: 700,
-                  border: 'none',
-                  boxShadow: 'none',
-                  outline: 'none',
-                  paddingLeft: 0,
-                  paddingRight: 0,
-                  paddingTop: '16px',
-                  paddingBottom: '16px',
-                  backgroundColor: 'transparent',
-                }}
-                onFocus={(e) => {
-                  e.target.style.boxShadow = 'none';
-                  e.target.style.border = 'none';
-                }}
-              />
-            </Form.Item>
-
-            {/* 分割线 */}
-            <div className="h-px bg-gray-100 my-2" />
-
-            {/* 分类选择 - 轻量化 */}
-            <Form.Item
-              name="category"
-              rules={[{ required: true, message: "请选择分类" }]}
-              className="mb-4"
-            >
-              <Radio.Group optionType="button" buttonStyle="solid" className="flex flex-wrap gap-2">
-                {CATEGORY_OPTIONS.map((item) => (
-                  <Radio.Button 
-                    key={item} 
-                    value={item}
-                    className="border border-gray-200 bg-white text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors rounded-md px-4 py-1"
-                  >
-                    <span className="text-sm">{item}</span>
-                  </Radio.Button>
-                ))}
-              </Radio.Group>
-            </Form.Item>
-
-            {/* 正文区域 - 无边框，与标题无缝衔接 */}
-            <Form.Item
-              name="content"
-              rules={[{ required: true, message: "请输入内容" }]}
-              className="mb-4"
-            >
-              <TextArea
-                placeholder="在这里写下你的想法..."
-                maxLength={5000}
-                autoSize={{ minRows: 12, maxRows: 30 }}
-                className="border-none shadow-none outline-none focus:ring-0 px-0 py-2 text-base text-gray-700 placeholder:text-gray-300 resize-none"
-                style={{
-                  border: 'none',
-                  boxShadow: 'none',
-                  outline: 'none',
-                  paddingLeft: 0,
-                  paddingRight: 0,
-                  backgroundColor: 'transparent',
-                  fontSize: '16px',
-                  lineHeight: '1.8',
-                  resize: 'none',
-                }}
-                onFocus={(e) => {
-                  e.target.style.boxShadow = 'none';
-                  e.target.style.border = 'none';
-                }}
-              />
-            </Form.Item>
-
-            {/* 底部辅助区域 */}
-            <div className="border-t border-gray-100 pt-4 mt-4">
-              {/* 标签选择 */}
-              <Form.Item 
-                name="tags"
-                className="mb-4"
+            {/* 标题输入区域 - 顶部区域，有内边距 */}
+            <div className="px-6 pt-6 pb-4">
+              <Form.Item
+                name="title"
+                rules={[
+                  { required: true, message: "请输入标题" },
+                  { min: 2, max: 100, message: "标题长度为2-100字符" },
+                ]}
+                className="mb-0"
               >
-                <Select
-                  mode="tags"
-                  maxTagCount={5}
-                  placeholder="添加标签（最多5个）"
-                  options={tagOptions.map((tag) => ({ label: tag, value: tag }))}
-                  onSearch={handleTagSearch}
-                  onChange={handleTagsChange}
-                  loading={tagFetching}
-                  className="w-full"
+                <Input
+                  placeholder="请输入标题"
+                  maxLength={100}
+                  className="text-3xl font-bold border-none shadow-none outline-none focus:ring-0 px-0 py-2 text-gray-900 placeholder:text-gray-300"
                   style={{
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '6px',
+                    fontSize: '28px',
+                    fontWeight: 700,
+                    border: 'none',
+                    boxShadow: 'none',
+                    outline: 'none',
+                    paddingLeft: 0,
+                    paddingRight: 0,
+                    paddingTop: '8px',
+                    paddingBottom: '8px',
+                    backgroundColor: 'transparent',
                   }}
                 />
               </Form.Item>
+            </div>
+
+            {/* 分隔线 - 区分标题和正文区域 */}
+            <div className="h-px bg-gray-100 mx-6" />
+
+            {/* 分类选择区域 - 浅色背景区分 */}
+            <div className="px-6 py-4 bg-gray-50/50">
+              <div className="flex items-center gap-2 mb-2">
+                <TagsOutlined className="text-blue-500" />
+                <span className="text-sm font-medium text-gray-700">选择分类</span>
+              </div>
+              <Form.Item
+                name="category"
+                rules={[{ required: true, message: "请选择分类" }]}
+                className="mb-0"
+              >
+                <Radio.Group optionType="button" buttonStyle="solid" className="flex flex-wrap gap-2">
+                  {CATEGORY_OPTIONS.map((item) => (
+                    <Radio.Button 
+                      key={item} 
+                      value={item}
+                      className="border border-gray-200 bg-white text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors rounded-md px-4 py-1"
+                    >
+                      <span className="text-sm">{item}</span>
+                    </Radio.Button>
+                  ))}
+                </Radio.Group>
+              </Form.Item>
+            </div>
+
+            {/* 分隔线 */}
+            <div className="h-px bg-gray-100 mx-6" />
+
+            {/* 正文编辑区域 - 主要内容区域，有更多内边距 */}
+            <div className="px-6 py-6">
+              <div className="flex items-center gap-2 mb-3">
+                <EditOutlined className="text-blue-500" />
+                <span className="text-sm font-medium text-gray-700">正文内容</span>
+              </div>
+              <Form.Item
+                name="content"
+                rules={[{ required: true, message: "请输入内容" }]}
+                className="mb-0"
+              >
+                <TextArea
+                  placeholder="在这里写下你的想法..."
+                  maxLength={5000}
+                  autoSize={{ minRows: 12, maxRows: 30 }}
+                  className="border-none shadow-none outline-none focus:ring-0 px-0 py-2 text-base text-gray-700 placeholder:text-gray-300 resize-none"
+                  style={{
+                    border: 'none',
+                    boxShadow: 'none',
+                    outline: 'none',
+                    paddingLeft: 0,
+                    paddingRight: 0,
+                    backgroundColor: 'transparent',
+                    fontSize: '16px',
+                    lineHeight: '1.8',
+                    resize: 'none',
+                  }}
+                />
+              </Form.Item>
+            </div>
+
+            {/* 分隔线 */}
+            <div className="h-px bg-gray-100 mx-6" />
+
+            {/* 底部辅助区域 - 标签和图片上传 */}
+            <div className="px-6 py-5 bg-gray-50/80">
+              {/* 标签选择 */}
+              <div className="mb-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <TagsOutlined className="text-yellow-500" />
+                  <span className="text-sm font-medium text-gray-700">添加标签</span>
+                  <span className="text-xs text-gray-400">（最多5个）</span>
+                </div>
+                <Form.Item 
+                  name="tags"
+                  className="mb-0"
+                >
+                  <Select
+                    mode="tags"
+                    maxTagCount={5}
+                    placeholder="输入标签后按 Enter 添加"
+                    options={tagOptions.map((tag) => ({ label: tag, value: tag }))}
+                    onSearch={handleTagSearch}
+                    onChange={handleTagsChange}
+                    loading={tagFetching}
+                    className="w-full"
+                    style={{
+                      borderRadius: '8px',
+                    }}
+                  />
+                </Form.Item>
+                {watchedTags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <Text type="secondary" className="text-xs">已添加：</Text>
+                    {watchedTags.map((tag: string) => (
+                      <span 
+                        key={tag}
+                        className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-medium"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {/* 图片上传 */}
-              <Form.Item className="mb-4">
-                <div className="flex items-center gap-4">
-                  <Upload
-                    listType="picture-card"
-                    fileList={fileList}
-                    onChange={({ fileList: next }) => setFileList(next.slice(0, 4))}
-                    beforeUpload={(file) => {
-                      const isImage = file.type.startsWith("image/");
-                      if (!isImage) {
-                        messageApi.error("仅支持图片格式");
-                        return Upload.LIST_IGNORE;
-                      }
-                      return false;
-                    }}
-                    maxCount={4}
-                    accept="image/*"
-                    className="mr-4"
-                  >
-                    {fileList.length >= 4 ? null : (
-                      <div className="flex flex-col items-center justify-center text-gray-400 py-4">
-                        <PictureOutlined className="text-xl mb-1" />
-                        <span className="text-xs">上传图片</span>
-                      </div>
-                    )}
-                  </Upload>
-                  
-                  {watchedTags.length > 0 && (
-                    <div className="flex flex-wrap gap-2 items-center">
-                      <Text type="secondary" className="text-xs">已添加：</Text>
-                      {watchedTags.map((tag: string) => (
-                        <span 
-                          key={tag}
-                          className="bg-blue-50 text-blue-600 px-2 py-1 rounded text-xs"
-                        >
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <PictureOutlined className="text-green-500" />
+                  <span className="text-sm font-medium text-gray-700">上传图片</span>
+                  <span className="text-xs text-gray-400">（最多4张）</span>
                 </div>
-              </Form.Item>
+                <Form.Item className="mb-0">
+                  <div className="flex flex-wrap gap-3">
+                    <Upload
+                      listType="picture-card"
+                      fileList={fileList}
+                      onChange={({ fileList: next }) => setFileList(next.slice(0, 4))}
+                      beforeUpload={(file) => {
+                        const isImage = file.type.startsWith("image/");
+                        if (!isImage) {
+                          messageApi.error("仅支持图片格式");
+                          return Upload.LIST_IGNORE;
+                        }
+                        return false;
+                      }}
+                      maxCount={4}
+                      accept="image/*"
+                    >
+                      {fileList.length >= 4 ? null : (
+                        <div className="flex flex-col items-center justify-center text-gray-400 py-2">
+                          <PictureOutlined className="text-lg mb-1" />
+                          <span className="text-xs">上传图片</span>
+                        </div>
+                      )}
+                    </Upload>
+                  </div>
+                </Form.Item>
+              </div>
+            </div>
 
-              {/* 操作按钮 - 移动端友好 */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-100">
+            {/* 底部操作栏 */}
+            <div className="px-6 py-5 border-t border-gray-200 bg-white rounded-b-xl">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-2 text-gray-400 text-sm">
                   <span>💡</span>
                   <span>优质内容有机会登上社区排行榜</span>
@@ -332,12 +357,12 @@ export default function PublishPost() {
         {/* 右侧辅助卡片 - 简化版，只在大屏幕显示 */}
         <div className="hidden lg:block mt-8">
           <div className="grid grid-cols-3 gap-4">
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-3">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+              <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
                 <StarOutlined className="text-yellow-500" />
-                <span className="font-medium text-gray-700">发布指南</span>
+                <span className="font-medium text-gray-800">发布指南</span>
               </div>
-              <ul className="text-sm text-gray-600 space-y-2">
+              <ul className="text-sm text-gray-600 space-y-3">
                 <li className="flex items-start gap-2">
                   <span className="text-blue-500 mt-0.5">📌</span>
                   <span>标题要明确具体</span>
@@ -353,29 +378,29 @@ export default function PublishPost() {
               </ul>
             </div>
 
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-3">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+              <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
                 <EditOutlined className="text-blue-500" />
-                <span className="font-medium text-gray-700">格式示例</span>
+                <span className="font-medium text-gray-800">格式示例</span>
               </div>
-              <div className="text-sm text-gray-600 space-y-2">
-                <div>
+              <div className="text-sm text-gray-600 space-y-4">
+                <div className="bg-gray-50 rounded-lg p-3">
                   <span className="font-medium text-blue-600">【问题求助】</span>
-                  <p className="text-xs text-gray-500 mt-1">1. 问题描述 2. 已尝试的方案 3. 期望结果</p>
+                  <p className="text-xs text-gray-500 mt-2 leading-relaxed">1. 问题描述<br/>2. 已尝试的方案<br/>3. 期望结果</p>
                 </div>
-                <div>
+                <div className="bg-gray-50 rounded-lg p-3">
                   <span className="font-medium text-green-600">【经验分享】</span>
-                  <p className="text-xs text-gray-500 mt-1">1. 资源介绍 2. 适用人群 3. 使用建议</p>
+                  <p className="text-xs text-gray-500 mt-2 leading-relaxed">1. 资源介绍<br/>2. 适用人群<br/>3. 使用建议</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-3">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+              <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
                 <TrophyOutlined className="text-yellow-500" />
-                <span className="font-medium text-gray-700">社区规则</span>
+                <span className="font-medium text-gray-800">社区规则</span>
               </div>
-              <ul className="text-sm text-gray-600 space-y-2">
+              <ul className="text-sm text-gray-600 space-y-3">
                 <li className="flex items-start gap-2">
                   <span className="text-red-500 mt-0.5">🚫</span>
                   <span>禁止发布广告内容</span>
@@ -422,7 +447,7 @@ export default function PublishPost() {
           .ant-input[placeholder*="请输入标题"] {
             font-size: 28px !important;
             font-weight: 700 !important;
-            padding: 16px 0 !important;
+            padding: 8px 0 !important;
           }
           
           /* 正文区域样式 */
@@ -471,8 +496,10 @@ export default function PublishPost() {
           /* Select 样式 */
           .ant-select-selector {
             border: 1px solid #e5e7eb !important;
-            border-radius: 6px !important;
+            border-radius: 8px !important;
             box-shadow: none !important;
+            min-height: 40px !important;
+            padding: 4px 12px !important;
           }
           
           .ant-select-focused .ant-select-selector,
@@ -485,25 +512,27 @@ export default function PublishPost() {
           
           /* Upload 样式 */
           .ant-upload.ant-upload-select-picture-card {
-            width: 80px !important;
-            height: 80px !important;
+            width: 88px !important;
+            height: 88px !important;
             border: 1px dashed #d1d5db !important;
-            border-radius: 8px !important;
+            border-radius: 12px !important;
             background: #f9fafb !important;
-            margin-right: 8px !important;
-            margin-bottom: 8px !important;
+            margin-right: 12px !important;
+            margin-bottom: 12px !important;
           }
           
           .ant-upload.ant-upload-select-picture-card:hover {
             border-color: #3b82f6 !important;
+            background: #eff6ff !important;
           }
           
           .ant-upload-list-picture-card .ant-upload-list-item {
-            width: 80px !important;
-            height: 80px !important;
-            border-radius: 8px !important;
-            margin-right: 8px !important;
-            margin-bottom: 8px !important;
+            width: 88px !important;
+            height: 88px !important;
+            border-radius: 12px !important;
+            margin-right: 12px !important;
+            margin-bottom: 12px !important;
+            border: 1px solid #e5e7eb !important;
           }
           
           /* 响应式样式 */
@@ -515,6 +544,14 @@ export default function PublishPost() {
             .ant-radio-button-wrapper {
               padding: 0 12px !important;
               font-size: 14px !important;
+            }
+            
+            .ant-upload.ant-upload-select-picture-card,
+            .ant-upload-list-picture-card .ant-upload-list-item {
+              width: 72px !important;
+              height: 72px !important;
+              margin-right: 8px !important;
+              margin-bottom: 8px !important;
             }
           }
         `}
