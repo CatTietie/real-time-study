@@ -26,6 +26,7 @@ import {
   removeCommunityClient,
 } from "../services/community-realtime.service";
 import { recordView, getUserTodayViews } from "../services/view-record.service";
+import { uploadFilesToOss } from "../middlewares/upload.middleware";
 
 const parseTags = (tags?: string[] | string) => {
   const parsed = Array.isArray(tags)
@@ -435,10 +436,9 @@ export const createCommunityPost = async (req: Request, res: Response) => {
         .status(400)
         .json({ success: false, message: "最多只能上传4张图片" });
     }
-    const baseUrl = `${req.protocol}://${req.get("host")}`;
-    const imageUrls = files.map(
-      (file) => `${baseUrl}/uploads/posts/${file.filename}`,
-    );
+    
+    // 使用 OSS 上传（如果 OSS 可用）
+    const imageUrls = await uploadFilesToOss(req);
 
     const isDraftFlag =
       typeof isDraft === "string" ? isDraft === "true" : Boolean(isDraft);

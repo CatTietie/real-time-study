@@ -4,6 +4,7 @@ import { useAppSelector } from "../../app/hooks";
 import type { RootState } from "../../app/store";
 import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
+import { uploadAvatar } from "../../services/auth";
 
 import Banner from "../../components/student/profile/Banner";
 import BasicInfoCard from "../../components/student/profile/BasicInfoCard";
@@ -81,17 +82,22 @@ export default function ProfileEdit() {
     }
   };
 
-  const handleAvatarUpload = (info: unknown) => {
+  const handleAvatarUpload = async (info: unknown) => {
     if (info && typeof info === 'object' && 'file' in info) {
       const fileInfo = info as { file: { status: string; originFileObj?: File } };
-      if (fileInfo.file.status === 'done') {
-        if (fileInfo.file.originFileObj) {
-          const mockUrl = URL.createObjectURL(fileInfo.file.originFileObj);
-          setAvatarUrl(mockUrl);
-          message.success('头像上传成功');
+      
+      if (fileInfo.file.originFileObj) {
+        try {
+          const response = await uploadAvatar(fileInfo.file.originFileObj);
+          if (response.success && response.data?.avatar) {
+            setAvatarUrl(response.data.avatar);
+            message.success('头像上传成功');
+          } else {
+            throw new Error(response.message || '头像上传失败');
+          }
+        } catch (error) {
+          message.error(error instanceof Error ? error.message : '头像上传失败');
         }
-      } else if (fileInfo.file.status === 'error') {
-        message.error('头像上传失败');
       }
     }
   };
