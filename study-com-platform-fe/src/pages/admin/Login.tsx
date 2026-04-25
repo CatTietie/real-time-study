@@ -134,6 +134,7 @@ export default function Login() {
           username: result.data.username,
           userId: result.data.id,
           nickname: result.data.nickname,
+          avatar: result.data.avatar,
         }),
       );
       setFailedAttempts(0);

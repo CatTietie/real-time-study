@@ -1,10 +1,11 @@
 import { Form, Row, Col, message } from "antd";
 import { useState, useEffect } from "react";
-import { useAppSelector } from "../../app/hooks";
+import { useAppSelector, useAppDispatch } from "../../app/hooks";
 import type { RootState } from "../../app/store";
 import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import { uploadAvatar } from "../../services/auth";
+import { updateAvatar as updateAvatarAction } from "../../features/auth/authSlice";
 
 import Banner from "../../components/student/profile/Banner";
 import BasicInfoCard from "../../components/student/profile/BasicInfoCard";
@@ -28,11 +29,12 @@ interface ProfileFormData {
 
 export default function ProfileEdit() {
   const authState = useAppSelector((state: RootState) => state.auth);
-  const { username, nickname, userId } = authState;
+  const { username, nickname, userId, avatar } = authState;
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const [form] = Form.useForm<ProfileFormData>();
   const [loading, setLoading] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState<string>("");
+  const [avatarUrl, setAvatarUrl] = useState<string>(avatar || "");
   const [goalsLoading, setGoalsLoading] = useState(false);
   const [goalsData, setGoalsData] = useState<{
     goalPosts?: number;
@@ -82,23 +84,26 @@ export default function ProfileEdit() {
     }
   };
 
-  const handleAvatarUpload = async (info: unknown) => {
-    if (info && typeof info === 'object' && 'file' in info) {
-      const fileInfo = info as { file: { status: string; originFileObj?: File } };
+  const handleAvatarUpload = async (file: File) => {
+    try {
+      // 先显示本地预览
+      const localPreviewUrl = URL.createObjectURL(file);
+      setAvatarUrl(localPreviewUrl);
       
-      if (fileInfo.file.originFileObj) {
-        try {
-          const response = await uploadAvatar(fileInfo.file.originFileObj);
-          if (response.success && response.data?.avatar) {
-            setAvatarUrl(response.data.avatar);
-            message.success('头像上传成功');
-          } else {
-            throw new Error(response.message || '头像上传失败');
-          }
-        } catch (error) {
-          message.error(error instanceof Error ? error.message : '头像上传失败');
-        }
+      // 调用上传接口
+      const response = await uploadAvatar(file);
+      if (response.success && response.data?.avatar) {
+        // 上传成功后，使用服务器返回的 URL
+        const newAvatarUrl = response.data.avatar;
+        setAvatarUrl(newAvatarUrl);
+        // 更新 Redux store 中的头像信息
+        dispatch(updateAvatarAction(newAvatarUrl));
+        message.success('头像上传成功');
+      } else {
+        throw new Error(response.message || '头像上传失败');
       }
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '头像上传失败');
     }
   };
 

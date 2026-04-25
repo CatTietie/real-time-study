@@ -1,5 +1,6 @@
 import { Card, Form, Input, Avatar, Upload, Button, Typography, Space } from "antd";
 import { CameraOutlined, UserOutlined } from "@ant-design/icons";
+import type { UploadProps } from "antd";
 
 const { Text } = Typography;
 
@@ -7,7 +8,7 @@ interface BasicInfoCardProps {
   avatarUrl: string;
   username: string;
   nickname: string;
-  onAvatarUpload: (info: unknown) => void;
+  onAvatarUpload: (file: File) => void;
 }
 
 export default function BasicInfoCard({ 
@@ -16,6 +17,11 @@ export default function BasicInfoCard({
   nickname,
   onAvatarUpload 
 }: BasicInfoCardProps) {
+  const handleUploadChange: UploadProps["beforeUpload"] = (file) => {
+    onAvatarUpload(file);
+    return false;
+  };
+
   return (
     <Card 
       title={
@@ -36,8 +42,7 @@ export default function BasicInfoCard({
           />
           <Upload
             showUploadList={false}
-            beforeUpload={() => false}
-            onChange={onAvatarUpload}
+            beforeUpload={handleUploadChange}
             accept="image/*"
           >
             <Button
