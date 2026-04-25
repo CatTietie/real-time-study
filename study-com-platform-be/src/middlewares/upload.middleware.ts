@@ -2,6 +2,8 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { NextFunction, Request, Response } from "express";
+import { ossService } from "../services/oss.service";
+import { ossDirectories } from "../config/oss";
 
 const uploadsRoot = path.join(process.cwd(), "uploads", "posts");
 
@@ -9,7 +11,8 @@ if (!fs.existsSync(uploadsRoot)) {
   fs.mkdirSync(uploadsRoot, { recursive: true });
 }
 
-const storage = multer.diskStorage({
+// 磁盘存储（本地存储模式）
+const diskStorage = multer.diskStorage({
   destination: (_req, _file, cb) => {
     cb(null, uploadsRoot);
   },
@@ -21,6 +24,19 @@ const storage = multer.diskStorage({
   },
 });
 
+// 内存存储（用于 OSS 上传）
+const memoryStorage = multer.memoryStorage();
+
+// 根据 OSS 是否可用选择存储方式
+const getStorage = () => {
+  if (ossService.isAvailable()) {
+    console.log("✅ 使用 OSS 存储模式");
+    return memoryStorage;
+  }
+  console.log("⚠️ 使用本地磁盘存储模式");
+  return diskStorage;
+};
+
 const fileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
   if (!file.mimetype.startsWith("image/")) {
     return cb(new Error("仅支持图片格式"));
@@ -29,7 +45,7 @@ const fileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
 };
 
 export const uploadPostImages = multer({
-  storage,
+  storage: getStorage(),
   fileFilter,
   limits: {
     files: 4,
@@ -50,3 +66,79 @@ export const conditionalPostImages = (
   }
   return next();
 };
+
+/**
+ * 上传文件到 OSS（如果 OSS 可用）
+ * 如果使用内存存储，则上传到 OSS；如果使用磁盘存储，则保持原逻辑
+ */
+export const uploadFilesToOss = async (
+  req: Request,
+  directory: string = ossDirectories.post,
+): Promise<string[]> => {
+  const files = (req.files || []) as Express.Multer.File[];
+  
+  if (files.length === 0) {
+    return [];
+  }
+
+  // 如果 OSS 可用，上传到 OSS
+  if (ossService.isAvailable()) {
+    const uploadPromises = files.map(async (file) => {
+      // 检查是否是内存存储（有 buffer）
+      if (file.buffer) {
+        return ossService.uploadBuffer(file.buffer, file.originalname, directory);
+      }
+      // 如果是磁盘存储，则构建本地 URL
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      return `${baseUrl}/uploads/posts/${file.filename}`;
+    });
+
+    return Promise.all(uploadPromises);
+  }
+
+  // OSS 不可用，使用本地存储
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  return files.map((file) => `${baseUrl}/uploads/posts/${file.filename}`);
+};
+
+/**
+ * 上传单个文件到 OSS
+ */
+export const uploadSingleFileToOss = async (
+  req: Request,
+  fieldName: string = "avatar",
+  directory: string = ossDirectories.avatar,
+): Promise<string | null> => {
+  const file = (req as any).file as Express.Multer.File;
+  
+  if (!file) {
+    return null;
+  }
+
+  // 如果 OSS 可用，上传到 OSS
+  if (ossService.isAvailable()) {
+    // 检查是否是内存存储（有 buffer）
+    if (file.buffer) {
+      return ossService.uploadBuffer(file.buffer, file.originalname, directory);
+    }
+    // 如果是磁盘存储，则构建本地 URL
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    return `${baseUrl}/uploads/${directory}${file.filename}`;
+  }
+
+  // OSS 不可用，使用本地存储
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  return `${baseUrl}/uploads/${directory}${file.filename}`;
+};
+
+/**
+ * 头像上传中间件
+ */
+export const uploadAvatar = multer({
+  storage: getStorage(),
+  fileFilter,
+  limits: {
+    files: 1,
+    fileSize: 2 * 1024 * 1024, // 2MB
+  },
+});
