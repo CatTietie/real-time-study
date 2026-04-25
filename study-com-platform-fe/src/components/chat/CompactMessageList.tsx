@@ -140,12 +140,14 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
       <div style={{ 
         flex: 1, 
         overflowY: 'auto', 
-        padding: '16px',
+        padding: '20px',
         display: 'flex',
         flexDirection: 'column',
-        background: 'linear-gradient(180deg, rgba(248, 250, 252, 0.8) 0%, rgba(237, 242, 247, 0.8) 100%)',
-        borderRadius: '16px',
-        margin: '8px'
+        background: 'linear-gradient(180deg, rgba(226, 232, 240, 0.6) 0%, rgba(203, 213, 225, 0.6) 100%)',
+        borderRadius: '20px',
+        margin: '12px',
+        border: '1px solid rgba(160, 174, 192, 0.3)',
+        boxShadow: 'inset 0 2px 10px rgba(0, 0, 0, 0.03)'
       }}>
         {loading ? (
           <div style={{ 
@@ -204,20 +206,33 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
                   maxWidth: '80%',
                   padding: '12px 16px',
                   borderRadius: '16px',
-                  backgroundColor: isSystemMessage(message) ? 'rgba(240, 240, 240, 0.9)' : 
-                                 message.user_id === currentUserId ? 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)' : 'rgba(255, 255, 255, 0.95)',
-                  color: isSystemMessage(message) ? '#666' : 
-                        message.user_id === currentUserId ? '#fff' : '#2d3748',
-                  border: isSystemMessage(message) ? 'none' : 
-                         message.user_id === currentUserId ? 'none' : '1px solid rgba(226, 232, 240, 0.8)',
+                  background: isSystemMessage(message) 
+                    ? 'rgba(226, 232, 240, 0.9)'  // 系统消息：浅灰色背景
+                    : message.user_id === currentUserId 
+                      ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'  // 自己的消息：蓝紫渐变
+                      : 'rgba(255, 255, 255, 0.98)',  // 他人消息：白色背景
+                  color: isSystemMessage(message) 
+                    ? '#4a5568'  // 系统消息文字：深灰色
+                    : message.user_id === currentUserId 
+                      ? '#ffffff'  // 自己的消息文字：纯白色
+                      : '#1a202c',  // 他人消息文字：深黑色
+                  border: isSystemMessage(message) 
+                    ? 'none' 
+                    : message.user_id === currentUserId 
+                      ? 'none' 
+                      : '1px solid rgba(160, 174, 192, 0.5)',  // 他人消息：添加边框增加区分度
                   wordWrap: 'break-word',
                   boxShadow: message.user_id === currentUserId 
-                    ? '0 4px 15px rgba(102, 126, 234, 0.3)' 
-                    : '0 2px 8px rgba(0, 0, 0, 0.06)',
+                    ? '0 6px 20px rgba(102, 126, 234, 0.4)'  // 自己的消息：较深阴影
+                    : isSystemMessage(message)
+                      ? '0 2px 8px rgba(0, 0, 0, 0.05)'  // 系统消息：浅阴影
+                      : '0 3px 12px rgba(0, 0, 0, 0.08)',  // 他人消息：中等阴影
                   transition: 'all 0.3s ease',
                   cursor: 'default',
                   position: 'relative',
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  fontWeight: '500',  // 增加字体粗细提高可读性
+                  lineHeight: '1.6'  // 增加行高提高可读性
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = 'scale(1.02)';
