@@ -29,4 +29,5 @@ export const ossDirectories = {
   avatar: "avatars/",
   post: "posts/",
   temp: "temp/",
+  chat: "chat/",
 };
