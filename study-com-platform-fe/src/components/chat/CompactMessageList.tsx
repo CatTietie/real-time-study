@@ -103,6 +103,159 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
     return displayName;
   };
 
+  // 格式化文件大小
+  const formatFileSize = (bytes: number): string => {
+    if (!bytes) return '未知大小';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  // 获取文件图标
+  const getFileIcon = (fileName: string): string => {
+    if (!fileName) return '📄';
+    const ext = fileName.split('.').pop()?.toLowerCase() || '';
+    const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'];
+    const docExts = ['doc', 'docx', 'pdf', 'txt', 'md'];
+    const videoExts = ['mp4', 'avi', 'mov', 'mkv', 'webm'];
+    const audioExts = ['mp3', 'wav', 'flac', 'aac', 'ogg'];
+    const zipExts = ['zip', 'rar', '7z', 'tar', 'gz'];
+    
+    if (imageExts.includes(ext)) return '🖼️';
+    if (docExts.includes(ext)) return '📄';
+    if (videoExts.includes(ext)) return '🎬';
+    if (audioExts.includes(ext)) return '🎵';
+    if (zipExts.includes(ext)) return '📦';
+    return '📄';
+  };
+
+  // 渲染消息内容
+  const renderMessageContent = (message: ChatMessage) => {
+    const isOwn = message.user_id === currentUserId;
+    
+    // 图片消息
+    if (message.message_type === 'image') {
+      return (
+        <div style={{
+          display: 'inline-block',
+          maxWidth: '280px',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          cursor: 'pointer',
+          position: 'relative'
+        }}>
+          <img 
+            src={message.file_url || message.content}
+            alt={message.file_name || '图片'}
+            style={{
+              maxWidth: '100%',
+              maxHeight: '200px',
+              borderRadius: '12px',
+              display: 'block',
+              objectFit: 'cover'
+            }}
+            onClick={() => {
+              // 点击图片可以预览
+              window.open(message.file_url || message.content, '_blank');
+            }}
+          />
+          {message.file_name && (
+            <div style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              background: 'linear-gradient(transparent, rgba(0,0,0,0.6))',
+              padding: '20px 12px 8px',
+              borderRadius: '0 0 12px 12px',
+              fontSize: '12px',
+              color: '#fff'
+            }}>
+              {message.file_name}
+              {message.file_size && (
+                <span style={{ opacity: 0.8, marginLeft: '8px' }}>
+                  {formatFileSize(message.file_size)}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    // 文件消息
+    if (message.message_type === 'file') {
+      return (
+        <a 
+          href={message.file_url || message.content}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '12px 16px',
+            background: isOwn 
+              ? 'rgba(255,255,255,0.15)' 
+              : 'rgba(102, 126, 234, 0.05)',
+            borderRadius: '12px',
+            textDecoration: 'none',
+            color: isOwn ? '#fff' : '#334155',
+            border: isOwn 
+              ? 'none' 
+              : '1px solid rgba(102, 126, 234, 0.2)',
+            transition: 'all 0.3s ease',
+            minWidth: '200px'
+          }}
+          onMouseEnter={(e) => {
+            if (!isOwn) {
+              e.currentTarget.style.background = 'rgba(102, 126, 234, 0.1)';
+              e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.3)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isOwn) {
+              e.currentTarget.style.background = 'rgba(102, 126, 234, 0.05)';
+              e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.2)';
+            }
+          }}
+        >
+          <div style={{
+            fontSize: '32px',
+            lineHeight: '1'
+          }}>
+            {getFileIcon(message.file_name || '')}
+          </div>
+          <div style={{
+            flex: 1,
+            minWidth: 0
+          }}>
+            <div style={{
+              fontWeight: '600',
+              fontSize: '14px',
+              marginBottom: '4px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}>
+              {message.file_name || '文件'}
+            </div>
+            <div style={{
+              fontSize: '12px',
+              opacity: 0.7
+            }}>
+              {formatFileSize(message.file_size || 0)}
+              <span style={{ marginLeft: '8px' }}>点击下载</span>
+            </div>
+          </div>
+        </a>
+      );
+    }
+    
+    // 文本消息（默认）
+    return <span>{message.content}</span>;
+  };
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* 顶部历史消息按钮 */}
@@ -201,54 +354,66 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
                 )}
                 
                 {/* 消息内容 */}
-                <div style={{ 
-                  display: 'inline-block',
-                  maxWidth: '80%',
-                  padding: '12px 16px',
-                  borderRadius: '16px',
-                  background: isSystemMessage(message) 
-                    ? 'rgba(226, 232, 240, 0.9)'  // 系统消息：浅灰色背景
-                    : message.user_id === currentUserId 
-                      ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'  // 自己的消息：蓝紫渐变
-                      : 'rgba(255, 255, 255, 0.98)',  // 他人消息：白色背景
-                  color: isSystemMessage(message) 
-                    ? '#4a5568'  // 系统消息文字：深灰色
-                    : message.user_id === currentUserId 
-                      ? '#ffffff'  // 自己的消息文字：纯白色
-                      : '#1a202c',  // 他人消息文字：深黑色
-                  border: isSystemMessage(message) 
-                    ? 'none' 
-                    : message.user_id === currentUserId 
+                {message.message_type === 'image' || message.message_type === 'file' ? (
+                  // 图片/文件消息：不使用气泡背景
+                  <div style={{
+                    display: 'inline-block',
+                    maxWidth: '80%',
+                    transition: 'all 0.3s ease'
+                  }}>
+                    {renderMessageContent(message)}
+                  </div>
+                ) : (
+                  // 文本/系统消息：使用气泡背景
+                  <div style={{ 
+                    display: 'inline-block',
+                    maxWidth: '80%',
+                    padding: '12px 16px',
+                    borderRadius: '16px',
+                    background: isSystemMessage(message) 
+                      ? 'rgba(226, 232, 240, 0.9)'  // 系统消息：浅灰色背景
+                      : message.user_id === currentUserId 
+                        ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'  // 自己的消息：蓝紫渐变
+                        : 'rgba(255, 255, 255, 0.98)',  // 他人消息：白色背景
+                    color: isSystemMessage(message) 
+                      ? '#4a5568'  // 系统消息文字：深灰色
+                      : message.user_id === currentUserId 
+                        ? '#ffffff'  // 自己的消息文字：纯白色
+                        : '#1a202c',  // 他人消息文字：深黑色
+                    border: isSystemMessage(message) 
                       ? 'none' 
-                      : '1px solid rgba(160, 174, 192, 0.5)',  // 他人消息：添加边框增加区分度
-                  wordWrap: 'break-word',
-                  boxShadow: message.user_id === currentUserId 
-                    ? '0 6px 20px rgba(102, 126, 234, 0.4)'  // 自己的消息：较深阴影
-                    : isSystemMessage(message)
-                      ? '0 2px 8px rgba(0, 0, 0, 0.05)'  // 系统消息：浅阴影
-                      : '0 3px 12px rgba(0, 0, 0, 0.08)',  // 他人消息：中等阴影
-                  transition: 'all 0.3s ease',
-                  cursor: 'default',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  fontWeight: '500',  // 增加字体粗细提高可读性
-                  lineHeight: '1.6'  // 增加行高提高可读性
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'scale(1.02)';
-                  e.currentTarget.style.boxShadow = message.user_id === currentUserId 
-                    ? '0 8px 25px rgba(102, 126, 234, 0.4)' 
-                    : '0 6px 20px rgba(0, 0, 0, 0.1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.boxShadow = message.user_id === currentUserId 
-                    ? '0 4px 15px rgba(102, 126, 234, 0.3)' 
-                    : '0 2px 8px rgba(0, 0, 0, 0.06)';
-                }}
-                >
-                  {message.content}
-                </div>
+                      : message.user_id === currentUserId 
+                        ? 'none' 
+                        : '1px solid rgba(160, 174, 192, 0.5)',  // 他人消息：添加边框增加区分度
+                    wordWrap: 'break-word',
+                    boxShadow: message.user_id === currentUserId 
+                      ? '0 6px 20px rgba(102, 126, 234, 0.4)'  // 自己的消息：较深阴影
+                      : isSystemMessage(message)
+                        ? '0 2px 8px rgba(0, 0, 0, 0.05)'  // 系统消息：浅阴影
+                        : '0 3px 12px rgba(0, 0, 0, 0.08)',  // 他人消息：中等阴影
+                    transition: 'all 0.3s ease',
+                    cursor: 'default',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    fontWeight: '500',  // 增加字体粗细提高可读性
+                    lineHeight: '1.6'  // 增加行高提高可读性
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.02)';
+                    e.currentTarget.style.boxShadow = message.user_id === currentUserId 
+                      ? '0 8px 25px rgba(102, 126, 234, 0.4)' 
+                      : '0 6px 20px rgba(0, 0, 0, 0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.boxShadow = message.user_id === currentUserId 
+                      ? '0 4px 15px rgba(102, 126, 234, 0.3)' 
+                      : '0 2px 8px rgba(0, 0, 0, 0.06)';
+                  }}
+                  >
+                    {renderMessageContent(message)}
+                  </div>
+                )}
                 
                 {/* 发送时间 */}
                 <div style={{ 

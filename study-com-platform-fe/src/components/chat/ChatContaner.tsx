@@ -83,6 +83,28 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     }
   };
 
+  // 处理图片发送
+  const handleSendImage = (fileUrl: string, fileName: string, fileSize: number) => {
+    if (isConnected) {
+      sendMessage(fileUrl, 'image', {
+        file_name: fileName,
+        file_size: fileSize,
+        file_url: fileUrl
+      });
+    }
+  };
+
+  // 处理文件发送
+  const handleSendFile = (fileUrl: string, fileName: string, fileSize: number) => {
+    if (isConnected) {
+      sendMessage(fileUrl, 'file', {
+        file_name: fileName,
+        file_size: fileSize,
+        file_url: fileUrl
+      });
+    }
+  };
+
   return (
     <Card 
       title={`学习聊天室`} 
@@ -130,6 +152,8 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
               value={inputValue}
               onChange={setInputValue}
               onSend={handleSend}
+              onSendImage={handleSendImage}
+              onSendFile={handleSendFile}
               disabled={!isConnected}
             />
           </div>
