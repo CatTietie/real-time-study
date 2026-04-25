@@ -1,27 +1,30 @@
 import { 
-  Card, 
-  Row, 
-  Col,
   Avatar, 
   Space, 
   Typography,
-  Progress,
-  List,
   Tag,
   message,
   Button,
+  Spin,
 } from "antd";
 import { 
   UserOutlined,
   FireOutlined,
-  TeamOutlined,
   EditOutlined,
+  ReloadOutlined,
+  ArrowRightOutlined,
+  MessageOutlined,
+  HeartOutlined,
+  EyeOutlined,
+  CalendarOutlined,
+  TrophyOutlined,
 } from "@ant-design/icons";
 import { useEffect, useState } from "react";
 import { useAppSelector } from "../../app/hooks";
 import type { RootState } from "../../app/store";
 import api from "../../services/api";
 import { useNavigate } from "react-router-dom";
+import "../../styles/student-dashboard.css";
 
 interface UserProfile {
   id: number;
@@ -40,27 +43,29 @@ interface UserProfile {
   status: number;
 }
 
+interface PostItem {
+  id: number;
+  title: string;
+  created_at: string;
+  view_count: number;
+  comment_count: number;
+  like_count: number;
+  is_top: boolean;
+  publish_status: number;
+}
+
 const { Title, Text } = Typography;
 
 export default function StudentDashboard() {
-  console.log('=== Dashboard 组件开始执行 ===');
-  
   const authState = useAppSelector((state: RootState) => state.auth);
   const { username, nickname, userId } = authState;
   
-  console.log('完整的 auth state:', authState);
-  console.log('提取的变量:', { username, nickname, userId });
-  
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [userPosts, setUserPosts] = useState<Array<Record<string, unknown>>>([]);
+  const [userPosts, setUserPosts] = useState<PostItem[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
   const navigate = useNavigate();
   
-  // 调试信息
-  console.log('Dashboard 组件渲染:', { username, nickname, userId, userProfile, loading });
-  
-  // 默认数据（仅用于加载失败降级，字段必须与数据库一致）
   const defaultStatsData = {
     points: 0,
     level: 1,
@@ -70,89 +75,64 @@ export default function StudentDashboard() {
     rank: 1
   };
 
-  // 使用真实数据或默认数据
   const statsData = userProfile || defaultStatsData;
 
-
-  // 获取用户资料数据
   useEffect(() => {
-    console.log('=== Dashboard useEffect 执行 ===');
-    console.log('当前 userId:', userId);
-    console.log('当前 userProfile:', userProfile);
-    
     const fetchUserProfile = async () => {
-      // 确保 userId 存在且有效
       if (!userId || userId <= 0) {
-        console.warn('❌ 用户ID无效:', userId);
         setLoading(false);
         return;
       }
       
       try {
-        console.log('🚀 开始调用 API 获取用户资料，userId:', userId);
         setLoading(true);
         const response = await api.get(`/user/profile/${userId}`);
-        console.log('✅ API响应成功:', response);
-        
         if (response.data.success) {
-          console.log('✅ 获取用户资料成功:', response.data.data);
           setUserProfile(response.data.data);
         } else {
           throw new Error(response.data.message || '获取用户资料失败');
         }
       } catch (error) {
-        console.error('❌ 获取用户资料失败:', error);
+        console.error('获取用户资料失败:', error);
         message.error('获取用户资料失败，显示默认数据');
-        // 使用默认数据
         setUserProfile(null);
       } finally {
         setLoading(false);
       }
     };
 
-    console.log('🔍 触发数据获取...');
     fetchUserProfile();
     
-    // 添加定时刷新机制（每30秒刷新一次）
     const intervalId = setInterval(() => {
-      console.log('⏰ 定时刷新用户数据');
       fetchUserProfile();
     }, 30000);
     
-    // 清理定时器
     return () => {
       clearInterval(intervalId);
     };
   }, [userId]);
 
-  // 今日目标进度状态
   const [todayGoals, setTodayGoals] = useState({
     posts: 0,
     comments: 0,
     likes: 0,
-    hotPosts: 0 // 热榜帖子目标
+    hotPosts: 0
   });
 
-  // 目标值配置（从学习目标获取）
   const [GOAL_CONFIG, setGoalConfig] = useState({
-    posts: 3,      // 发帖目标
-    comments: 20,  // 评论目标
-    likes: 50,     // 点赞目标
-    hotPosts: 1    // 热榜帖子目标
+    posts: 3,
+    comments: 20,
+    likes: 50,
+    hotPosts: 1
   });
 
-  // Displayed username and nickname
   const displayName = userProfile?.nickname || nickname || username || "学生用户";
   const displayUsername = userProfile?.username || username || "student_user";
   
-  // 计算目标进度百分比
   const getGoalProgress = (current: number, target: number) => {
     return Math.min(100, Math.round((current / target) * 100));
   };
   
-  // 不再需要初始化浏览记录，使用真实数据
-  
-  // 获取用户学习目标配置
   useEffect(() => {
     const fetchLearningGoals = async () => {
       if (!userId) return;
@@ -164,20 +144,18 @@ export default function StudentDashboard() {
           setGoalConfig({
             posts: goals.goal_posts,
             comments: goals.goal_comments,
-            likes: 50, // 点赞目标暂时固定
+            likes: 50,
             hotPosts: goals.goal_hot_posts
           });
         }
       } catch (error) {
         console.error('获取学习目标配置失败:', error);
-        // 使用默认值
       }
     };
     
     fetchLearningGoals();
   }, [userId]);
 
-  // 更新今日目标数据（包括热榜帖子数量）
   useEffect(() => {
     if (userProfile) {
       setTodayGoals(prev => ({
@@ -190,13 +168,6 @@ export default function StudentDashboard() {
     }
   }, [userProfile]);
   
-  // 不再需要保存浏览记录到localStorage，使用真实数据
-  
-  // 调试：打印实际使用的数据
-  console.log('显示数据:', { displayName, displayUsername, statsData });
-
-  
-  // 获取用户发布的帖子
   const fetchUserPosts = async () => {
     if (!userId) return;
     
@@ -213,353 +184,357 @@ export default function StudentDashboard() {
     }
   };
   
-  // 当用户资料加载完成后获取帖子
   useEffect(() => {
     if (userProfile?.id) {
       fetchUserPosts();
     }
   }, [userProfile?.id]);
 
-  console.log('=== 开始渲染 Dashboard JSX ===');
-  console.log('statsData 内容:', statsData);
-  
+  const handleRefresh = async () => {
+    setLoading(true);
+    try {
+      const response = await api.get(`/user/profile/${userId}`);
+      if (response.data.success) {
+        setUserProfile(response.data.data);
+        message.success('数据已刷新');
+      }
+    } catch (_err) {
+      message.error('刷新失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getLevelProgress = (level: number) => {
+    const basePoints = (level - 1) * 100;
+    const currentPoints = statsData.points - basePoints;
+    const nextLevelPoints = level * 100;
+    const progressPoints = nextLevelPoints - basePoints;
+    return Math.min(100, Math.round((currentPoints / progressPoints) * 100));
+  };
+
+  const navItems = [
+    { icon: '🏠', label: '个人中心', active: true },
+    { icon: '📊', label: '学习数据', onClick: () => navigate('/student/analytics') },
+    { icon: '📚', label: '自习室', onClick: () => navigate('/student/study-rooms') },
+    { icon: '🎯', label: '我的预约', onClick: () => navigate('/student/reservations') },
+    { icon: '💬', label: '社区广场', onClick: () => navigate('/community') },
+  ];
+
+  const goalItems = [
+    {
+      key: 'posts',
+      icon: '📝',
+      name: '发帖任务',
+      color: 'blue' as const,
+      current: todayGoals.posts,
+      target: GOAL_CONFIG.posts,
+      unit: '篇'
+    },
+    {
+      key: 'comments',
+      icon: '💬',
+      name: '评论任务',
+      color: 'green' as const,
+      current: todayGoals.comments,
+      target: GOAL_CONFIG.comments,
+      unit: '条'
+    },
+    {
+      key: 'likes',
+      icon: '❤️',
+      name: '获得点赞',
+      color: 'yellow' as const,
+      current: todayGoals.likes,
+      target: GOAL_CONFIG.likes,
+      unit: '次'
+    },
+    {
+      key: 'hotPosts',
+      icon: '🔥',
+      name: '热榜任务',
+      color: 'pink' as const,
+      current: todayGoals.hotPosts,
+      target: GOAL_CONFIG.hotPosts,
+      unit: '篇'
+    }
+  ];
+
+  const totalCompleted = goalItems.filter(item => item.current >= item.target).length;
+
+  if (loading) {
+    return (
+      <div className="student-dashboard" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
+
   return (
     <div className="student-dashboard">
-      {/* Personal Info Header */}
-      {/* Personal Info Header */}
-      <Card className="profile-header">
-        <Row align="middle" gutter={24}>
-          <Col>
-            <Avatar 
-              size={80} 
-              icon={<UserOutlined />} 
-            />
-          </Col>
-          <Col flex="1">
-            <Space direction="vertical">
-              <Title level={3} style={{ margin: 0 }}>
-                {displayName}
-                <EditOutlined 
-                  style={{ fontSize: 16, color: '#1890ff', marginLeft: 12, cursor: 'pointer' }}
-                  onClick={() => navigate('/student/profile')} 
-                />
-              </Title>
-              <Text type="secondary">@{displayUsername}</Text>
-              <Text type="secondary">Lv.{statsData.level || 1} 学习者</Text>
-              <Button 
-                type="link" 
-                icon={<EditOutlined />}
-                onClick={() => navigate('/student/profile')}
-                style={{ padding: 0, fontSize: 14 }}
-              >
-                个人设置
-              </Button>
-              <Space size="large">
-                <Text>社区积分：<Text strong>{statsData.points}</Text></Text>
-                <Text>等级：<Text strong>Lv.{statsData.level}</Text></Text>
-                <Text>排名：<Text strong>第{statsData.rank}名</Text></Text>
-              </Space>
-            </Space>
-          </Col>
-          <Col>
-            <div className="level-badge">
-              <FireOutlined style={{ fontSize: 24, color: "#faad14" }} />
-              <Text strong>Lv.{statsData.level || 1}</Text>
-            </div>
-          </Col>
-        </Row>
-      </Card>
-
-      {/* 主要内容区域 - 左右分区布局 */}
-      <Row gutter={24} style={{ marginTop: 24 }}>
-        {/* 左侧：今日目标进度 */}
-        <Col span={10}>
-          <Card 
-            title={
-              <span style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                background: 'linear-gradient(90deg, #1890ff, #52c41a)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                fontWeight: 'bold',
-                fontSize: '18px'
-              }}>
-                <FireOutlined />
-                今日目标进度
-                <Button 
-                  type="link" 
-                  size="small" 
-                  onClick={async () => {
-                    console.log('手动刷新用户数据');
-                    setLoading(true);
-                    try {
-                      const response = await api.get(`/user/profile/${userId}`);
-                      if (response.data.success) {
-                        setUserProfile(response.data.data);
-                        message.success('数据已刷新');
-                      }
-                    } catch (_err) {
-                      message.error('刷新失败');
-                    } finally {
-                      setLoading(false);
-                    }
-                  }}
-                  style={{ padding: '0 8px', fontSize: 12 }}
+      <div className="dashboard-container">
+        {/* 左侧导航栏 */}
+        <div className="dashboard-sidebar">
+          <div className="sidebar-nav-card">
+            <div className="sidebar-nav-title">功能导航</div>
+            <div className="sidebar-nav-list">
+              {navItems.map((item, index) => (
+                <div
+                  key={index}
+                  className={`sidebar-nav-item ${item.active ? 'active' : ''}`}
+                  onClick={item.onClick}
                 >
-                  🔄 刷新
-                </Button>
-              </span>
-            }
-            style={{ height: '100%' }}
-          >
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: '1fr 1fr', 
-              gridTemplateRows: '1fr 1fr',
-              gap: 16,
-              height: '100%'
-            }}>
-              {/* 发帖目标 */}
-              <div style={{
-                background: '#e6f7ff',
-                padding: '12px',
-                borderRadius: 8,
-                border: '1px solid #91d5ff',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 16 }}>📝</span>
-                  <span style={{ fontWeight: 600, color: '#1890ff', fontSize: 14 }}>发帖任务</span>
+                  <span className="sidebar-nav-item-icon">{item.icon}</span>
+                  <span>{item.label}</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-                    {todayGoals.posts}/{GOAL_CONFIG.posts}
-                  </span>
-                  <span style={{ fontSize: 12, color: '#1890ff' }}>
-                    {getGoalProgress(todayGoals.posts, GOAL_CONFIG.posts)}%
-                  </span>
-                </div>
-                <Progress 
-                  percent={getGoalProgress(todayGoals.posts, GOAL_CONFIG.posts)} 
-                  strokeColor="#1890ff"
-                  showInfo={false}
-                  size="small"
-                />
-              </div>
-
-              {/* 评论目标 */}
-              <div style={{
-                background: '#f6ffed',
-                padding: '12px',
-                borderRadius: 8,
-                border: '1px solid #b7eb8f',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 16 }}>💬</span>
-                  <span style={{ fontWeight: 600, color: '#52c41a', fontSize: 14 }}>评论任务</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 18, fontWeight: 700, color: '#52c41a' }}>
-                    {todayGoals.comments}/{GOAL_CONFIG.comments}
-                  </span>
-                  <span style={{ fontSize: 12, color: '#52c41a' }}>
-                    {getGoalProgress(todayGoals.comments, GOAL_CONFIG.comments)}%
-                  </span>
-                </div>
-                <Progress 
-                  percent={getGoalProgress(todayGoals.comments, GOAL_CONFIG.comments)} 
-                  strokeColor="#52c41a"
-                  showInfo={false}
-                  size="small"
-                />
-              </div>
-
-              {/* 点赞目标 */}
-              <div style={{
-                background: '#fffbe6',
-                padding: '12px',
-                borderRadius: 8,
-                border: '1px solid #ffe58f',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 16 }}>❤️</span>
-                  <span style={{ fontWeight: 600, color: '#faad14', fontSize: 14 }}>点赞任务</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 18, fontWeight: 700, color: '#faad14' }}>
-                    {todayGoals.likes}/{GOAL_CONFIG.likes}
-                  </span>
-                  <span style={{ fontSize: 12, color: '#faad14' }}>
-                    {getGoalProgress(todayGoals.likes, GOAL_CONFIG.likes)}%
-                  </span>
-                </div>
-                <Progress 
-                  percent={getGoalProgress(todayGoals.likes, GOAL_CONFIG.likes)} 
-                  strokeColor="#faad14"
-                  showInfo={false}
-                  size="small"
-                />
-              </div>
-
-              {/* 热榜任务目标 */}
-              <div style={{
-                background: '#fff0f6',
-                padding: '12px',
-                borderRadius: 8,
-                border: '1px solid #ffadd2',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 16 }}>🔥</span>
-                  <span style={{ fontWeight: 600, color: '#eb2f96', fontSize: 14 }}>热榜任务</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 18, fontWeight: 700, color: '#eb2f96' }}>
-                    {todayGoals.hotPosts}/{GOAL_CONFIG.hotPosts}
-                  </span>
-                  <span style={{ fontSize: 12, color: '#eb2f96' }}>
-                    {getGoalProgress(todayGoals.hotPosts, GOAL_CONFIG.hotPosts)}%
-                  </span>
-                </div>
-                <Progress 
-                  percent={getGoalProgress(todayGoals.hotPosts, GOAL_CONFIG.hotPosts)} 
-                  strokeColor="#eb2f96"
-                  showInfo={false}
-                  size="small"
-                />
-                <div>
-                  <Text type="secondary" style={{ fontSize: 10, display: 'block', marginBottom: 4 }}>
-                    帖子进入热榜前十
-                  </Text>
-                  <Button 
-                    size="small" 
-                    type="primary" 
-                    ghost
-                    style={{ padding: '0 8px', fontSize: 10, height: 20 }}
-                    onClick={() => navigate('/community/leaderboard')}
-                  >
-                    查看热榜
-                  </Button>
-                </div>
-              </div>
+              ))}
             </div>
-          </Card>
-        </Col>
-
-        {/* 右侧：用户帖子列表 */}
-        <Col span={14}>
-          <Card 
-            title={
-              <span style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                background: 'linear-gradient(90deg, #722ed1, #eb2f96)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                fontWeight: 'bold',
-                fontSize: '18px'
-              }}>
-                <TeamOutlined />
-                我的帖子
-              </span>
-            }
-            extra={
-              <Button 
-                type="link" 
-                onClick={() => navigate('/community/posts')} 
-                style={{ padding: 0 }}
-              >
-                查看全部
-              </Button>
-            }
-            style={{ height: '100%' }}
-          >
-            <List
-              loading={postsLoading}
-              dataSource={userPosts}
-              renderItem={(post: Record<string, unknown>) => (
-                <List.Item 
-                  style={{ 
-                    padding: '12px 0', 
-                    borderBottom: '1px solid #f0f0f0',
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => navigate(`/community/posts/${post.id}`)}
-                >
-                  <List.Item.Meta
-                    title={
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Text strong style={{ fontSize: 14 }}>{post.title}</Text>
-                        {post.is_top && (
-                          <Tag color="red" style={{ fontSize: 10, padding: '0 4px' }}>置顶</Tag>
-                        )}
-                      </div>
-                    }
-                    description={
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          📅 {new Date(post.created_at).toLocaleDateString()}
-                        </Text>
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          👁️ {post.view_count || 0}
-                        </Text>
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          💬 {post.comment_count || 0}
-                        </Text>
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          ❤️ {post.like_count || 0}
-                        </Text>
-                        <Tag color={post.publish_status === 1 ? 'green' : 'orange'} style={{ fontSize: 10 }}>
-                          {post.publish_status === 1 ? '已发布' : '草稿'}
-                        </Tag>
-                      </div>
-                    }
-                  />
-                </List.Item>
-              )}
-              locale={{ emptyText: '暂无帖子' }}
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      {/* 底部激励信息 */}
-      <Card 
-        style={{ marginTop: 24, background: 'linear-gradient(135deg, #f0f5ff 0%, #e6fffb 100%)' }}
-        bodyStyle={{ padding: '16px 24px' }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-          <FireOutlined style={{ fontSize: 20, color: '#1890ff' }} />
-          <Text style={{ fontSize: 16 }}>
-            <span style={{ color: '#1890ff', fontWeight: 500 }}>🎯 今日目标：</span>
-            已完成 
-            <span style={{ color: '#52c41a', fontWeight: 600, fontSize: 18 }}>
-              {todayGoals.posts + todayGoals.comments + todayGoals.likes + todayGoals.hotPosts}
-            </span> 
-            项任务，继续加油！
-          </Text>
-          <Button 
-            type="primary" 
-            size="small"
-            onClick={() => navigate('/community/publish')}
-          >
-            去发帖
-          </Button>
+          </div>
         </div>
-      </Card>
+
+        {/* 右侧内容区 */}
+        <div className="dashboard-content">
+          {/* 顶部信息卡 */}
+          <div className="profile-header-card">
+            <div className="profile-header-decor"></div>
+            <div className="profile-header-decor-2"></div>
+            <div className="profile-header-content">
+              <div className="profile-header-left">
+                <div className="profile-avatar-wrapper">
+                  <Avatar
+                    size={96}
+                    src={userProfile?.avatar}
+                    icon={<UserOutlined />}
+                    className="profile-avatar"
+                  />
+                </div>
+                <div className="profile-info">
+                  <div className="profile-name">
+                    {displayName}
+                    <button
+                      className="profile-edit-btn"
+                      onClick={() => navigate('/student/profile')}
+                    >
+                      <EditOutlined /> 编辑资料
+                    </button>
+                  </div>
+                  <div className="profile-username">@{displayUsername}</div>
+                  <div className="profile-stats">
+                    <div className="profile-stat-item">
+                      <span className="profile-stat-label">社区积分</span>
+                      <span className="profile-stat-value">{statsData.points}</span>
+                    </div>
+                    <div className="profile-stat-item">
+                      <span className="profile-stat-label">当前等级</span>
+                      <span className="profile-stat-value">Lv.{statsData.level}</span>
+                    </div>
+                    <div className="profile-stat-item">
+                      <span className="profile-stat-label">社区排名</span>
+                      <span className="profile-stat-value">第{statsData.rank}名</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="profile-header-right">
+                <div className="level-badge">
+                  <div className="level-icon">
+                    <FireOutlined />
+                  </div>
+                  <div className="level-info">
+                    <div className="level-text">Lv.{statsData.level || 1}</div>
+                    <div className="level-label">学习者等级</div>
+                  </div>
+                </div>
+                <div className="level-progress-wrapper">
+                  <div className="level-progress-bar">
+                    <div
+                      className="level-progress-fill"
+                      style={{ width: `${getLevelProgress(statsData.level)}%` }}
+                    />
+                  </div>
+                  <div className="level-progress-text">
+                    <span>距离下一等级</span>
+                    <span>{Math.max(0, statsData.level * 100 - statsData.points)} 积分</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 今日目标 */}
+          <div className="dashboard-card">
+            <div className="dashboard-card-header">
+              <div className="dashboard-card-title">
+                <div
+                  className="dashboard-card-title-icon"
+                  style={{
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: '#fff'
+                  }}
+                >
+                  🎯
+                </div>
+                <span>今日目标进度</span>
+              </div>
+              <button
+                className="refresh-btn"
+                onClick={handleRefresh}
+                disabled={loading}
+              >
+                <ReloadOutlined /> 刷新数据
+              </button>
+            </div>
+            <div className="dashboard-card-body">
+              <div className="goals-grid">
+                {goalItems.map((goal) => (
+                  <div
+                    key={goal.key}
+                    className={`goal-card ${goal.color}`}
+                  >
+                    <div className="goal-header">
+                      <div className="goal-title">
+                        <div className={`goal-icon ${goal.color}`}>
+                          {goal.icon}
+                        </div>
+                        <span className="goal-name">{goal.name}</span>
+                      </div>
+                      <div className="goal-numbers">
+                        <span className={`goal-current ${goal.color}`}>
+                          {goal.current}
+                        </span>
+                        <span className="goal-target">/ {goal.target} {goal.unit}</span>
+                      </div>
+                    </div>
+                    <div className="goal-progress-wrapper">
+                      <div className="goal-progress-bar">
+                        <div
+                          className={`goal-progress-fill ${goal.color}`}
+                          style={{ width: `${getGoalProgress(goal.current, goal.target)}%` }}
+                        />
+                      </div>
+                      <div className="goal-progress-text">
+                        <span>完成进度</span>
+                        <span className={`goal-progress-percent ${goal.color}`}>
+                          {getGoalProgress(goal.current, goal.target)}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* 我的帖子 */}
+          <div className="dashboard-card">
+            <div className="dashboard-card-header">
+              <div className="dashboard-card-title">
+                <div
+                  className="dashboard-card-title-icon"
+                  style={{
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                    color: '#fff'
+                  }}
+                >
+                  📝
+                </div>
+                <span>我的帖子</span>
+              </div>
+              <span
+                className="view-all-btn"
+                onClick={() => navigate('/community/posts')}
+              >
+                查看全部 <ArrowRightOutlined />
+              </span>
+            </div>
+            <div className="dashboard-card-body">
+              {postsLoading ? (
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                  <Spin />
+                </div>
+              ) : userPosts.length > 0 ? (
+                <div className="posts-list">
+                  {userPosts.map((post) => (
+                    <div
+                      key={post.id}
+                      className="post-item-card"
+                      onClick={() => navigate(`/community/posts/${post.id}`)}
+                    >
+                      <div className="post-header">
+                        <div className="post-title">
+                          <span className="post-title-text">{post.title}</span>
+                        </div>
+                        <div className="post-tags">
+                          {post.is_top && (
+                            <span className="post-tag top">置顶</span>
+                          )}
+                          <span className={`post-tag ${post.publish_status === 1 ? 'published' : 'draft'}`}>
+                            {post.publish_status === 1 ? '已发布' : '草稿'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="post-meta">
+                        <div className="post-meta-item">
+                          <CalendarOutlined className="post-meta-icon" />
+                          <span className="post-meta-value">
+                            {new Date(post.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <div className="post-meta-item">
+                          <EyeOutlined className="post-meta-icon" />
+                          <span className="post-meta-value">{post.view_count || 0}</span>
+                        </div>
+                        <div className="post-meta-item">
+                          <MessageOutlined className="post-meta-icon" />
+                          <span className="post-meta-value">{post.comment_count || 0}</span>
+                        </div>
+                        <div className="post-meta-item">
+                          <HeartOutlined className="post-meta-icon" />
+                          <span className="post-meta-value">{post.like_count || 0}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="posts-empty">
+                  <div className="posts-empty-icon">📭</div>
+                  <div className="posts-empty-text">暂无帖子，快去发布你的第一篇帖子吧！</div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 底部CTA卡片 */}
+          <div className="cta-card">
+            <div className="cta-content">
+              <div className="cta-icon">
+                🚀
+              </div>
+              <div className="cta-text">
+                <div className="cta-title">开始你的学习之旅</div>
+                <div className="cta-description">
+                  分享学习心得，参与社区讨论，与同学们一起成长进步
+                </div>
+                <div className="cta-highlight">
+                  <TrophyOutlined style={{ color: '#fbbf24', fontSize: 18 }} />
+                  <span className="cta-highlight-number">{totalCompleted}</span>
+                  <span className="cta-highlight-text">/ 4 个目标已完成</span>
+                </div>
+              </div>
+            </div>
+            <div className="cta-button-wrapper">
+              <button
+                className="cta-button"
+                onClick={() => navigate('/community/publish')}
+              >
+                <EditOutlined className="cta-button-icon" />
+                去发帖
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
