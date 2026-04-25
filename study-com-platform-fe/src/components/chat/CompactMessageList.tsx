@@ -108,15 +108,28 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
       {/* 顶部历史消息按钮 */}
       {totalMessageCount > 4 && (
         <div style={{ 
-          padding: '8px 12px', 
+          padding: '12px 16px', 
           borderBottom: '1px solid #f0f0f0',
-          backgroundColor: '#fafafa'
+          background: 'linear-gradient(90deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%)',
+          borderRadius: '12px',
+          margin: '8px'
         }}>
           <Button 
-            type="link" 
+            type="primary" 
             icon={<HistoryOutlined />}
             onClick={() => setShowHistoryModal(true)}
-            style={{ padding: 0, height: 'auto' }}
+            style={{ 
+              padding: '8px 20px', 
+              height: 'auto',
+              borderRadius: '12px',
+              background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+              border: 'none',
+              boxShadow: '0 4px 15px rgba(102, 126, 234, 0.3)',
+              transition: 'all 0.3s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
           >
             查看历史消息 ({totalMessageCount}条)
           </Button>
@@ -127,9 +140,12 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
       <div style={{ 
         flex: 1, 
         overflowY: 'auto', 
-        padding: '12px',
+        padding: '16px',
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        background: 'linear-gradient(180deg, rgba(248, 250, 252, 0.8) 0%, rgba(237, 242, 247, 0.8) 100%)',
+        borderRadius: '16px',
+        margin: '8px'
       }}>
         {loading ? (
           <div style={{ 
@@ -146,9 +162,14 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
             justifyContent: 'center', 
             alignItems: 'center', 
             flex: 1,
-            color: '#999'
+            color: '#a0aec0',
+            fontSize: '16px',
+            flexDirection: 'column',
+            gap: '8px'
           }}>
-            暂无消息
+            <div style={{ fontSize: '48px', marginBottom: '8px' }}>💬</div>
+            <div>暂无消息</div>
+            <div style={{ fontSize: '12px', color: '#cbd5e0' }}>开始发送第一条消息吧</div>
           </div>
         ) : (
           <>
@@ -156,18 +177,22 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
               <div 
                 key={message.id} 
                 style={{ 
-                  marginBottom: '12px',
+                  marginBottom: '16px',
                   textAlign: isSystemMessage(message) ? 'center' : 
-                           message.user_id === currentUserId ? 'right' : 'left'
+                           message.user_id === currentUserId ? 'right' : 'left',
+                  transition: 'all 0.3s ease'
                 }}
+                className="message-item"
               >
                 {/* 发送人信息 */}
                 {!isSystemMessage(message) && (
                   <div style={{ 
                     fontSize: '12px', 
-                    color: '#888', 
-                    marginBottom: '2px',
-                    textAlign: message.user_id === currentUserId ? 'right' : 'left'
+                    color: '#718096', 
+                    marginBottom: '4px',
+                    textAlign: message.user_id === currentUserId ? 'right' : 'left',
+                    fontWeight: '500',
+                    letterSpacing: '0.5px'
                   }}>
                     {getMessageSenderName(message)}
                   </div>
@@ -177,25 +202,46 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
                 <div style={{ 
                   display: 'inline-block',
                   maxWidth: '80%',
-                  padding: '8px 12px',
-                  borderRadius: '12px',
-                  backgroundColor: isSystemMessage(message) ? '#f0f0f0' : 
-                                 message.user_id === currentUserId ? '#1890ff' : '#fff',
+                  padding: '12px 16px',
+                  borderRadius: '16px',
+                  backgroundColor: isSystemMessage(message) ? 'rgba(240, 240, 240, 0.9)' : 
+                                 message.user_id === currentUserId ? 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)' : 'rgba(255, 255, 255, 0.95)',
                   color: isSystemMessage(message) ? '#666' : 
-                        message.user_id === currentUserId ? '#fff' : '#333',
-                  border: isSystemMessage(message) ? 'none' : '1px solid #d9d9d9',
+                        message.user_id === currentUserId ? '#fff' : '#2d3748',
+                  border: isSystemMessage(message) ? 'none' : 
+                         message.user_id === currentUserId ? 'none' : '1px solid rgba(226, 232, 240, 0.8)',
                   wordWrap: 'break-word',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                }}>
+                  boxShadow: message.user_id === currentUserId 
+                    ? '0 4px 15px rgba(102, 126, 234, 0.3)' 
+                    : '0 2px 8px rgba(0, 0, 0, 0.06)',
+                  transition: 'all 0.3s ease',
+                  cursor: 'default',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.02)';
+                  e.currentTarget.style.boxShadow = message.user_id === currentUserId 
+                    ? '0 8px 25px rgba(102, 126, 234, 0.4)' 
+                    : '0 6px 20px rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.boxShadow = message.user_id === currentUserId 
+                    ? '0 4px 15px rgba(102, 126, 234, 0.3)' 
+                    : '0 2px 8px rgba(0, 0, 0, 0.06)';
+                }}
+                >
                   {message.content}
                 </div>
                 
                 {/* 发送时间 */}
                 <div style={{ 
                   fontSize: '11px', 
-                  color: '#999', 
-                  marginTop: '2px',
-                  textAlign: message.user_id === currentUserId ? 'right' : 'left'
+                  color: '#a0aec0', 
+                  marginTop: '4px',
+                  textAlign: message.user_id === currentUserId ? 'right' : 'left',
+                  fontWeight: '400'
                 }}>
                   {formatTime(message.created_at)}
                 </div>
@@ -215,6 +261,24 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
         footer={null}
         width={800}
         destroyOnClose
+        centered
+        styles={{
+          header: {
+            background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+            color: '#fff',
+            borderRadius: '16px 16px 0 0',
+            borderBottom: 'none',
+            padding: '16px 24px'
+          },
+          content: {
+            borderRadius: '16px',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15)',
+            overflow: 'hidden'
+          },
+          body: {
+            padding: '0'
+          }
+        }}
       >
         <div style={{ height: '60vh' }}>
           <EnhancedMessageList 
