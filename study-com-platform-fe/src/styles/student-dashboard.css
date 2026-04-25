@@ -2,92 +2,11 @@
 
 /* ========== 全局样式 ========== */
 .student-dashboard {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
-  padding: 24px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
 }
 
-/* ========== 主布局容器 ========== */
-.dashboard-container {
-  display: flex;
-  gap: 24px;
-  max-width: 1440px;
-  margin: 0 auto;
-}
-
-/* ========== 左侧导航栏 ========== */
-.dashboard-sidebar {
-  width: 260px;
-  flex-shrink: 0;
-}
-
-.sidebar-nav-card {
-  background: linear-gradient(145deg, #ffffff 0%, #fefefe 100%);
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 
-    0 2px 16px rgba(148, 163, 184, 0.08),
-    0 1px 4px rgba(148, 163, 184, 0.04);
-  padding: 20px;
-  position: sticky;
-  top: 24px;
-}
-
-.sidebar-nav-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #64748b;
-  padding: 8px 14px;
-  margin-bottom: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-}
-
-.sidebar-nav-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.sidebar-nav-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  color: #64748b;
-  font-size: 15px;
-  font-weight: 500;
-}
-
-.sidebar-nav-item:hover {
-  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-  color: #0284c7;
-  transform: translateX(6px);
-  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.15);
-}
-
-.sidebar-nav-item.active {
-  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
-  color: #ffffff;
-  box-shadow: 0 8px 24px rgba(14, 165, 233, 0.35);
-}
-
-.sidebar-nav-item-icon {
-  font-size: 20px;
-  width: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* ========== 右侧内容区 ========== */
+/* ========== 内容区 ========== */
 .dashboard-content {
-  flex: 1;
-  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 24px;

@@ -213,14 +213,6 @@ export default function StudentDashboard() {
     return Math.min(100, Math.round((currentPoints / progressPoints) * 100));
   };
 
-  const navItems = [
-    { icon: '🏠', label: '个人中心', active: true },
-    { icon: '📊', label: '学习数据', onClick: () => navigate('/student/analytics') },
-    { icon: '📚', label: '自习室', onClick: () => navigate('/student/study-rooms') },
-    { icon: '🎯', label: '我的预约', onClick: () => navigate('/student/reservations') },
-    { icon: '💬', label: '社区广场', onClick: () => navigate('/community') },
-  ];
-
   const goalItems = [
     {
       key: 'posts',
@@ -272,28 +264,7 @@ export default function StudentDashboard() {
 
   return (
     <div className="student-dashboard">
-      <div className="dashboard-container">
-        {/* 左侧导航栏 */}
-        <div className="dashboard-sidebar">
-          <div className="sidebar-nav-card">
-            <div className="sidebar-nav-title">功能导航</div>
-            <div className="sidebar-nav-list">
-              {navItems.map((item, index) => (
-                <div
-                  key={index}
-                  className={`sidebar-nav-item ${item.active ? 'active' : ''}`}
-                  onClick={item.onClick}
-                >
-                  <span className="sidebar-nav-item-icon">{item.icon}</span>
-                  <span>{item.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* 右侧内容区 */}
-        <div className="dashboard-content">
+      <div className="dashboard-content">
           {/* 顶部信息卡 */}
           <div className="profile-header-card">
             <div className="profile-header-decor"></div>
