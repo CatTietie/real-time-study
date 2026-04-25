@@ -1,0 +1,152 @@
+/* 学生端布局样式 - 现代清爽浅色渐变卡片风 */
+
+/* ========== 主布局容器 ========== */
+.student-layout {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
+}
+
+/* ========== 左侧导航栏 ========== */
+.student-layout-sider {
+  background: linear-gradient(145deg, #ffffff 0%, #fefefe 100%) !important;
+  box-shadow: 2px 0 16px rgba(148, 163, 184, 0.08) !important;
+  border-right: 1px solid rgba(226, 232, 240, 0.8) !important;
+}
+
+.student-layout-logo {
+  background: linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%) !important;
+  border-bottom: none !important;
+  margin: 12px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 16px rgba(14, 165, 233, 0.3) !important;
+}
+
+.student-layout-logo-text {
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  font-size: 16px !important;
+}
+
+/* ========== 菜单样式 ========== */
+.student-layout-menu {
+  background: transparent !important;
+  border-right: none !important;
+  padding: 8px 12px !important;
+}
+
+.student-layout-menu .ant-menu-item {
+  margin: 4px 0 !important;
+  border-radius: 12px !important;
+  padding: 0 16px !important;
+  height: 48px !important;
+  line-height: 48px !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  color: #64748b !important;
+  font-weight: 500 !important;
+  font-size: 14.5px !important;
+}
+
+.student-layout-menu .ant-menu-item:hover {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%) !important;
+  color: #0284c7 !important;
+  transform: translateX(4px) !important;
+}
+
+.student-layout-menu .ant-menu-item-selected {
+  background: linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%) !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  box-shadow: 0 4px 16px rgba(14, 165, 233, 0.35) !important;
+}
+
+.student-layout-menu .ant-menu-item .ant-menu-item-icon {
+  font-size: 18px !important;
+}
+
+.student-layout-menu .ant-menu-item-selected .ant-menu-item-icon {
+  color: #ffffff !important;
+}
+
+/* ========== 顶部导航栏 ========== */
+.student-layout-header {
+  background: linear-gradient(145deg, #ffffff 0%, #fafbfc 100%) !important;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.6) !important;
+  box-shadow: 0 2px 12px rgba(148, 163, 184, 0.04) !important;
+  padding: 0 24px !important;
+  height: 60px !important;
+  line-height: 60px !important;
+}
+
+.student-layout-header-title {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  color: #1e293b !important;
+}
+
+/* ========== 用户下拉菜单 ========== */
+.student-layout-user-menu {
+  background: linear-gradient(145deg, #ffffff 0%, #fefefe 100%) !important;
+  padding: 8px 14px !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(226, 232, 240, 0.6) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  cursor: pointer !important;
+}
+
+.student-layout-user-menu:hover {
+  background: linear-gradient(145deg, #f0f9ff 0%, #e0f2fe 100%) !important;
+  border-color: rgba(14, 165, 233, 0.3) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px rgba(14, 165, 233, 0.15) !important;
+}
+
+.student-layout-avatar {
+  background: linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%) !important;
+  border: 2px solid rgba(255, 255, 255, 0.8) !important;
+  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3) !important;
+}
+
+.student-layout-username {
+  color: #334155 !important;
+  font-weight: 500 !important;
+  font-size: 14px !important;
+}
+
+/* ========== 内容区域 ========== */
+.student-layout-content-wrapper {
+  background: transparent !important;
+  padding: 20px 20px 20px 20px !important;
+}
+
+.student-layout-content-card {
+  background: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 0 !important;
+  min-height: auto !important;
+}
+
+/* ========== 响应式设计 ========== */
+@media (max-width: 1200px) {
+  .student-layout-sider {
+    position: relative !important;
+    height: auto !important;
+  }
+}
+
+/* ========== 动画效果 ========== */
+@keyframes fadeInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.student-layout-sider {
+  animation: fadeInLeft 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
