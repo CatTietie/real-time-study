@@ -1,24 +1,15 @@
-// 验证工具
-export const validateEmail = (email: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
-
-export const validatePassword = (password: string): boolean => {
-  return password.length >= 8;
-};
-
-export interface PasswordStrengthResult {
-  isValid: boolean;
+export interface PasswordStrength {
   score: number;
   label: string;
+  color: string;
+  isValid: boolean;
   requirements: {
     met: boolean;
     text: string;
   }[];
 }
 
-export const getPasswordStrength = (password: string): PasswordStrengthResult => {
+export const getPasswordStrength = (password: string): PasswordStrength => {
   const requirements = [
     { met: password.length >= 8, text: "至少8个字符" },
     { met: /[A-Z]/.test(password), text: "包含大写字母" },
@@ -31,36 +22,40 @@ export const getPasswordStrength = (password: string): PasswordStrengthResult =>
   
   let score = 0;
   let label = "弱";
+  let color = "#ff4d4f";
 
   if (metCount >= 5) {
     score = 100;
     label = "非常强";
+    color = "#52c41a";
   } else if (metCount >= 4) {
     score = 80;
     label = "强";
+    color = "#73d13d";
   } else if (metCount >= 3) {
     score = 60;
     label = "中等";
+    color = "#faad14";
   } else if (metCount >= 2) {
     score = 40;
     label = "弱";
+    color = "#fa8c16";
   } else {
     score = 20;
     label = "非常弱";
+    color = "#ff4d4f";
   }
 
-  const unmetRequirements = requirements.filter(r => !r.met);
   const isValid = metCount >= 3;
 
-  return { 
-    isValid, 
-    score, 
-    label, 
-    requirements 
-  };
+  return { score, label, color, isValid, requirements };
 };
 
 export const validatePasswordStrength = (password: string): { isValid: boolean; message: string } => {
+  if (!password) {
+    return { isValid: true, message: "密码为空，不进行修改" };
+  }
+
   const result = getPasswordStrength(password);
   
   if (!result.isValid) {
@@ -73,17 +68,4 @@ export const validatePasswordStrength = (password: string): { isValid: boolean; 
   }
   
   return { isValid: true, message: "密码强度符合要求" };
-};
-
-export const validateUsername = (username: string): boolean => {
-  return username.length >= 3 && username.length <= 20;
-};
-
-export const validateURL = (url: string): boolean => {
-  try {
-    new URL(url);
-    return true;
-  } catch {
-    return false;
-  }
 };
