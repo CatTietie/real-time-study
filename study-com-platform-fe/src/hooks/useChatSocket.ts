@@ -140,13 +140,30 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
   }, [roomId, socket, isConnected, userId, username, nickname]);
 
   // 发送普通消息
-  const sendMessage = useCallback((content: string, messageType: string = 'text') => {
+  const sendMessage = useCallback((
+    content: string, 
+    messageType: 'text' | 'image' | 'file' = 'text',
+    extraData?: {
+      file_name?: string;
+      file_size?: number;
+      file_url?: string;
+    }
+  ) => {
     if (socket && isConnected) {
-      socket.emit('send_chat_message', {
+      const messageData: any = {
         roomId,
         content,
         messageType
-      });
+      };
+      
+      // 添加额外的文件信息
+      if (extraData) {
+        if (extraData.file_name) messageData.file_name = extraData.file_name;
+        if (extraData.file_size) messageData.file_size = extraData.file_size;
+        if (extraData.file_url) messageData.file_url = extraData.file_url;
+      }
+      
+      socket.emit('send_chat_message', messageData);
     }
   }, [socket, isConnected, roomId]);
 
