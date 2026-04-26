@@ -36,7 +36,8 @@ import { ChatRoomSelector } from './ChatRoomSelector';
 import { useChatSocket } from '../../hooks/useChatSocket';
 import { useAppSelector } from '../../app/hooks';
 import type { ChatRoom, ChatMessage, AvailableUser } from '../../types/chat';
-import { forwardMessage, deleteMessage, getChatRooms, getImageBase64 } from '../../services/chat';
+import { forwardMessage, deleteMessage, getChatRooms, getImageBase64, uploadChatFile } from '../../services/chat';
+import type { PendingImage } from './MessageInput';
 
 type UserStatus = 'online' | 'away' | 'busy';
 
@@ -195,6 +196,21 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
       });
     }
   };
+
+  const handleSendImages = useCallback(async (images: PendingImage[]) => {
+    if (!isConnected || images.length === 0) return;
+
+    for (const image of images) {
+      try {
+        const result = await uploadChatFile(image.file);
+        handleSendImage(result.file_url, result.file_name, result.file_size);
+        message.success(`图片「${result.file_name}」发送成功`);
+      } catch (error) {
+        console.error('发送图片失败:', error);
+        message.error(`图片「${image.fileName}」发送失败，请重试`);
+      }
+    }
+  }, [isConnected, handleSendImage]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent, message: ChatMessage) => {
     e.preventDefault();
@@ -577,6 +593,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                 onSend={handleSend}
                 onSendImage={handleSendImage}
                 onSendFile={handleSendFile}
+                onSendImages={handleSendImages}
                 disabled={!isConnected}
                 inputRef={inputRef}
                 setInputRef={setInputRef}
