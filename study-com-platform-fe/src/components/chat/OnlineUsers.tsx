@@ -15,8 +15,7 @@ import {
   ReloadOutlined,
   LoadingOutlined,
   CheckCircleOutlined,
-  InfoCircleOutlined,
-  AtOutlined
+  InfoCircleOutlined
 } from '@ant-design/icons';
 import { getAvailableUsers, addUserToRoom } from '../../services/chat';
 import type { AvailableUser } from '../../types/chat';
@@ -363,7 +362,7 @@ export const OnlineUsers: React.FC<OnlineUsersProps> = ({
     const menuItems = [
       {
         key: 'mention',
-        icon: <AtOutlined style={{ color: '#667eea' }} />,
+        icon: <UserOutlined style={{ color: '#667eea' }} />,
         label: <span>@用户</span>,
         onClick: () => {
           if (onMentionUser) {

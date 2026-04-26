@@ -27,7 +27,7 @@ import {
   CopyOutlined,
   ShareAltOutlined,
   DeleteOutlined,
-  AtOutlined
+  UserOutlined
 } from '@ant-design/icons';
 import CompactMessageList from './CompactMessageList';
 import { MessageInput } from './MessageInput';
@@ -719,7 +719,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
               alignItems: 'center',
               gap: '6px'
             }}>
-              <AtOutlined />
+              <UserOutlined />
               <span>原消息内容：</span>
             </div>
             <div style={{
