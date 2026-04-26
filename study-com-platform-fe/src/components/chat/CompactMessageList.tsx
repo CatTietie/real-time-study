@@ -103,20 +103,186 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
     return displayName;
   };
 
+  // 格式化文件大小
+  const formatFileSize = (bytes: number): string => {
+    if (!bytes) return '未知大小';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  // 获取文件图标
+  const getFileIcon = (fileName: string): string => {
+    if (!fileName) return '📄';
+    const ext = fileName.split('.').pop()?.toLowerCase() || '';
+    const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'];
+    const docExts = ['doc', 'docx', 'pdf', 'txt', 'md'];
+    const videoExts = ['mp4', 'avi', 'mov', 'mkv', 'webm'];
+    const audioExts = ['mp3', 'wav', 'flac', 'aac', 'ogg'];
+    const zipExts = ['zip', 'rar', '7z', 'tar', 'gz'];
+    
+    if (imageExts.includes(ext)) return '🖼️';
+    if (docExts.includes(ext)) return '📄';
+    if (videoExts.includes(ext)) return '🎬';
+    if (audioExts.includes(ext)) return '🎵';
+    if (zipExts.includes(ext)) return '📦';
+    return '📄';
+  };
+
+  // 渲染消息内容
+  const renderMessageContent = (message: ChatMessage) => {
+    const isOwn = message.user_id === currentUserId;
+    
+    // 图片消息
+    if (message.message_type === 'image') {
+      return (
+        <div style={{
+          display: 'inline-block',
+          maxWidth: '280px',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          cursor: 'pointer',
+          position: 'relative'
+        }}>
+          <img 
+            src={message.file_url || message.content}
+            alt={message.file_name || '图片'}
+            style={{
+              maxWidth: '100%',
+              maxHeight: '200px',
+              borderRadius: '12px',
+              display: 'block',
+              objectFit: 'cover'
+            }}
+            onClick={() => {
+              // 点击图片可以预览
+              window.open(message.file_url || message.content, '_blank');
+            }}
+          />
+          {message.file_name && (
+            <div style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              background: 'linear-gradient(transparent, rgba(0,0,0,0.6))',
+              padding: '20px 12px 8px',
+              borderRadius: '0 0 12px 12px',
+              fontSize: '12px',
+              color: '#fff'
+            }}>
+              {message.file_name}
+              {message.file_size && (
+                <span style={{ opacity: 0.8, marginLeft: '8px' }}>
+                  {formatFileSize(message.file_size)}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    // 文件消息
+    if (message.message_type === 'file') {
+      return (
+        <a 
+          href={message.file_url || message.content}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '12px 16px',
+            background: isOwn 
+              ? 'rgba(255,255,255,0.15)' 
+              : 'rgba(102, 126, 234, 0.05)',
+            borderRadius: '12px',
+            textDecoration: 'none',
+            color: isOwn ? '#fff' : '#334155',
+            border: isOwn 
+              ? 'none' 
+              : '1px solid rgba(102, 126, 234, 0.2)',
+            transition: 'all 0.3s ease',
+            minWidth: '200px'
+          }}
+          onMouseEnter={(e) => {
+            if (!isOwn) {
+              e.currentTarget.style.background = 'rgba(102, 126, 234, 0.1)';
+              e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.3)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isOwn) {
+              e.currentTarget.style.background = 'rgba(102, 126, 234, 0.05)';
+              e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.2)';
+            }
+          }}
+        >
+          <div style={{
+            fontSize: '32px',
+            lineHeight: '1'
+          }}>
+            {getFileIcon(message.file_name || '')}
+          </div>
+          <div style={{
+            flex: 1,
+            minWidth: 0
+          }}>
+            <div style={{
+              fontWeight: '600',
+              fontSize: '14px',
+              marginBottom: '4px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}>
+              {message.file_name || '文件'}
+            </div>
+            <div style={{
+              fontSize: '12px',
+              opacity: 0.7
+            }}>
+              {formatFileSize(message.file_size || 0)}
+              <span style={{ marginLeft: '8px' }}>点击下载</span>
+            </div>
+          </div>
+        </a>
+      );
+    }
+    
+    // 文本消息（默认）
+    return <span>{message.content}</span>;
+  };
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* 顶部历史消息按钮 */}
       {totalMessageCount > 4 && (
         <div style={{ 
-          padding: '8px 12px', 
+          padding: '12px 16px', 
           borderBottom: '1px solid #f0f0f0',
-          backgroundColor: '#fafafa'
+          background: 'linear-gradient(90deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%)',
+          borderRadius: '12px',
+          margin: '8px'
         }}>
           <Button 
-            type="link" 
+            type="primary" 
             icon={<HistoryOutlined />}
             onClick={() => setShowHistoryModal(true)}
-            style={{ padding: 0, height: 'auto' }}
+            style={{ 
+              padding: '8px 20px', 
+              height: 'auto',
+              borderRadius: '12px',
+              background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+              border: 'none',
+              boxShadow: '0 4px 15px rgba(102, 126, 234, 0.3)',
+              transition: 'all 0.3s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
           >
             查看历史消息 ({totalMessageCount}条)
           </Button>
@@ -127,9 +293,14 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
       <div style={{ 
         flex: 1, 
         overflowY: 'auto', 
-        padding: '12px',
+        padding: '20px',
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        background: 'linear-gradient(180deg, rgba(226, 232, 240, 0.6) 0%, rgba(203, 213, 225, 0.6) 100%)',
+        borderRadius: '20px',
+        margin: '12px',
+        border: '1px solid rgba(160, 174, 192, 0.3)',
+        boxShadow: 'inset 0 2px 10px rgba(0, 0, 0, 0.03)'
       }}>
         {loading ? (
           <div style={{ 
@@ -146,9 +317,14 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
             justifyContent: 'center', 
             alignItems: 'center', 
             flex: 1,
-            color: '#999'
+            color: '#a0aec0',
+            fontSize: '16px',
+            flexDirection: 'column',
+            gap: '8px'
           }}>
-            暂无消息
+            <div style={{ fontSize: '48px', marginBottom: '8px' }}>💬</div>
+            <div>暂无消息</div>
+            <div style={{ fontSize: '12px', color: '#cbd5e0' }}>开始发送第一条消息吧</div>
           </div>
         ) : (
           <>
@@ -156,46 +332,96 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
               <div 
                 key={message.id} 
                 style={{ 
-                  marginBottom: '12px',
+                  marginBottom: '16px',
                   textAlign: isSystemMessage(message) ? 'center' : 
-                           message.user_id === currentUserId ? 'right' : 'left'
+                           message.user_id === currentUserId ? 'right' : 'left',
+                  transition: 'all 0.3s ease'
                 }}
+                className="message-item"
               >
                 {/* 发送人信息 */}
                 {!isSystemMessage(message) && (
                   <div style={{ 
                     fontSize: '12px', 
-                    color: '#888', 
-                    marginBottom: '2px',
-                    textAlign: message.user_id === currentUserId ? 'right' : 'left'
+                    color: '#718096', 
+                    marginBottom: '4px',
+                    textAlign: message.user_id === currentUserId ? 'right' : 'left',
+                    fontWeight: '500',
+                    letterSpacing: '0.5px'
                   }}>
                     {getMessageSenderName(message)}
                   </div>
                 )}
                 
                 {/* 消息内容 */}
-                <div style={{ 
-                  display: 'inline-block',
-                  maxWidth: '80%',
-                  padding: '8px 12px',
-                  borderRadius: '12px',
-                  backgroundColor: isSystemMessage(message) ? '#f0f0f0' : 
-                                 message.user_id === currentUserId ? '#1890ff' : '#fff',
-                  color: isSystemMessage(message) ? '#666' : 
-                        message.user_id === currentUserId ? '#fff' : '#333',
-                  border: isSystemMessage(message) ? 'none' : '1px solid #d9d9d9',
-                  wordWrap: 'break-word',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                }}>
-                  {message.content}
-                </div>
+                {message.message_type === 'image' || message.message_type === 'file' ? (
+                  // 图片/文件消息：不使用气泡背景
+                  <div style={{
+                    display: 'inline-block',
+                    maxWidth: '80%',
+                    transition: 'all 0.3s ease'
+                  }}>
+                    {renderMessageContent(message)}
+                  </div>
+                ) : (
+                  // 文本/系统消息：使用气泡背景
+                  <div style={{ 
+                    display: 'inline-block',
+                    maxWidth: '80%',
+                    padding: '12px 16px',
+                    borderRadius: '16px',
+                    background: isSystemMessage(message) 
+                      ? 'rgba(226, 232, 240, 0.9)'  // 系统消息：浅灰色背景
+                      : message.user_id === currentUserId 
+                        ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'  // 自己的消息：蓝紫渐变
+                        : 'rgba(255, 255, 255, 0.98)',  // 他人消息：白色背景
+                    color: isSystemMessage(message) 
+                      ? '#4a5568'  // 系统消息文字：深灰色
+                      : message.user_id === currentUserId 
+                        ? '#ffffff'  // 自己的消息文字：纯白色
+                        : '#1a202c',  // 他人消息文字：深黑色
+                    border: isSystemMessage(message) 
+                      ? 'none' 
+                      : message.user_id === currentUserId 
+                        ? 'none' 
+                        : '1px solid rgba(160, 174, 192, 0.5)',  // 他人消息：添加边框增加区分度
+                    wordWrap: 'break-word',
+                    boxShadow: message.user_id === currentUserId 
+                      ? '0 6px 20px rgba(102, 126, 234, 0.4)'  // 自己的消息：较深阴影
+                      : isSystemMessage(message)
+                        ? '0 2px 8px rgba(0, 0, 0, 0.05)'  // 系统消息：浅阴影
+                        : '0 3px 12px rgba(0, 0, 0, 0.08)',  // 他人消息：中等阴影
+                    transition: 'all 0.3s ease',
+                    cursor: 'default',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    fontWeight: '500',  // 增加字体粗细提高可读性
+                    lineHeight: '1.6'  // 增加行高提高可读性
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.02)';
+                    e.currentTarget.style.boxShadow = message.user_id === currentUserId 
+                      ? '0 8px 25px rgba(102, 126, 234, 0.4)' 
+                      : '0 6px 20px rgba(0, 0, 0, 0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.boxShadow = message.user_id === currentUserId 
+                      ? '0 4px 15px rgba(102, 126, 234, 0.3)' 
+                      : '0 2px 8px rgba(0, 0, 0, 0.06)';
+                  }}
+                  >
+                    {renderMessageContent(message)}
+                  </div>
+                )}
                 
                 {/* 发送时间 */}
                 <div style={{ 
                   fontSize: '11px', 
-                  color: '#999', 
-                  marginTop: '2px',
-                  textAlign: message.user_id === currentUserId ? 'right' : 'left'
+                  color: '#a0aec0', 
+                  marginTop: '4px',
+                  textAlign: message.user_id === currentUserId ? 'right' : 'left',
+                  fontWeight: '400'
                 }}>
                   {formatTime(message.created_at)}
                 </div>
@@ -215,6 +441,24 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
         footer={null}
         width={800}
         destroyOnClose
+        centered
+        styles={{
+          header: {
+            background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+            color: '#fff',
+            borderRadius: '16px 16px 0 0',
+            borderBottom: 'none',
+            padding: '16px 24px'
+          },
+          content: {
+            borderRadius: '16px',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15)',
+            overflow: 'hidden'
+          },
+          body: {
+            padding: '0'
+          }
+        }}
       >
         <div style={{ height: '60vh' }}>
           <EnhancedMessageList 
