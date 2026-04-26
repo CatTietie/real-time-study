@@ -3,6 +3,7 @@ import ChatRoom from "../models/chat-room.model";
 import ChatMessage from "../models/chat-message.model";
 import User from "../models/user.model";
 import { Op } from "sequelize";
+import { uploadChatFileToOss } from "../middlewares/upload.middleware";
 
 export const createChatRoom = async (req: Request, res: Response) => {
   try {
@@ -107,7 +108,7 @@ export const getOnlineUsers = async (req: Request, res: Response) => {
 export const getChatHistory = async (req: Request, res: Response) => {
   try {
     const { roomId } = req.params;
-    const { page = 1, limit = 50, beforeId } = req.query;
+    const { page = 1, limit = 50, beforeId, startTime, endTime } = req.query;
     
     // 验证房间是否存在
     const room = await ChatRoom.findByPk(roomId);
@@ -124,6 +125,16 @@ export const getChatHistory = async (req: Request, res: Response) => {
     // 如果提供了beforeId，则查询该ID之前的消息
     if (beforeId) {
       whereCondition.id = { [Op.lt]: Number(beforeId) };
+    }
+    
+    // 如果提供了时间范围，则按时间范围查询
+    if (startTime) {
+      whereCondition.created_at = whereCondition.created_at || {};
+      whereCondition.created_at[Op.gte] = new Date(String(startTime));
+    }
+    if (endTime) {
+      whereCondition.created_at = whereCondition.created_at || {};
+      whereCondition.created_at[Op.lte] = new Date(String(endTime));
     }
     
     // 查询消息
@@ -395,6 +406,199 @@ export const getAvailableUsers = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : "获取用户列表失败"
+    });
+  }
+};
+
+// 转发消息
+export const forwardMessage = async (req: Request, res: Response) => {
+  try {
+    const { messageId, targetRoomId } = req.body;
+    const userId = req.user?.id;
+    const username = req.user?.username;
+
+    if (!messageId || !targetRoomId) {
+      return res.status(400).json({
+        success: false,
+        message: "消息ID和目标房间ID不能为空"
+      });
+    }
+
+    // 查找原消息
+    const originalMessage = await ChatMessage.findByPk(messageId, {
+      include: [{
+        model: User,
+        attributes: ['id', 'username', 'nickname']
+      }]
+    });
+
+    if (!originalMessage) {
+      return res.status(404).json({
+        success: false,
+        message: "消息不存在"
+      });
+    }
+
+    // 验证目标房间是否存在
+    const targetRoom = await ChatRoom.findByPk(targetRoomId);
+    if (!targetRoom) {
+      return res.status(404).json({
+        success: false,
+        message: "目标聊天室不存在"
+      });
+    }
+
+    const originalMsgJson = originalMessage.toJSON() as any;
+    const originalUser = originalMsgJson.User;
+
+    // 构建转发内容
+    let forwardContent = '';
+    if (originalMsgJson.message_type === 'text') {
+      forwardContent = originalMsgJson.content;
+    } else if (originalMsgJson.message_type === 'image') {
+      forwardContent = originalMsgJson.file_url || originalMsgJson.content;
+    } else if (originalMsgJson.message_type === 'file') {
+      forwardContent = originalMsgJson.file_url || originalMsgJson.content;
+    }
+
+    // 创建新消息（转发标记）
+    const newMessage = await ChatMessage.create({
+      room_id: targetRoomId,
+      user_id: userId,
+      content: forwardContent,
+      message_type: originalMsgJson.message_type,
+      // 可以添加转发来源标记
+    });
+
+    const forwardedData = {
+      ...newMessage.toJSON(),
+      username: username,
+      user_id: userId,
+      created_at: new Date().toISOString(),
+      message_type: originalMsgJson.message_type,
+      file_name: originalMsgJson.file_name,
+      file_size: originalMsgJson.file_size,
+      file_url: originalMsgJson.file_url,
+      // 转发来源信息
+      forwarded_from: {
+        originalMessageId: originalMsgJson.id,
+        originalRoomId: originalMsgJson.room_id,
+        originalUserId: originalMsgJson.user_id,
+        originalUsername: originalUser?.username || `用户${originalMsgJson.user_id}`,
+        originalNickname: originalUser?.nickname
+      }
+    };
+
+    // TODO: 可以在这里通过 Socket 发送到目标房间
+    // 暂时只返回成功，前端可以在转发后刷新或跳转
+
+    res.json({
+      success: true,
+      message: "消息转发成功",
+      data: {
+        targetRoomId: targetRoomId,
+        targetRoomName: targetRoom.name,
+        forwardedMessage: forwardedData
+      }
+    });
+
+  } catch (error) {
+    console.error('转发消息失败:', error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "转发消息失败"
+    });
+  }
+};
+
+// 删除消息
+export const deleteMessage = async (req: Request, res: Response) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user?.id;
+
+    if (!messageId) {
+      return res.status(400).json({
+        success: false,
+        message: "消息ID不能为空"
+      });
+    }
+
+    // 查找消息
+    const message = await ChatMessage.findByPk(messageId);
+
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: "消息不存在"
+      });
+    }
+
+    // 检查权限：只能删除自己发送的消息
+    if (message.user_id !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "只能删除自己发送的消息"
+      });
+    }
+
+    // 删除消息
+    await message.destroy();
+
+    res.json({
+      success: true,
+      message: "消息删除成功",
+      data: {
+        messageId: message.id,
+        roomId: message.room_id
+      }
+    });
+
+  } catch (error) {
+    console.error('删除消息失败:', error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "删除消息失败"
+    });
+  }
+};
+
+// 聊天文件上传
+export const uploadFile = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "未授权访问"
+      });
+    }
+
+    // 上传文件到 OSS 或本地存储
+    const fileInfo = await uploadChatFileToOss(req);
+    
+    if (!fileInfo) {
+      return res.status(400).json({
+        success: false,
+        message: "请选择要上传的文件"
+      });
+    }
+
+    console.log(`✅ 文件上传成功: ${fileInfo.file_name} (${fileInfo.file_size} bytes)`);
+
+    res.json({
+      success: true,
+      message: "文件上传成功",
+      data: {
+        file_name: fileInfo.file_name,
+        file_url: fileInfo.file_url,
+        file_size: fileInfo.file_size,
+      }
+    });
+  } catch (error) {
+    console.error('文件上传失败:', error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "文件上传失败"
     });
   }
 };
