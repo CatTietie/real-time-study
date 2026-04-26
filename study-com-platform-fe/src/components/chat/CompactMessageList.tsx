@@ -10,6 +10,7 @@ interface CompactMessageListProps {
   onNewMessage?: (message: ChatMessage) => void;
   username: string;
   nickname?: string;
+  onContextMenu?: (e: React.MouseEvent, message: ChatMessage) => void;
 }
 
 const CompactMessageList: React.FC<CompactMessageListProps> = ({ 
@@ -17,7 +18,8 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
   currentUserId,
   onNewMessage,
   username,
-  nickname
+  nickname,
+  onContextMenu
 }) => {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [initialScrollDone, setInitialScrollDone] = useState(false);
@@ -232,6 +234,12 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
 
   const showHistoryButton = collapsedMessageCount > 0 || hasMoreHistory || (totalMessageCount > 0 && messages.length > 0);
 
+  const handleMessageContextMenu = (e: React.MouseEvent, message: ChatMessage) => {
+    if (onContextMenu) {
+      onContextMenu(e, message);
+    }
+  };
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div 
@@ -320,6 +328,7 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
                   transition: 'all 0.3s ease'
                 }}
                 className="message-item"
+                onContextMenu={(e) => handleMessageContextMenu(e, message)}
               >
                 {!isSystemMessage(message) && (
                   <div style={{ 

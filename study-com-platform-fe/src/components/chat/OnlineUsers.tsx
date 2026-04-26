@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Card, List, Avatar, Tag, Spin, Button, Tooltip, Popover, Badge, Input, Empty, message, Popconfirm } from 'antd';
+import { Card, List, Avatar, Tag, Spin, Button, Tooltip, Popover, Badge, Input, Empty, message, Popconfirm, Dropdown, Menu } from 'antd';
 import { 
   UserOutlined, 
   UsergroupAddOutlined,
@@ -15,7 +15,8 @@ import {
   ReloadOutlined,
   LoadingOutlined,
   CheckCircleOutlined,
-  InfoCircleOutlined
+  InfoCircleOutlined,
+  AtOutlined
 } from '@ant-design/icons';
 import { getAvailableUsers, addUserToRoom } from '../../services/chat';
 import type { AvailableUser } from '../../types/chat';
@@ -40,7 +41,8 @@ interface OnlineUsersProps {
   roomId: number;
   socket: any;
   sendSystemMessage: (message: string) => void;
-  currentUser?: { id: number; username: string };
+  currentUser?: { id: number; username: string; nickname?: string };
+  onMentionUser?: (user: { id: number; username: string; nickname?: string }) => void;
 }
 
 type UserStatus = 'online' | 'away' | 'busy' | 'offline';
@@ -134,7 +136,13 @@ const generateUserStatus = (): 'online' | 'away' | 'offline' => {
   return 'offline';
 };
 
-export const OnlineUsers: React.FC<OnlineUsersProps> = ({ roomId, socket, sendSystemMessage, currentUser }) => {
+export const OnlineUsers: React.FC<OnlineUsersProps> = ({ 
+  roomId, 
+  socket, 
+  sendSystemMessage, 
+  currentUser,
+  onMentionUser 
+}) => {
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [availableUsers, setAvailableUsers] = useState<EnhancedAvailableUser[]>([]);
   const [loadingOnline, setLoadingOnline] = useState(false);
@@ -352,6 +360,24 @@ export const OnlineUsers: React.FC<OnlineUsersProps> = ({ roomId, socket, sendSy
       </div>
     );
 
+    const menuItems = [
+      {
+        key: 'mention',
+        icon: <AtOutlined style={{ color: '#667eea' }} />,
+        label: <span>@用户</span>,
+        onClick: () => {
+          if (onMentionUser) {
+            onMentionUser({
+              id: user.userId,
+              username: user.username,
+              nickname: user.username
+            });
+            message.success(`已@${user.username}`);
+          }
+        }
+      }
+    ];
+
     return (
       <List.Item
         key={user.userId}
@@ -369,44 +395,55 @@ export const OnlineUsers: React.FC<OnlineUsersProps> = ({ roomId, socket, sendSy
       >
         <List.Item.Meta
           avatar={
-            <Popover
-              content={userDetailContent}
-              title={null}
+            <Dropdown 
+              menu={{ items: menuItems }} 
+              trigger={['contextMenu', 'hover']}
               placement="left"
-              trigger="hover"
-              arrowPointAtCenter
             >
-              <div style={{ position: 'relative' }}>
-                <Avatar
-                  size={32}
-                  style={{
-                    background: getAvatarGradient(user.username),
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    boxShadow: isHovered 
-                      ? `0 4px 12px ${statusConfig.color}30`
-                      : 'none',
-                    transform: isHovered ? 'scale(1.1)' : 'scale(1)',
-                    transition: 'all 0.3s ease'
-                  }}
-                >
-                  {user.username.charAt(0).toUpperCase()}
-                </Avatar>
-                <Badge
-                  status={
-                    user.status === 'online' ? 'success' :
-                    user.status === 'away' ? 'warning' : 'error'
-                  }
-                  style={{
-                    position: 'absolute',
-                    bottom: '0',
-                    right: '0',
-                    transform: 'scale(1.2)',
-                    boxShadow: '0 0 0 2px #fff'
-                  }}
-                />
-              </div>
-            </Popover>
+              <Popover
+                content={userDetailContent}
+                title={null}
+                placement="left"
+                trigger="hover"
+                arrowPointAtCenter
+              >
+                <div style={{ position: 'relative' }}>
+                  <Avatar
+                    size={32}
+                    style={{
+                      background: getAvatarGradient(user.username),
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      boxShadow: isHovered 
+                        ? `0 4px 12px ${statusConfig.color}30`
+                        : 'none',
+                      transform: isHovered ? 'scale(1.1)' : 'scale(1)',
+                      transition: 'all 0.3s ease'
+                    }}
+                    title={
+                      <span>
+                        右键点击 @{user.username}
+                      </span>
+                    }
+                  >
+                    {user.username.charAt(0).toUpperCase()}
+                  </Avatar>
+                  <Badge
+                    status={
+                      user.status === 'online' ? 'success' :
+                      user.status === 'away' ? 'warning' : 'error'
+                    }
+                    style={{
+                      position: 'absolute',
+                      bottom: '0',
+                      right: '0',
+                      transform: 'scale(1.2)',
+                      boxShadow: '0 0 0 2px #fff'
+                    }}
+                  />
+                </div>
+              </Popover>
+            </Dropdown>
           }
           title={
             <div style={{ 
@@ -618,6 +655,16 @@ export const OnlineUsers: React.FC<OnlineUsersProps> = ({ roomId, socket, sendSy
         }}>
           <UserOutlined style={{ color: '#667eea' }} />
           <span>用户管理</span>
+          <Tooltip title="右键点击在线用户头像可以@用户">
+            <span style={{ 
+              fontSize: '10px', 
+              color: '#a0aec0',
+              fontWeight: '400',
+              marginLeft: '4px'
+            }}>
+              (右键@用户)
+            </span>
+          </Tooltip>
         </div>
       }
       size="small"
