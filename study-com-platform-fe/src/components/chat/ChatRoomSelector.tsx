@@ -248,9 +248,15 @@ export const ChatRoomSelector: React.FC<ChatRoomSelectorProps> = ({
             <div style={{ fontSize: '12px', marginTop: '4px' }}>点击上方按钮创建</div>
           </div>
         ) : (
-          <List
-            dataSource={rooms}
-            renderItem={(room) => {
+          <div style={{ 
+            maxHeight: '180px', 
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            paddingRight: '4px'
+          }}>
+            <List
+              dataSource={rooms}
+              renderItem={(room) => {
               const isSelected = room.id === currentRoomId;
               const isOwner = room.created_by === user?.id;
               const roomType = room.type as RoomType;
@@ -484,6 +490,7 @@ export const ChatRoomSelector: React.FC<ChatRoomSelectorProps> = ({
               );
             }}
           />
+          </div>
         )}
       </Card>
 

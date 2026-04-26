@@ -287,9 +287,15 @@ export const OnlineUsers: React.FC<OnlineUsersProps> = ({ roomId, socket, sendSy
           <div style={{ fontSize: '12px', marginTop: '4px' }}>点击上方邀请按钮拉同学加入</div>
         </div>
       ) : (
-        <List
-          dataSource={otherUsers}
-          renderItem={(user) => {
+        <div style={{ 
+          maxHeight: '280px', 
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          paddingRight: '4px'
+        }}>
+          <List
+            dataSource={otherUsers}
+            renderItem={(user) => {
             const isHovered = hoveredUserId === user.userId;
             const statusConfig = STATUS_CONFIG[user.status || 'online'];
             const roleConfig = ROLE_CONFIG[user.role || 'normal'];
@@ -537,6 +543,7 @@ export const OnlineUsers: React.FC<OnlineUsersProps> = ({ roomId, socket, sendSy
             );
           }}
         />
+        </div>
       )}
     </Card>
 
