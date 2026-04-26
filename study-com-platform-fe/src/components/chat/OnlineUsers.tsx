@@ -103,7 +103,7 @@ export const OnlineUsers: React.FC<OnlineUsersProps> = ({ roomId, socket, sendSy
     socket.on('online_users_list', (users: OnlineUser[]) => {
       const enhancedUsers = users.map((user, index) => ({
         ...user,
-        status: (['online', 'away', 'busy'] as UserStatus[])[Math.floor(Math.random() * 3)],
+        status: (user.status as UserStatus) || 'online',
         role: index === 0 ? 'admin' : (index < 3 ? 'active' : 'normal') as UserRole,
         messageCount: Math.floor(Math.random() * 20)
       }));
@@ -131,6 +131,20 @@ export const OnlineUsers: React.FC<OnlineUsersProps> = ({ roomId, socket, sendSy
       setOnlineUsers(prev => prev.filter(user => user.userId !== data.userId));
     });
 
+    // 监听其他用户状态变化
+    socket.on('user_status_changed', (data: { userId: number; username: string; status: UserStatus }) => {
+      console.log('收到用户状态变化:', data);
+      setOnlineUsers(prev => prev.map(user => {
+        if (user.userId === data.userId) {
+          return {
+            ...user,
+            status: data.status
+          };
+        }
+        return user;
+      }));
+    });
+
     loadOnlineUsers();
 
     const interval = setInterval(loadOnlineUsers, 10000);
@@ -139,6 +153,7 @@ export const OnlineUsers: React.FC<OnlineUsersProps> = ({ roomId, socket, sendSy
       socket.off('online_users_list');
       socket.off('user_joined');
       socket.off('user_left');
+      socket.off('user_status_changed');
       clearInterval(interval);
     };
   }, [socket, roomId]);

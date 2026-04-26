@@ -9,6 +9,7 @@ interface ClientInfo {
   nickname?: string;
   roomId: number;
   joinTime: Date;
+  status?: 'online' | 'away' | 'busy';
 }
 
 // 存储所有连接的客户端
@@ -42,7 +43,8 @@ export const initChatSockets = (io: Server) => {
           username: data.username,
           nickname: data.nickname,
           roomId: data.roomId,
-          joinTime: new Date()
+          joinTime: new Date(),
+          status: 'online'
         });
 
         // 更新房间在线用户列表
@@ -251,15 +253,14 @@ export const initChatSockets = (io: Server) => {
     socket.on('get_online_users', (data: { roomId: number }) => {
       const roomUsers = roomOnlineUsers.get(data.roomId);
       if (roomUsers) {
-        // 获取用户详细信息
         const onlineUserInfo = Array.from(roomUsers).map(userId => {
-          // 查找该用户的连接信息
           for (const [socketId, clientInfo] of connectedClients) {
             if (clientInfo.userId === userId && clientInfo.roomId === data.roomId) {
               return {
                 userId: clientInfo.userId,
                 username: clientInfo.username,
-                joinTime: clientInfo.joinTime
+                joinTime: clientInfo.joinTime,
+                status: clientInfo.status || 'online'
               };
             }
           }
@@ -269,6 +270,39 @@ export const initChatSockets = (io: Server) => {
         socket.emit('online_users_list', onlineUserInfo);
       } else {
         socket.emit('online_users_list', []);
+      }
+    });
+
+    // 更新用户状态
+    socket.on('update_user_status', (data: { roomId: number; userId: number; status: 'online' | 'away' | 'busy' }) => {
+      console.log('收到用户状态更新:', data);
+      
+      for (const [socketId, clientInfo] of connectedClients) {
+        if (clientInfo.userId === data.userId && clientInfo.roomId === data.roomId) {
+          // 更新状态
+          connectedClients.set(socketId, {
+            ...clientInfo,
+            status: data.status
+          });
+          
+          console.log(`用户 ${clientInfo.username} 状态更新为: ${data.status}`);
+          
+          // 广播状态变化给房间内其他用户
+          socket.to(`chat_${data.roomId}`).emit('user_status_changed', {
+            userId: data.userId,
+            username: clientInfo.username,
+            status: data.status
+          });
+          
+          // 确认给发送者
+          socket.emit('status_updated', {
+            userId: data.userId,
+            status: data.status,
+            success: true
+          });
+          
+          break;
+        }
       }
     });
   });

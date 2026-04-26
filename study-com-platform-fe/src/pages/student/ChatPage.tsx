@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Layout, Spin, message } from 'antd';
 import { ChatContainer } from '../../components/chat/ChatContaner';
 import { getChatRooms } from '../../services/chat';
@@ -33,6 +33,10 @@ export default function ChatPage() {
         loadRooms();
     }, []);
 
+    const currentRoom = useMemo(() => {
+        return rooms.find(r => r.id === currentRoomId);
+    }, [rooms, currentRoomId]);
+
     const handleRoomChange = (roomId: number) => {
         setCurrentRoomId(roomId);
     };
@@ -57,7 +61,7 @@ export default function ChatPage() {
         }}>
             <Content
                 style={{
-                    padding: '24px',               // 添加内边距
+                    padding: '0',
                     display: 'flex',
                     flexDirection: 'column',
                     minHeight: '100vh'
@@ -67,6 +71,7 @@ export default function ChatPage() {
                     <ChatContainer
                         roomId={currentRoomId}
                         onRoomChange={handleRoomChange}
+                        currentRoom={currentRoom}
                     />
                 ) : (
                     <div style={{
@@ -75,7 +80,8 @@ export default function ChatPage() {
                         color: '#666',
                         background: 'rgba(255, 255, 255, 0.9)',
                         borderRadius: '16px',
-                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
+                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+                        margin: '20px'
                     }}>
                         <p style={{ fontSize: '18px', marginBottom: '12px', color: '#4a5568' }}>暂无可用的聊天室</p>
                         <p style={{ color: '#718096' }}>请管理员创建聊天室后重试</p>
