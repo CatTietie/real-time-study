@@ -307,12 +307,12 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
     const avatarWithMenu = onMentionUser ? (
       <Dropdown 
         menu={{ items: userMenuItems }} 
-        trigger={['contextMenu', 'hover']}
+        trigger={['contextMenu']}
         placement={isOwn ? 'topRight' : 'topLeft'}
       >
-        <Tooltip title={`右键@${displayName}`}>
+        <div style={{ cursor: 'context-menu' }}>
           {avatarContent}
-        </Tooltip>
+        </div>
       </Dropdown>
     ) : (
       avatarContent

@@ -157,3 +157,15 @@ export const deleteMessage = async (messageId: number): Promise<{
   const response = await api.delete(`/chat/messages/${messageId}`);
   return response.data.data;
 };
+
+// 获取图片 base64 数据（用于复制图片到剪贴板）
+export const getImageBase64 = async (imageUrl: string): Promise<{
+  base64: string;
+  dataUrl: string;
+  mimeType: string;
+}> => {
+  const response = await api.get('/chat/image-base64', {
+    params: { url: imageUrl }
+  });
+  return response.data.data;
+};

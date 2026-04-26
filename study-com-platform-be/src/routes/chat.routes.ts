@@ -25,4 +25,8 @@ router.post("/upload", uploadChatFile.single("file"), chatController.uploadFile)
 router.post("/forward", chatController.forwardMessage);
 router.delete("/messages/:messageId", chatController.deleteMessage);
 
+// 图片代理接口（解决跨域图片复制问题）
+router.get("/proxy-image", chatController.proxyImage);
+router.get("/image-base64", chatController.getImageBase64);
+
 export default router;

@@ -36,7 +36,7 @@ import { ChatRoomSelector } from './ChatRoomSelector';
 import { useChatSocket } from '../../hooks/useChatSocket';
 import { useAppSelector } from '../../app/hooks';
 import type { ChatRoom, ChatMessage, AvailableUser } from '../../types/chat';
-import { forwardMessage, deleteMessage, getChatRooms } from '../../services/chat';
+import { forwardMessage, deleteMessage, getChatRooms, getImageBase64 } from '../../services/chat';
 
 type UserStatus = 'online' | 'away' | 'busy';
 
@@ -220,6 +220,21 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     return () => document.removeEventListener('click', handleClickOutside);
   }, [contextMenuVisible, handleCloseContextMenu]);
 
+  const base64ToBlob = (base64: string, mimeType: string): Blob => {
+    const byteCharacters = atob(base64);
+    const byteArrays = [];
+    for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+      const slice = byteCharacters.slice(offset, offset + 512);
+      const byteNumbers = new Array(slice.length);
+      for (let i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      byteArrays.push(byteArray);
+    }
+    return new Blob(byteArrays, { type: mimeType });
+  };
+
   const handleCopyMessage = useCallback(async () => {
     if (!contextMenuMessage) return;
     
@@ -229,15 +244,21 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         message.success('文字已复制到剪贴板');
       } else if (contextMenuMessage.message_type === 'image') {
         const imageUrl = contextMenuMessage.file_url || contextMenuMessage.content;
+        
         try {
-          const response = await fetch(imageUrl);
-          const blob = await response.blob();
-          const item = new ClipboardItem({ [blob.type]: blob });
-          await navigator.clipboard.write([item]);
-          message.success('图片已复制到剪贴板');
+          const imageData = await getImageBase64(imageUrl);
+          const blob = base64ToBlob(imageData.base64, imageData.mimeType);
+          const clipboardItem = new ClipboardItem({ [imageData.mimeType]: blob });
+          await navigator.clipboard.write([clipboardItem]);
+          message.success('图片已复制到剪贴板，可直接粘贴发送');
         } catch (clipboardError) {
-          await navigator.clipboard.writeText(imageUrl);
-          message.success('图片链接已复制到剪贴板（跨域图片无法直接复制）');
+          console.log('剪贴板复制失败，尝试复制链接:', clipboardError);
+          try {
+            await navigator.clipboard.writeText(imageUrl);
+            message.success('图片链接已复制到剪贴板');
+          } catch {
+            message.error('复制失败，请手动复制');
+          }
         }
       } else if (contextMenuMessage.message_type === 'file') {
         const fileUrl = contextMenuMessage.file_url || contextMenuMessage.content;
@@ -284,17 +305,6 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
       setForwardModalVisible(false);
       setForwardingMessage(null);
       
-      if (socket && isConnected) {
-        socket.emit('send_chat_message', {
-          roomId: selectedTargetRoom,
-          content: result.forwardedMessage.content,
-          messageType: result.forwardedMessage.message_type,
-          file_name: result.forwardedMessage.file_name,
-          file_size: result.forwardedMessage.file_size,
-          file_url: result.forwardedMessage.file_url
-        });
-      }
-      
       onRoomChange(selectedTargetRoom);
     } catch (error) {
       console.error('转发消息失败:', error);
@@ -302,7 +312,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     } finally {
       setForwarding(false);
     }
-  }, [forwardingMessage, selectedTargetRoom, socket, isConnected, onRoomChange]);
+  }, [forwardingMessage, selectedTargetRoom, onRoomChange]);
 
   const handleDeleteMessage = useCallback(async () => {
     if (!contextMenuMessage) return;

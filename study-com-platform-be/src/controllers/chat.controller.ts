@@ -4,6 +4,25 @@ import ChatMessage from "../models/chat-message.model";
 import User from "../models/user.model";
 import { Op } from "sequelize";
 import { uploadChatFileToOss } from "../middlewares/upload.middleware";
+import { broadcastToRoom } from "../utils/socketManager";
+import axios from "axios";
+
+const ALLOWED_IMAGE_DOMAINS = [
+  'weblog-dev.oss-cn-beijing.aliyuncs.com',
+  'localhost',
+  '127.0.0.1'
+];
+
+const isValidImageUrl = (url: string): boolean => {
+  try {
+    const parsedUrl = new URL(url);
+    return ALLOWED_IMAGE_DOMAINS.some(domain => 
+      parsedUrl.hostname.includes(domain)
+    );
+  } catch {
+    return false;
+  }
+};
 
 export const createChatRoom = async (req: Request, res: Response) => {
   try {
@@ -491,8 +510,8 @@ export const forwardMessage = async (req: Request, res: Response) => {
       }
     };
 
-    // TODO: 可以在这里通过 Socket 发送到目标房间
-    // 暂时只返回成功，前端可以在转发后刷新或跳转
+    // 通过 Socket 广播到目标房间
+    broadcastToRoom(targetRoomId, 'new_chat_message', forwardedData);
 
     res.json({
       success: true,
@@ -601,6 +620,121 @@ export const uploadFile = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : "文件上传失败"
+    });
+  }
+};
+
+// 图片代理接口 - 解决跨域图片复制问题
+export const proxyImage = async (req: Request, res: Response) => {
+  try {
+    const { url } = req.query;
+    
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: "图片URL不能为空"
+      });
+    }
+
+    if (!isValidImageUrl(url)) {
+      return res.status(403).json({
+        success: false,
+        message: "不允许访问的图片域名"
+      });
+    }
+
+    console.log(`[Image Proxy] 代理图片请求: ${url}`);
+
+    const response = await axios.get(url, {
+      responseType: 'arraybuffer',
+      maxContentLength: 10 * 1024 * 1024,
+      timeout: 30000,
+      headers: {
+        'Accept': 'image/*'
+      }
+    });
+
+    const contentType = response.headers['content-type'] || 'image/png';
+    
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    
+    res.send(response.data);
+    
+    console.log(`[Image Proxy] 图片代理成功: ${contentType}, size: ${response.data?.length || 0} bytes`);
+
+  } catch (error) {
+    console.error('[Image Proxy] 图片代理失败:', error);
+    
+    if (axios.isAxiosError(error)) {
+      if (error.response) {
+        return res.status(error.response.status).json({
+          success: false,
+          message: `图片获取失败: ${error.response.status} ${error.response.statusText}`
+        });
+      } else if (error.request) {
+        return res.status(504).json({
+          success: false,
+          message: "图片请求超时"
+        });
+      }
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "图片代理失败"
+    });
+  }
+};
+
+// 获取图片 base64 数据接口
+export const getImageBase64 = async (req: Request, res: Response) => {
+  try {
+    const { url } = req.query;
+    
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: "图片URL不能为空"
+      });
+    }
+
+    if (!isValidImageUrl(url)) {
+      return res.status(403).json({
+        success: false,
+        message: "不允许访问的图片域名"
+      });
+    }
+
+    console.log(`[Image Base64] 获取图片: ${url}`);
+
+    const response = await axios.get(url, {
+      responseType: 'arraybuffer',
+      maxContentLength: 10 * 1024 * 1024,
+      timeout: 30000
+    });
+
+    const contentType = response.headers['content-type'] || 'image/png';
+    const base64Data = Buffer.from(response.data, 'binary').toString('base64');
+    const dataUrl = `data:${contentType};base64,${base64Data}`;
+
+    console.log(`[Image Base64] 成功获取图片: ${contentType}, size: ${base64Data.length} chars`);
+
+    res.json({
+      success: true,
+      data: {
+        base64: base64Data,
+        dataUrl: dataUrl,
+        mimeType: contentType
+      }
+    });
+
+  } catch (error) {
+    console.error('[Image Base64] 获取图片失败:', error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "获取图片失败"
     });
   }
 };
