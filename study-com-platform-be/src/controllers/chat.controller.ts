@@ -3,6 +3,7 @@ import ChatRoom from "../models/chat-room.model";
 import ChatMessage from "../models/chat-message.model";
 import User from "../models/user.model";
 import { Op } from "sequelize";
+import { uploadChatFileToOss } from "../middlewares/upload.middleware";
 
 export const createChatRoom = async (req: Request, res: Response) => {
   try {
@@ -107,7 +108,7 @@ export const getOnlineUsers = async (req: Request, res: Response) => {
 export const getChatHistory = async (req: Request, res: Response) => {
   try {
     const { roomId } = req.params;
-    const { page = 1, limit = 50, beforeId } = req.query;
+    const { page = 1, limit = 50, beforeId, startTime, endTime } = req.query;
     
     // 验证房间是否存在
     const room = await ChatRoom.findByPk(roomId);
@@ -124,6 +125,16 @@ export const getChatHistory = async (req: Request, res: Response) => {
     // 如果提供了beforeId，则查询该ID之前的消息
     if (beforeId) {
       whereCondition.id = { [Op.lt]: Number(beforeId) };
+    }
+    
+    // 如果提供了时间范围，则按时间范围查询
+    if (startTime) {
+      whereCondition.created_at = whereCondition.created_at || {};
+      whereCondition.created_at[Op.gte] = new Date(String(startTime));
+    }
+    if (endTime) {
+      whereCondition.created_at = whereCondition.created_at || {};
+      whereCondition.created_at[Op.lte] = new Date(String(endTime));
     }
     
     // 查询消息
@@ -395,6 +406,46 @@ export const getAvailableUsers = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : "获取用户列表失败"
+    });
+  }
+};
+
+// 聊天文件上传
+export const uploadFile = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "未授权访问"
+      });
+    }
+
+    // 上传文件到 OSS 或本地存储
+    const fileInfo = await uploadChatFileToOss(req);
+    
+    if (!fileInfo) {
+      return res.status(400).json({
+        success: false,
+        message: "请选择要上传的文件"
+      });
+    }
+
+    console.log(`✅ 文件上传成功: ${fileInfo.file_name} (${fileInfo.file_size} bytes)`);
+
+    res.json({
+      success: true,
+      message: "文件上传成功",
+      data: {
+        file_name: fileInfo.file_name,
+        file_url: fileInfo.file_url,
+        file_size: fileInfo.file_size,
+      }
+    });
+  } catch (error) {
+    console.error('文件上传失败:', error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "文件上传失败"
     });
   }
 };
