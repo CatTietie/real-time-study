@@ -51,28 +51,34 @@ export default function ChatPage() {
     }
 
     return (
-        <Layout style={{ minHeight: '100vh', background: '#f0f2f5' }}>
+        <Layout style={{ 
+            minHeight: '100vh', 
+            background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' 
+        }}>
             <Content
                 style={{
-                    padding: 0,               // 移除默认内边距
+                    padding: '24px',               // 添加内边距
                     display: 'flex',
                     flexDirection: 'column',
+                    minHeight: '100vh'
                 }}
             >
                 {currentRoomId > 0 ? (
                     <ChatContainer
                         roomId={currentRoomId}
                         onRoomChange={handleRoomChange}
-                        style={{ flex: 1 }}      // 让容器填满剩余高度（需确保 ChatContainer 接受 style 属性）
                     />
                 ) : (
                     <div style={{
                         textAlign: 'center',
-                        padding: '40px',
-                        color: '#666'
+                        padding: '60px 40px',
+                        color: '#666',
+                        background: 'rgba(255, 255, 255, 0.9)',
+                        borderRadius: '16px',
+                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
                     }}>
-                        <p>暂无可用的聊天室</p>
-                        <p>请管理员创建聊天室后重试</p>
+                        <p style={{ fontSize: '18px', marginBottom: '12px', color: '#4a5568' }}>暂无可用的聊天室</p>
+                        <p style={{ color: '#718096' }}>请管理员创建聊天室后重试</p>
                     </div>
                 )}
             </Content>

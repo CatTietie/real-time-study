@@ -107,3 +107,20 @@ export const searchChatMessages = async (
   });
   return response.data.data;
 };
+
+// 上传聊天文件/图片
+export const uploadChatFile = async (file: File): Promise<{
+  file_name: string;
+  file_url: string;
+  file_size: number;
+}> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const response = await api.post('/chat/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return response.data.data;
+};

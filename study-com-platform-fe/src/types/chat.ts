@@ -13,10 +13,13 @@ export interface ChatMessage {
   room_id: number;
   user_id: number;
   content: string;
-  message_type: 'text' | 'image' | 'system';
+  message_type: 'text' | 'image' | 'file' | 'system';
   created_at: string;
   username?: string;
   nickname?: string;
+  file_name?: string;
+  file_size?: number;
+  file_url?: string;
 }
 
 export interface OnlineUser {
