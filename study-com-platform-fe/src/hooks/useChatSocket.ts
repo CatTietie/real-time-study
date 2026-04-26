@@ -18,6 +18,9 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(false);
   const [totalMessageCount, setTotalMessageCount] = useState(0);
+  const [currentMonthMessageCount, setCurrentMonthMessageCount] = useState(0);
+  const [collapsedMessageCount, setCollapsedMessageCount] = useState(0);
+  const [isAllHistoryLoaded, setIsAllHistoryLoaded] = useState(false);
   
   const earliestMessageIdRef = useRef<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -32,6 +35,16 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
     console.log('useChatSocket 接收到的有效参数:', { roomId, userId, username, nickname });
   }
 
+  const getCurrentMonthRange = useCallback(() => {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    return {
+      startTime: firstDay.toISOString(),
+      endTime: lastDay.toISOString()
+    };
+  }, []);
+
   const setAllMessages = useCallback((newMessages: ChatMessage[]) => {
     setMessages(newMessages);
   }, []);
@@ -39,6 +52,80 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
   const prependMessages = useCallback((oldMessages: ChatMessage[]) => {
     setMessages(prev => [...oldMessages, ...prev]);
   }, []);
+
+  const loadCurrentMonthMessages = useCallback(async () => {
+    const { startTime, endTime } = getCurrentMonthRange();
+    console.log('加载本月消息:', { startTime, endTime });
+    
+    setLoadingHistory(true);
+    try {
+      const result = await getChatHistory(roomId, 1, 100, undefined, startTime, endTime);
+      console.log('本月消息结果:', {
+        count: result.messages.length,
+        total: result.pagination.total
+      });
+      
+      const sortedMessages = [...result.messages].sort((a, b) => {
+        const aDate = new Date(a.created_at || a.createdAt || 0);
+        const bDate = new Date(b.created_at || b.createdAt || 0);
+        return aDate.getTime() - bDate.getTime();
+      });
+      
+      setMessages(sortedMessages);
+      setCurrentMonthMessageCount(result.pagination.total);
+      
+      if (sortedMessages.length > 0) {
+        earliestMessageIdRef.current = sortedMessages[0].id || null;
+      }
+      
+      const totalResult = await getChatHistory(roomId, 1, 1);
+      setTotalMessageCount(totalResult.pagination.total);
+      
+      const collapsed = totalResult.pagination.total - result.pagination.total;
+      setCollapsedMessageCount(Math.max(0, collapsed));
+      setHasMoreHistory(collapsed > 0);
+      setIsAllHistoryLoaded(false);
+      
+    } catch (error) {
+      console.error('加载本月消息失败:', error);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [roomId, getCurrentMonthRange]);
+
+  const loadAllMessages = useCallback(async () => {
+    console.log('加载所有消息（不带时间范围）');
+    
+    setLoadingHistory(true);
+    try {
+      const result = await getChatHistory(roomId, 1, 1000);
+      console.log('所有消息结果:', {
+        count: result.messages.length,
+        total: result.pagination.total
+      });
+      
+      const sortedMessages = [...result.messages].sort((a, b) => {
+        const aDate = new Date(a.created_at || a.createdAt || 0);
+        const bDate = new Date(b.created_at || b.createdAt || 0);
+        return aDate.getTime() - bDate.getTime();
+      });
+      
+      setMessages(sortedMessages);
+      setTotalMessageCount(result.pagination.total);
+      setCollapsedMessageCount(0);
+      setHasMoreHistory(false);
+      setIsAllHistoryLoaded(true);
+      
+      if (sortedMessages.length > 0) {
+        earliestMessageIdRef.current = sortedMessages[0].id || null;
+      }
+      
+    } catch (error) {
+      console.error('加载所有消息失败:', error);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [roomId]);
 
   useEffect(() => {
     const newSocket = io(API_BASE.replace('/api', ''), {
@@ -72,23 +159,8 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
     });
 
     newSocket.on('chat_history', (historyMessages: ChatMessage[]) => {
-      console.log('📥 收到历史消息:', historyMessages.length, '条');
-      setMessages(historyMessages);
-      
-      if (historyMessages.length > 0) {
-        const sortedMessages = [...historyMessages].sort((a, b) => {
-          const aId = a.id || 0;
-          const bId = b.id || 0;
-          return aId - bId;
-        });
-        earliestMessageIdRef.current = sortedMessages[0].id || null;
-        setHasMoreHistory(historyMessages.length >= 10);
-      } else {
-        earliestMessageIdRef.current = null;
-        setHasMoreHistory(false);
-      }
-      
-      loadTotalMessageCount();
+      console.log('📥 收到socket历史消息（忽略，使用API按时间范围查询）:', historyMessages.length, '条');
+      // 忽略 socket 发送的历史消息，改用 API 按时间范围查询
     });
 
     newSocket.on('receive_chat_message', (message: ChatMessage) => {
@@ -100,6 +172,8 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
           messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
         }
       }, 100);
+      
+      setTotalMessageCount(prev => prev + 1);
     });
 
     newSocket.on('user_joined', (data: { username: string }) => {
@@ -141,6 +215,9 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
       earliestMessageIdRef.current = null;
       setHasMoreHistory(false);
       setTotalMessageCount(0);
+      setCurrentMonthMessageCount(0);
+      setCollapsedMessageCount(0);
+      setIsAllHistoryLoaded(false);
       
       console.log('加入新房间:', roomId);
       socket.emit('join_chat_room', { 
@@ -149,21 +226,31 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
         username,
         nickname
       });
+      
+      loadCurrentMonthMessages();
     }
-  }, [roomId, socket, isConnected, userId, username, nickname]);
+  }, [roomId, socket, isConnected, userId, username, nickname, loadCurrentMonthMessages]);
 
-  const loadTotalMessageCount = async () => {
-    try {
-      const result = await getChatHistory(roomId, 1, 1);
-      setTotalMessageCount(result.pagination.total);
-    } catch (error) {
-      console.error('加载消息总数失败:', error);
+  useEffect(() => {
+    if (socket && isConnected && roomId > 0 && userId > 0) {
+      loadCurrentMonthMessages();
     }
-  };
+  }, [socket, isConnected, roomId, userId, loadCurrentMonthMessages]);
 
   const loadMoreHistory = useCallback(async () => {
-    if (loadingHistory || !hasMoreHistory) {
-      console.log('跳过加载历史消息:', { loadingHistory, hasMoreHistory });
+    if (loadingHistory) {
+      console.log('跳过加载历史消息: loadingHistory = true');
+      return;
+    }
+
+    if (isAllHistoryLoaded) {
+      console.log('已经加载了所有消息');
+      return;
+    }
+
+    if (collapsedMessageCount > 0) {
+      console.log('有被折叠的消息，点击加载所有消息');
+      await loadAllMessages();
       return;
     }
 
@@ -206,7 +293,6 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
           return uniqueMessages;
         });
         
-        setTotalMessageCount(result.pagination.total);
       } else {
         setHasMoreHistory(false);
         console.log('没有更多消息，设置 hasMoreHistory = false');
@@ -217,7 +303,7 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
     } finally {
       setLoadingHistory(false);
     }
-  }, [roomId, loadingHistory, hasMoreHistory]);
+  }, [roomId, loadingHistory, isAllHistoryLoaded, collapsedMessageCount, loadAllMessages]);
 
   const sendMessage = useCallback((
     content: string, 
@@ -261,7 +347,12 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
     loadingHistory,
     hasMoreHistory,
     totalMessageCount,
+    currentMonthMessageCount,
+    collapsedMessageCount,
+    isAllHistoryLoaded,
     loadMoreHistory,
+    loadAllMessages,
+    loadCurrentMonthMessages,
     setAllMessages,
     prependMessages,
     messagesEndRef,

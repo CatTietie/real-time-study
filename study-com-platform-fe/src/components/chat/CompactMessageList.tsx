@@ -27,6 +27,8 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
     loadingHistory, 
     hasMoreHistory, 
     totalMessageCount,
+    collapsedMessageCount,
+    isAllHistoryLoaded,
     loadMoreHistory,
     isConnected
   } = useChatSocket({
@@ -228,7 +230,7 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
     return <span>{message.content}</span>;
   };
 
-  const showHistoryButton = hasMoreHistory || (totalMessageCount > 0 && messages.length > 0);
+  const showHistoryButton = collapsedMessageCount > 0 || hasMoreHistory || (totalMessageCount > 0 && messages.length > 0);
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -298,9 +300,11 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
                 >
                   {loadingHistory 
                     ? '加载中...' 
-                    : hasMoreHistory 
-                      ? `查看历史消息 (共${totalMessageCount}条)`
-                      : '已加载全部历史消息'}
+                    : collapsedMessageCount > 0 
+                      ? `查看历史消息 (${collapsedMessageCount}条被折叠)`
+                      : hasMoreHistory 
+                        ? '查看更早的消息'
+                        : '已加载全部历史消息'}
                 </Button>
               </div>
             )}

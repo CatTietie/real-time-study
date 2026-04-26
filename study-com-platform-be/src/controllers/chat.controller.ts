@@ -108,7 +108,7 @@ export const getOnlineUsers = async (req: Request, res: Response) => {
 export const getChatHistory = async (req: Request, res: Response) => {
   try {
     const { roomId } = req.params;
-    const { page = 1, limit = 50, beforeId } = req.query;
+    const { page = 1, limit = 50, beforeId, startTime, endTime } = req.query;
     
     // 验证房间是否存在
     const room = await ChatRoom.findByPk(roomId);
@@ -125,6 +125,16 @@ export const getChatHistory = async (req: Request, res: Response) => {
     // 如果提供了beforeId，则查询该ID之前的消息
     if (beforeId) {
       whereCondition.id = { [Op.lt]: Number(beforeId) };
+    }
+    
+    // 如果提供了时间范围，则按时间范围查询
+    if (startTime) {
+      whereCondition.created_at = whereCondition.created_at || {};
+      whereCondition.created_at[Op.gte] = new Date(String(startTime));
+    }
+    if (endTime) {
+      whereCondition.created_at = whereCondition.created_at || {};
+      whereCondition.created_at[Op.lte] = new Date(String(endTime));
     }
     
     // 查询消息

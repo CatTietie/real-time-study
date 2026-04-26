@@ -68,7 +68,9 @@ export const getChatHistory = async (
   roomId: number,
   page: number = 1,
   limit: number = 50,
-  beforeId?: number
+  beforeId?: number,
+  startTime?: string,
+  endTime?: string
 ): Promise<{
   messages: ChatMessage[];
   pagination: {
@@ -81,6 +83,12 @@ export const getChatHistory = async (
   const params: any = { page, limit };
   if (beforeId) {
     params.beforeId = beforeId;
+  }
+  if (startTime) {
+    params.startTime = startTime;
+  }
+  if (endTime) {
+    params.endTime = endTime;
   }
   
   const response = await api.get(`/chat/history/${roomId}`, { params });
