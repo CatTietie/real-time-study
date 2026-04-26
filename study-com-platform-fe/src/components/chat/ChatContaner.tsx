@@ -309,9 +309,24 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         overflow: 'hidden'
       }}
     >
-      <Row gutter={12} style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        <Col span={18} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+      <Row gutter={12} style={{ flex: 1, display: 'flex', minHeight: 0, height: '100%' }}>
+        <Col 
+          span={18} 
+          style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            minHeight: 0, 
+            overflow: 'hidden',
+            height: '100%'
+          }}
+        >
+          <div style={{ 
+            flex: 1, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            minHeight: 0, 
+            overflow: 'hidden'
+          }}>
             <CompactMessageList 
               roomId={roomId}
               currentUserId={user?.id}
@@ -336,7 +351,17 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
             />
           </div>
         </Col>
-        <Col span={6} style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflow: 'hidden' }}>
+        <Col 
+          span={6} 
+          style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '12px', 
+            overflow: 'hidden',
+            minHeight: 0,
+            height: '100%'
+          }}
+        >
           <ChatRoomSelector 
             currentRoomId={roomId}
             onRoomChange={onRoomChange}

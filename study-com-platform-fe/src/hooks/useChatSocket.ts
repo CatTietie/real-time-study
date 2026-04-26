@@ -261,7 +261,6 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
     loadingHistory,
     hasMoreHistory,
     totalMessageCount,
-    currentPage: currentPageRef.current,
     loadMoreHistory,
     setAllMessages,
     prependMessages,
