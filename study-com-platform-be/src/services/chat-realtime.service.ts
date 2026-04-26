@@ -106,11 +106,23 @@ export const initChatSockets = (io: Server) => {
     socket.on('send_chat_message', async (data: { 
       roomId: number; 
       content: string; 
-      messageType?: string 
+      messageType?: string;
+      file_name?: string;
+      file_size?: number;
+      file_url?: string;
     }) => {
       try {
         const clientInfo = connectedClients.get(socket.id);
         if (!clientInfo) return;
+
+        console.log('收到聊天消息:', {
+          roomId: data.roomId,
+          content: data.content?.substring(0, 50) + '...',
+          messageType: data.messageType,
+          file_name: data.file_name,
+          file_size: data.file_size,
+          file_url: data.file_url
+        });
 
         // 保存消息到数据库
         const message = await ChatMessage.create({
@@ -121,16 +133,29 @@ export const initChatSockets = (io: Server) => {
         });
 
         // 广播给房间内所有用户
+        // 包含前端发送的文件信息
         const messageData = {
           ...message.toJSON(),
           username: clientInfo.nickname || clientInfo.username,
           user_id: clientInfo.userId,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          // 添加文件相关字段（从前端传入的数据中获取）
+          file_name: data.file_name,
+          file_size: data.file_size,
+          file_url: data.file_url
         };
+        
+        console.log('广播消息:', {
+          id: messageData.id,
+          messageType: messageData.message_type,
+          file_name: messageData.file_name,
+          file_url: messageData.file_url
+        });
         
         io.to(`chat_${data.roomId}`).emit('receive_chat_message', messageData);
 
       } catch (error) {
+        console.error('发送消息失败:', error);
         socket.emit('error', { message: '发送消息失败' });
       }
     });
