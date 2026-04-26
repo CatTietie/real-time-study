@@ -7,8 +7,10 @@ interface ClientInfo {
   userId: number;
   username: string;
   nickname?: string;
+  avatar?: string;
   roomId: number;
   joinTime: Date;
+  status?: 'online' | 'away' | 'busy';
 }
 
 // 存储所有连接的客户端
@@ -36,13 +38,20 @@ export const initChatSockets = (io: Server) => {
         // 加入房间
         socket.join(`chat_${data.roomId}`);
         
+        // 查询用户头像
+        const user = await User.findByPk(data.userId, {
+          attributes: ['id', 'username', 'nickname', 'avatar']
+        });
+        
         // 记录客户端信息
         connectedClients.set(socket.id, {
           userId: data.userId,
           username: data.username,
           nickname: data.nickname,
+          avatar: (user?.toJSON() as any)?.avatar || null,
           roomId: data.roomId,
-          joinTime: new Date()
+          joinTime: new Date(),
+          status: 'online'
         });
 
         // 更新房间在线用户列表
@@ -58,16 +67,16 @@ export const initChatSockets = (io: Server) => {
           message: `${data.username} 加入了聊天`
         });
 
-        // 发送历史消息（最近50条）
+        // 发送历史消息（最近10条，默认不显示太多）
         console.log('开始查询房间历史消息:', data.roomId);
         const recentMessages = await ChatMessage.findAll({
           where: { room_id: data.roomId },
           include: [{
             model: User,
-            attributes: ['id', 'username', 'nickname']
+            attributes: ['id', 'username', 'nickname', 'avatar']
           }],
           order: [['created_at', 'DESC']],
-          limit: 50
+          limit: 10  // 只发送最近10条，用户点击加载更多再获取更早的
         });
         
         console.log(`查询到 ${recentMessages.length} 条历史消息`);
@@ -82,6 +91,7 @@ export const initChatSockets = (io: Server) => {
             ...msgJson,
             username: user?.username || `用户${msgJson.user_id}`,
             nickname: user?.nickname || null,
+            avatar: user?.avatar || null,
             created_at: msgJson.createdAt || msgJson.created_at
           };
           console.log('处理消息:', {
@@ -106,11 +116,23 @@ export const initChatSockets = (io: Server) => {
     socket.on('send_chat_message', async (data: { 
       roomId: number; 
       content: string; 
-      messageType?: string 
+      messageType?: string;
+      file_name?: string;
+      file_size?: number;
+      file_url?: string;
     }) => {
       try {
         const clientInfo = connectedClients.get(socket.id);
         if (!clientInfo) return;
+
+        console.log('收到聊天消息:', {
+          roomId: data.roomId,
+          content: data.content?.substring(0, 50) + '...',
+          messageType: data.messageType,
+          file_name: data.file_name,
+          file_size: data.file_size,
+          file_url: data.file_url
+        });
 
         // 保存消息到数据库
         const message = await ChatMessage.create({
@@ -121,16 +143,31 @@ export const initChatSockets = (io: Server) => {
         });
 
         // 广播给房间内所有用户
+        // 包含前端发送的文件信息
         const messageData = {
           ...message.toJSON(),
           username: clientInfo.nickname || clientInfo.username,
+          nickname: clientInfo.nickname,
+          avatar: clientInfo.avatar,
           user_id: clientInfo.userId,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          // 添加文件相关字段（从前端传入的数据中获取）
+          file_name: data.file_name,
+          file_size: data.file_size,
+          file_url: data.file_url
         };
+        
+        console.log('广播消息:', {
+          id: messageData.id,
+          messageType: messageData.message_type,
+          file_name: messageData.file_name,
+          file_url: messageData.file_url
+        });
         
         io.to(`chat_${data.roomId}`).emit('receive_chat_message', messageData);
 
       } catch (error) {
+        console.error('发送消息失败:', error);
         socket.emit('error', { message: '发送消息失败' });
       }
     });
@@ -226,15 +263,14 @@ export const initChatSockets = (io: Server) => {
     socket.on('get_online_users', (data: { roomId: number }) => {
       const roomUsers = roomOnlineUsers.get(data.roomId);
       if (roomUsers) {
-        // 获取用户详细信息
         const onlineUserInfo = Array.from(roomUsers).map(userId => {
-          // 查找该用户的连接信息
           for (const [socketId, clientInfo] of connectedClients) {
             if (clientInfo.userId === userId && clientInfo.roomId === data.roomId) {
               return {
                 userId: clientInfo.userId,
                 username: clientInfo.username,
-                joinTime: clientInfo.joinTime
+                joinTime: clientInfo.joinTime,
+                status: clientInfo.status || 'online'
               };
             }
           }
@@ -244,6 +280,39 @@ export const initChatSockets = (io: Server) => {
         socket.emit('online_users_list', onlineUserInfo);
       } else {
         socket.emit('online_users_list', []);
+      }
+    });
+
+    // 更新用户状态
+    socket.on('update_user_status', (data: { roomId: number; userId: number; status: 'online' | 'away' | 'busy' }) => {
+      console.log('收到用户状态更新:', data);
+      
+      for (const [socketId, clientInfo] of connectedClients) {
+        if (clientInfo.userId === data.userId && clientInfo.roomId === data.roomId) {
+          // 更新状态
+          connectedClients.set(socketId, {
+            ...clientInfo,
+            status: data.status
+          });
+          
+          console.log(`用户 ${clientInfo.username} 状态更新为: ${data.status}`);
+          
+          // 广播状态变化给房间内其他用户
+          socket.to(`chat_${data.roomId}`).emit('user_status_changed', {
+            userId: data.userId,
+            username: clientInfo.username,
+            status: data.status
+          });
+          
+          // 确认给发送者
+          socket.emit('status_updated', {
+            userId: data.userId,
+            status: data.status,
+            success: true
+          });
+          
+          break;
+        }
       }
     });
   });

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import io, { Socket } from 'socket.io-client';
 import type { ChatMessage } from '../types/chat';
 import { API_BASE } from '../services/api';
+import { getChatHistory } from '../services/chat';
 
 interface UseChatSocketProps {
   roomId: number;
@@ -14,22 +15,119 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
   const [socket, setSocket] = useState<Socket | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
+  const [totalMessageCount, setTotalMessageCount] = useState(0);
+  const [currentMonthMessageCount, setCurrentMonthMessageCount] = useState(0);
+  const [collapsedMessageCount, setCollapsedMessageCount] = useState(0);
+  const [isAllHistoryLoaded, setIsAllHistoryLoaded] = useState(false);
   
-  // 使用useRef存储最新的用户信息
+  const earliestMessageIdRef = useRef<number | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  
   const userInfoRef = useRef({ roomId, userId, username, nickname });
   
-  // 只有当用户信息有效时才更新ref
   if (userId > 0 && username) {
     userInfoRef.current = { roomId, userId, username, nickname };
   }
   
-  // 调试信息 - 只在用户信息有效时显示
   if (userId > 0 && username) {
     console.log('useChatSocket 接收到的有效参数:', { roomId, userId, username, nickname });
   }
 
+  const getCurrentMonthRange = useCallback(() => {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    return {
+      startTime: firstDay.toISOString(),
+      endTime: lastDay.toISOString()
+    };
+  }, []);
+
+  const setAllMessages = useCallback((newMessages: ChatMessage[]) => {
+    setMessages(newMessages);
+  }, []);
+
+  const prependMessages = useCallback((oldMessages: ChatMessage[]) => {
+    setMessages(prev => [...oldMessages, ...prev]);
+  }, []);
+
+  const loadCurrentMonthMessages = useCallback(async () => {
+    const { startTime, endTime } = getCurrentMonthRange();
+    console.log('加载本月消息:', { startTime, endTime });
+    
+    setLoadingHistory(true);
+    try {
+      const result = await getChatHistory(roomId, 1, 100, undefined, startTime, endTime);
+      console.log('本月消息结果:', {
+        count: result.messages.length,
+        total: result.pagination.total
+      });
+      
+      const sortedMessages = [...result.messages].sort((a, b) => {
+        const aDate = new Date(a.created_at || a.createdAt || 0);
+        const bDate = new Date(b.created_at || b.createdAt || 0);
+        return aDate.getTime() - bDate.getTime();
+      });
+      
+      setMessages(sortedMessages);
+      setCurrentMonthMessageCount(result.pagination.total);
+      
+      if (sortedMessages.length > 0) {
+        earliestMessageIdRef.current = sortedMessages[0].id || null;
+      }
+      
+      const totalResult = await getChatHistory(roomId, 1, 1);
+      setTotalMessageCount(totalResult.pagination.total);
+      
+      const collapsed = totalResult.pagination.total - result.pagination.total;
+      setCollapsedMessageCount(Math.max(0, collapsed));
+      setHasMoreHistory(collapsed > 0);
+      setIsAllHistoryLoaded(false);
+      
+    } catch (error) {
+      console.error('加载本月消息失败:', error);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [roomId, getCurrentMonthRange]);
+
+  const loadAllMessages = useCallback(async () => {
+    console.log('加载所有消息（不带时间范围）');
+    
+    setLoadingHistory(true);
+    try {
+      const result = await getChatHistory(roomId, 1, 1000);
+      console.log('所有消息结果:', {
+        count: result.messages.length,
+        total: result.pagination.total
+      });
+      
+      const sortedMessages = [...result.messages].sort((a, b) => {
+        const aDate = new Date(a.created_at || a.createdAt || 0);
+        const bDate = new Date(b.created_at || b.createdAt || 0);
+        return aDate.getTime() - bDate.getTime();
+      });
+      
+      setMessages(sortedMessages);
+      setTotalMessageCount(result.pagination.total);
+      setCollapsedMessageCount(0);
+      setHasMoreHistory(false);
+      setIsAllHistoryLoaded(true);
+      
+      if (sortedMessages.length > 0) {
+        earliestMessageIdRef.current = sortedMessages[0].id || null;
+      }
+      
+    } catch (error) {
+      console.error('加载所有消息失败:', error);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [roomId]);
+
   useEffect(() => {
-    // 创建Socket连接
     const newSocket = io(API_BASE.replace('/api', ''), {
       transports: ['websocket'],
       withCredentials: true
@@ -39,15 +137,12 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
       setSocket(newSocket);
     }, 0);
 
-    // 连接成功
     newSocket.on('connect', () => {
       console.log('聊天Socket连接成功');
       
-      // 使用最新的用户信息
       const { roomId: currentRoomId, userId: currentUserId, username: currentUsername } = userInfoRef.current;
       console.log('准备加入房间，参数:', { roomId: currentRoomId, userId: currentUserId, username: currentUsername });
       
-      // 验证用户信息
       if (!currentUserId || !currentUsername) {
         console.error('用户信息不完整，无法加入房间:', { userId: currentUserId, username: currentUsername });
         return;
@@ -55,7 +150,6 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
       
       setIsConnected(true);
       
-      // 加入聊天房间
       newSocket.emit('join_chat_room', { 
         roomId: currentRoomId, 
         userId: currentUserId, 
@@ -64,41 +158,36 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
       });
     });
 
-    // 收到历史消息
     newSocket.on('chat_history', (historyMessages: ChatMessage[]) => {
-      console.log('📥 收到历史消息:', historyMessages.length, '条');
-      console.log('历史消息内容预览:', historyMessages.slice(0, 3).map(msg => ({
-        id: msg.id,
-        content: msg.content?.substring(0, 30) + '...',
-        username: msg.username,
-        createdAt: msg.created_at
-      })));
-      setMessages(historyMessages);
-      console.log('✅ 历史消息已设置到状态中');
+      console.log('📥 收到socket历史消息（忽略，使用API按时间范围查询）:', historyMessages.length, '条');
+      // 忽略 socket 发送的历史消息，改用 API 按时间范围查询
     });
 
-    // 收到新消息
     newSocket.on('receive_chat_message', (message: ChatMessage) => {
       console.log('收到新消息:', message);
       setMessages(prev => [...prev, message]);
+      
+      setTimeout(() => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+      
+      setTotalMessageCount(prev => prev + 1);
     });
 
-    // 用户加入
     newSocket.on('user_joined', (data: { username: string }) => {
       console.log(`${data.username} 加入了聊天`);
     });
 
-    // 用户离开
     newSocket.on('user_left', (data: { username: string }) => {
       console.log(`${data.username} 离开了聊天`);
     });
 
-    // 错误处理
     newSocket.on('error', (error: { message: string }) => {
       console.error('聊天错误:', error.message);
     });
 
-    // 断开连接
     newSocket.on('disconnect', () => {
       setIsConnected(false);
       console.log('聊天Socket断开连接');
@@ -108,27 +197,28 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
       console.log('清理Socket连接');
       newSocket.close();
     };
-  }, []); // 只在组件挂载时初始化一次
+  }, []);
 
-  // 监听roomId变化，重新加入房间
   useEffect(() => {
     if (socket && isConnected && roomId && userId > 0 && username) {
       console.log('roomId变化，重新加入房间:', roomId);
       
-      // 先离开当前房间（如果在房间中）
       const currentRoomId = userInfoRef.current.roomId;
       if (currentRoomId && currentRoomId !== roomId) {
         console.log('离开当前房间:', currentRoomId);
         socket.emit('leave_chat_room', { roomId: currentRoomId });
       }
       
-      // 更新用户信息ref
       userInfoRef.current = { roomId, userId, username, nickname };
       
-      // 清空旧消息（在加入新房间之前）
       setMessages([]);
+      earliestMessageIdRef.current = null;
+      setHasMoreHistory(false);
+      setTotalMessageCount(0);
+      setCurrentMonthMessageCount(0);
+      setCollapsedMessageCount(0);
+      setIsAllHistoryLoaded(false);
       
-      // 加入新房间
       console.log('加入新房间:', roomId);
       socket.emit('join_chat_room', { 
         roomId, 
@@ -136,21 +226,111 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
         username,
         nickname
       });
+      
+      loadCurrentMonthMessages();
     }
-  }, [roomId, socket, isConnected, userId, username, nickname]);
+  }, [roomId, socket, isConnected, userId, username, nickname, loadCurrentMonthMessages]);
 
-  // 发送普通消息
-  const sendMessage = useCallback((content: string, messageType: string = 'text') => {
+  useEffect(() => {
+    if (socket && isConnected && roomId > 0 && userId > 0) {
+      loadCurrentMonthMessages();
+    }
+  }, [socket, isConnected, roomId, userId, loadCurrentMonthMessages]);
+
+  const loadMoreHistory = useCallback(async () => {
+    if (loadingHistory) {
+      console.log('跳过加载历史消息: loadingHistory = true');
+      return;
+    }
+
+    if (isAllHistoryLoaded) {
+      console.log('已经加载了所有消息');
+      return;
+    }
+
+    if (collapsedMessageCount > 0) {
+      console.log('有被折叠的消息，点击加载所有消息');
+      await loadAllMessages();
+      return;
+    }
+
+    console.log('开始加载历史消息，earliestMessageId:', earliestMessageIdRef.current);
+    setLoadingHistory(true);
+
+    try {
+      const result = await getChatHistory(
+        roomId, 
+        1, 
+        50, 
+        earliestMessageIdRef.current || undefined
+      );
+      console.log('加载历史消息结果:', {
+        count: result.messages.length,
+        total: result.pagination.total,
+        beforeId: earliestMessageIdRef.current
+      });
+      
+      if (result.messages.length > 0) {
+        const sortedNewMessages = [...result.messages].sort((a, b) => {
+          const aDate = new Date(a.created_at || a.createdAt || 0);
+          const bDate = new Date(b.created_at || b.createdAt || 0);
+          return aDate.getTime() - bDate.getTime();
+        });
+        
+        earliestMessageIdRef.current = sortedNewMessages[0].id || null;
+        setHasMoreHistory(result.messages.length >= 50);
+        
+        setMessages(prev => {
+          const newMessages = [...sortedNewMessages, ...prev];
+          const uniqueMessages = Array.from(
+            new Map(newMessages.map(m => [m.id, m])).values()
+          ).sort((a, b) => {
+            const aDate = new Date(a.created_at || a.createdAt || 0);
+            const bDate = new Date(b.created_at || b.createdAt || 0);
+            return aDate.getTime() - bDate.getTime();
+          });
+          console.log('合并后消息数量:', uniqueMessages.length);
+          return uniqueMessages;
+        });
+        
+      } else {
+        setHasMoreHistory(false);
+        console.log('没有更多消息，设置 hasMoreHistory = false');
+      }
+    } catch (error) {
+      console.error('加载历史消息失败:', error);
+      setHasMoreHistory(false);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [roomId, loadingHistory, isAllHistoryLoaded, collapsedMessageCount, loadAllMessages]);
+
+  const sendMessage = useCallback((
+    content: string, 
+    messageType: 'text' | 'image' | 'file' = 'text',
+    extraData?: {
+      file_name?: string;
+      file_size?: number;
+      file_url?: string;
+    }
+  ) => {
     if (socket && isConnected) {
-      socket.emit('send_chat_message', {
+      const messageData: any = {
         roomId,
         content,
         messageType
-      });
+      };
+      
+      if (extraData) {
+        if (extraData.file_name) messageData.file_name = extraData.file_name;
+        if (extraData.file_size) messageData.file_size = extraData.file_size;
+        if (extraData.file_url) messageData.file_url = extraData.file_url;
+      }
+      
+      socket.emit('send_chat_message', messageData);
     }
   }, [socket, isConnected, roomId]);
 
-  // 发送系统消息
   const sendSystemMessage = useCallback((message: string) => {
     if (socket && isConnected) {
       socket.emit('send_system_message', {
@@ -164,6 +344,18 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
     socket,
     messages,
     isConnected,
+    loadingHistory,
+    hasMoreHistory,
+    totalMessageCount,
+    currentMonthMessageCount,
+    collapsedMessageCount,
+    isAllHistoryLoaded,
+    loadMoreHistory,
+    loadAllMessages,
+    loadCurrentMonthMessages,
+    setAllMessages,
+    prependMessages,
+    messagesEndRef,
     sendMessage,
     sendSystemMessage
   };
