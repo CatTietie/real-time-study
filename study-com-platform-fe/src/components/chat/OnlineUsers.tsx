@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Card, List, Avatar, Tag, Spin, Button, Tooltip, Popover, Badge, Input, Empty, message } from 'antd';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Card, List, Avatar, Tag, Spin, Button, Tooltip, Popover, Badge, Input, Empty, message, Popconfirm } from 'antd';
 import { 
   UserOutlined, 
   UsergroupAddOutlined,
@@ -14,7 +14,8 @@ import {
   UserAddOutlined,
   ReloadOutlined,
   LoadingOutlined,
-  CheckCircleOutlined
+  CheckCircleOutlined,
+  InfoCircleOutlined
 } from '@ant-design/icons';
 import { getAvailableUsers, addUserToRoom } from '../../services/chat';
 import type { AvailableUser } from '../../types/chat';
@@ -119,17 +120,17 @@ const getAvatarGradient = (username: string): string => {
 const generateLastActiveTime = (): string => {
   const minutes = Math.floor(Math.random() * 60);
   if (minutes < 5) return '刚刚';
-  if (minutes < 30) return `${minutes}分钟前`;
+  if (minutes < 30) return `${minutes}分钟前';
   const hours = Math.floor(Math.random() * 24);
   if (hours < 1) return '1小时内';
-  if (hours < 24) return `${hours}小时前`;
+  if (hours < 24) return `${hours}小时前';
   return '1天前';
 };
 
 const generateUserStatus = (): 'online' | 'away' | 'offline' => {
   const random = Math.random();
-  if (random > 0.5) return 'online';
-  if (random > 0.2) return 'away';
+  if (random > 0.3) return 'online';
+  if (random > 0.1) return 'away';
   return 'offline';
 };
 
@@ -142,74 +143,38 @@ export const OnlineUsers: React.FC<OnlineUsersProps> = ({ roomId, socket, sendSy
   const [activeTab, setActiveTab] = useState<'online' | 'available'>('online');
   const [hoveredUserId, setHoveredUserId] = useState<number | null>(null);
   
-  const containerRef = useRef<HTMLDivElement>(null);
+  const roomIdRef = useRef(roomId);
+  const socketRef = useRef(socket);
+  const onlineUsersRef = useRef(onlineUsers);
 
   useEffect(() => {
-    if (!socket || !roomId) return;
+    roomIdRef.current = roomId;
+    socketRef.current = socket;
+    onlineUsersRef.current = onlineUsers;
+  }, [roomId, socket, onlineUsers]);
 
-    const loadOnlineUsers = () => {
-      setLoadingOnline(true);
-      socket.emit('get_online_users', { roomId });
-    };
+  const loadOnlineUsers = useCallback(() => {
+    const currentSocket = socketRef.current;
+    const currentRoomId = roomIdRef.current;
+    
+    if (!currentSocket || !currentRoomId) return;
+    
+    console.log('加载在线用户列表, roomId:', currentRoomId);
+    setLoadingOnline(true);
+    currentSocket.emit('get_online_users', { roomId: currentRoomId });
+  }, []);
 
-    socket.on('online_users_list', (users: OnlineUser[]) => {
-      const enhancedUsers = users.map((user, index) => ({
-        ...user,
-        status: (user.status as UserStatus) || 'online',
-        role: index === 0 ? 'admin' as UserRole : (index < 3 ? 'active' as UserRole : 'normal' as UserRole),
-        messageCount: Math.floor(Math.random() * 20)
-      }));
-      setOnlineUsers(enhancedUsers);
-      setLoadingOnline(false);
-    });
-
-    socket.on('user_joined', (data: { userId: number; username: string }) => {
-      setOnlineUsers(prev => {
-        if (!prev.some(user => user.userId === data.userId)) {
-          return [...prev, {
-            userId: data.userId,
-            username: data.username,
-            joinTime: new Date().toISOString(),
-            status: 'online',
-            role: 'normal',
-            messageCount: 0
-          }];
-        }
-        return prev;
-      });
-    });
-
-    socket.on('user_left', (data: { userId: number }) => {
-      setOnlineUsers(prev => prev.filter(user => user.userId !== data.userId));
-    });
-
-    socket.on('user_status_changed', (data: { userId: number; username: string; status: UserStatus }) => {
-      setOnlineUsers(prev => prev.map(user => {
-        if (user.userId === data.userId) {
-          return { ...user, status: data.status };
-        }
-        return user;
-      }));
-    });
-
-    loadOnlineUsers();
-    const interval = setInterval(loadOnlineUsers, 10000);
-
-    return () => {
-      socket.off('online_users_list');
-      socket.off('user_joined');
-      socket.off('user_left');
-      socket.off('user_status_changed');
-      clearInterval(interval);
-    };
-  }, [socket, roomId]);
-
-  const loadAvailableUsers = async () => {
+  const loadAvailableUsers = useCallback(async () => {
+    const currentRoomId = roomIdRef.current;
+    const currentOnlineUsers = onlineUsersRef.current;
+    
+    if (!currentRoomId || currentRoomId <= 0) return;
+    
     try {
       setLoadingAvailable(true);
-      const userList = await getAvailableUsers(roomId);
+      const userList = await getAvailableUsers(currentRoomId);
       
-      const onlineUserIds = onlineUsers.map(u => u.userId);
+      const onlineUserIds = currentOnlineUsers.map(u => u.userId);
       const filteredUsers = userList.filter(u => 
         u.id !== currentUser?.id && !onlineUserIds.includes(u.id)
       );
@@ -228,13 +193,79 @@ export const OnlineUsers: React.FC<OnlineUsersProps> = ({ roomId, socket, sendSy
     } finally {
       setLoadingAvailable(false);
     }
-  };
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!socket || !roomId) return;
+
+    const handleOnlineUsersList = (users: OnlineUser[]) => {
+      console.log('收到在线用户列表:', users);
+      const enhancedUsers = users.map((user, index) => ({
+        ...user,
+        status: (user.status as UserStatus) || 'online',
+        role: index === 0 ? 'admin' as UserRole : (index < 3 ? 'active' as UserRole : 'normal' as UserRole),
+        messageCount: Math.floor(Math.random() * 20)
+      }));
+      setOnlineUsers(enhancedUsers);
+      setLoadingOnline(false);
+    };
+
+    const handleUserJoined = (data: { userId: number; username: string }) => {
+      console.log('用户加入:', data);
+      setOnlineUsers(prev => {
+        if (!prev.some(user => user.userId === data.userId)) {
+          return [...prev, {
+            userId: data.userId,
+            username: data.username,
+            joinTime: new Date().toISOString(),
+            status: 'online',
+            role: 'normal',
+            messageCount: 0
+          }];
+        }
+        return prev;
+      });
+      loadOnlineUsers();
+    };
+
+    const handleUserLeft = (data: { userId: number }) => {
+      console.log('用户离开:', data);
+      setOnlineUsers(prev => prev.filter(user => user.userId !== data.userId));
+      loadOnlineUsers();
+    };
+
+    const handleUserStatusChanged = (data: { userId: number; username: string; status: UserStatus }) => {
+      console.log('用户状态变化:', data);
+      setOnlineUsers(prev => prev.map(user => {
+        if (user.userId === data.userId) {
+          return { ...user, status: data.status };
+        }
+        return user;
+      }));
+    };
+
+    socket.on('online_users_list', handleOnlineUsersList);
+    socket.on('user_joined', handleUserJoined);
+    socket.on('user_left', handleUserLeft);
+    socket.on('user_status_changed', handleUserStatusChanged);
+
+    loadOnlineUsers();
+    const interval = setInterval(loadOnlineUsers, 10000);
+
+    return () => {
+      socket.off('online_users_list', handleOnlineUsersList);
+      socket.off('user_joined', handleUserJoined);
+      socket.off('user_left', handleUserLeft);
+      socket.off('user_status_changed', handleUserStatusChanged);
+      clearInterval(interval);
+    };
+  }, [socket, roomId, loadOnlineUsers]);
 
   useEffect(() => {
     if (activeTab === 'available' && availableUsers.length === 0 && roomId > 0) {
       loadAvailableUsers();
     }
-  }, [activeTab, roomId]);
+  }, [activeTab, roomId, loadAvailableUsers, availableUsers.length]);
 
   useEffect(() => {
     const onlineUserIds = onlineUsers.map(u => u.userId);
@@ -282,15 +313,297 @@ export const OnlineUsers: React.FC<OnlineUsersProps> = ({ roomId, socket, sendSy
 
   const otherOnlineUsers = onlineUsers.filter(u => u.userId !== currentUser?.id);
 
-  const statusCounts = {
-    online: otherOnlineUsers.filter(u => u.status === 'online').length,
-    away: otherOnlineUsers.filter(u => u.status === 'away').length,
-    busy: otherOnlineUsers.filter(u => u.status === 'busy').length
-  };
-
   const formatJoinTime = (joinTime: string) => {
     const date = new Date(joinTime);
     return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const renderOnlineUserItem = (user: OnlineUser) => {
+    const isHovered = hoveredUserId === user.userId;
+    const statusConfig = STATUS_CONFIG[user.status || 'online'];
+    const roleConfig = ROLE_CONFIG[user.role || 'normal'];
+
+    const userDetailContent = (
+      <div style={{ padding: '8px', minWidth: '180px' }}>
+        <div style={{ fontWeight: '600', marginBottom: '8px', color: '#334155' }}>
+          {user.username}
+        </div>
+        <div style={{ fontSize: '12px', color: '#718096', marginBottom: '4px' }}>
+          <span style={{ marginRight: '12px' }}>
+            <InfoCircleOutlined style={{ marginRight: '4px' }} />
+            {roleConfig.label}
+          </span>
+        </div>
+        <div style={{ fontSize: '12px', color: '#718096', marginBottom: '4px' }}>
+          <span style={{ color: statusConfig.color, marginRight: '12px' }}>
+            {statusConfig.icon} {statusConfig.label}
+          </span>
+        </div>
+        <div style={{ fontSize: '12px', color: '#a0aec0' }}>
+          <ClockCircleOutlined style={{ marginRight: '4px' }} />
+          加入于 {formatJoinTime(user.joinTime)}
+          {user.messageCount !== undefined && user.messageCount > 0 && (
+            <span style={{ marginLeft: '12px' }}>
+              <MessageOutlined style={{ marginRight: '4px' }} />
+              {user.messageCount} 条消息
+            </span>
+          )}
+        </div>
+      </div>
+    );
+
+    return (
+      <List.Item
+        key={user.userId}
+        style={{
+          padding: '8px 12px',
+          borderBottom: '1px solid rgba(226, 232, 240, 0.3)',
+          transition: 'all 0.3s ease',
+          borderRadius: '8px',
+          margin: '2px 8px',
+          background: isHovered ? 'rgba(102, 126, 234, 0.05)' : 'transparent',
+          cursor: 'pointer'
+        }}
+        onMouseEnter={() => setHoveredUserId(user.userId)}
+        onMouseLeave={() => setHoveredUserId(null)}
+      >
+        <List.Item.Meta
+          avatar={
+            <Popover
+              content={userDetailContent}
+              title={null}
+              placement="left"
+              trigger="hover"
+              arrowPointAtCenter
+            >
+              <div style={{ position: 'relative' }}>
+                <Avatar
+                  size={32}
+                  style={{
+                    background: getAvatarGradient(user.username),
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    boxShadow: isHovered 
+                      ? `0 4px 12px ${statusConfig.color}30`
+                      : 'none',
+                    transform: isHovered ? 'scale(1.1)' : 'scale(1)',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  {user.username.charAt(0).toUpperCase()}
+                </Avatar>
+                <Badge
+                  status={
+                    user.status === 'online' ? 'success' :
+                    user.status === 'away' ? 'warning' : 'error'
+                  }
+                  style={{
+                    position: 'absolute',
+                    bottom: '0',
+                    right: '0',
+                    transform: 'scale(1.2)',
+                    boxShadow: '0 0 0 2px #fff'
+                  }}
+                />
+              </div>
+            </Popover>
+          }
+          title={
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px'
+            }}>
+              <span style={{ 
+                fontWeight: '500', 
+                color: isHovered ? '#667eea' : '#334155',
+                fontSize: '13px',
+                transition: 'all 0.3s ease'
+              }}>
+                {user.username}
+              </span>
+              
+              {user.role !== 'normal' && (
+                <span style={{ 
+                  fontSize: '11px', 
+                  color: roleConfig.color,
+                  opacity: 0.8
+                }}>
+                  {roleConfig.icon}
+                </span>
+              )}
+              
+              <span style={{ 
+                fontSize: '10px', 
+                color: statusConfig.color,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '2px'
+              }}>
+                {statusConfig.icon}
+              </span>
+            </div>
+          }
+        />
+      </List.Item>
+    );
+  };
+
+  const renderAvailableUserItem = (user: EnhancedAvailableUser) => {
+    const isHovered = hoveredUserId === user.id;
+    const statusConfig = STATUS_CONFIG[user.status || 'offline'];
+    const roleConfig = ROLE_CONFIG[user.role || 'normal'];
+
+    const userDetailContent = (
+      <div style={{ padding: '8px', minWidth: '160px' }}>
+        <div style={{ fontWeight: '600', marginBottom: '8px', color: '#334155' }}>
+          {user.nickname || user.username}
+        </div>
+        <div style={{ fontSize: '12px', color: '#718096', marginBottom: '4px' }}>
+          @{user.username}
+        </div>
+        <div style={{ fontSize: '12px', color: '#718096', marginBottom: '4px' }}>
+          <span style={{ marginRight: '12px' }}>
+            {roleConfig.icon} {roleConfig.label}
+          </span>
+        </div>
+        <div style={{ fontSize: '12px', color: '#a0aec0' }}>
+          <ClockCircleOutlined style={{ marginRight: '4px' }} />
+          最后活跃: {user.lastActive}
+        </div>
+      </div>
+    );
+
+    return (
+      <List.Item
+        key={user.id}
+        style={{
+          padding: '6px 12px',
+          borderBottom: '1px solid rgba(226, 232, 240, 0.3)',
+          transition: 'all 0.3s ease',
+          borderRadius: '8px',
+          margin: '2px 8px',
+          background: isHovered ? 'rgba(102, 126, 234, 0.05)' : 'transparent',
+          minHeight: '48px',
+          display: 'flex',
+          alignItems: 'center'
+        }}
+        onMouseEnter={() => setHoveredUserId(user.id)}
+        onMouseLeave={() => setHoveredUserId(null)}
+        actions={[
+          <Popconfirm
+            title={
+              <span>确认邀请 <strong>{user.nickname || user.username}</strong> 加入聊天室？</span>
+            }
+            onConfirm={() => handleInviteUser(user.id, user.username)}
+            okText="邀请"
+            cancelText="取消"
+            disabled={user.status === 'offline'}
+          >
+            <Button
+              type="primary"
+              icon={user.isInviting ? <LoadingOutlined /> : <UserAddOutlined />}
+              size="small"
+              loading={user.isInviting}
+              disabled={user.status === 'offline'}
+              style={{
+                borderRadius: '6px',
+                padding: '0 10px',
+                height: '26px',
+                fontSize: '11px',
+                background: user.isInviting || user.status === 'offline'
+                  ? '#cbd5e0'
+                  : 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+                border: 'none',
+                boxShadow: user.isInviting || user.status === 'offline'
+                  ? 'none'
+                  : '0 2px 6px rgba(102, 126, 234, 0.3)',
+                transition: 'all 0.3s ease'
+              }}
+            >
+              {user.isInviting ? '邀请中...' : '邀请'}
+            </Button>
+          </Popconfirm>
+        ]}
+      >
+        <List.Item.Meta
+          avatar={
+            <Popover
+              content={userDetailContent}
+              title={null}
+              placement="left"
+              trigger="hover"
+              arrowPointAtCenter
+            >
+              <div style={{ position: 'relative' }}>
+                <Avatar
+                  size={28}
+                  style={{
+                    background: getAvatarGradient(user.username),
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    opacity: user.status === 'offline' ? 0.6 : 1,
+                    transform: isHovered ? 'scale(1.1)' : 'scale(1)',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  {user.username.charAt(0).toUpperCase()}
+                </Avatar>
+                <Badge
+                  status={
+                    user.status === 'online' ? 'success' :
+                    user.status === 'away' ? 'warning' : 'default'
+                  }
+                  style={{
+                    position: 'absolute',
+                    bottom: '0',
+                    right: '0',
+                    transform: 'scale(1.1)',
+                    boxShadow: '0 0 0 2px #fff'
+                  }}
+                />
+              </div>
+            </Popover>
+          }
+          title={
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px'
+            }}>
+              <span style={{ 
+                fontWeight: '500', 
+                color: isHovered ? '#667eea' : '#334155',
+                fontSize: '13px',
+                opacity: user.status === 'offline' ? 0.6 : 1,
+                transition: 'all 0.3s ease'
+              }}>
+                {user.nickname || user.username}
+              </span>
+              
+              {user.role !== 'normal' && (
+                <span style={{ 
+                  fontSize: '10px', 
+                  color: roleConfig.color,
+                  opacity: 0.7
+                }}>
+                  {roleConfig.icon}
+                </span>
+              )}
+              
+              <span style={{ 
+                fontSize: '10px', 
+                color: statusConfig.color,
+                display: 'inline-flex',
+                alignItems: 'center'
+              }}>
+                {statusConfig.icon}
+              </span>
+            </div>
+          }
+        />
+      </List.Item>
+    );
   };
 
   return (
@@ -328,7 +641,7 @@ export const OnlineUsers: React.FC<OnlineUsersProps> = ({ roomId, socket, sendSy
     >
       <div style={{ 
         display: 'flex', 
-        borderBottom: '1px solid rgba(226, 232, 240, 0.5)' 
+        borderBottom: '1px solid rgba(226, 232, 240, 0.5)'
       }}>
         <div
           onClick={() => setActiveTab('online')}
@@ -405,7 +718,6 @@ export const OnlineUsers: React.FC<OnlineUsersProps> = ({ roomId, socket, sendSy
       </div>
 
       <div 
-        ref={containerRef}
         style={{ 
           maxHeight: '180px', 
           overflowY: 'auto',
@@ -415,156 +727,27 @@ export const OnlineUsers: React.FC<OnlineUsersProps> = ({ roomId, socket, sendSy
         {activeTab === 'online' && (
           <>
             {loadingOnline ? (
-              <div style={{ textAlign: 'center', padding: '24px 20px' }}>
-                <Spin size="small" />
-                <div style={{ marginTop: 8, color: '#a0aec0', fontSize: '13px' }}>加载中...</div>
-              </div>
-            ) : otherOnlineUsers.length === 0 ? (
-              <Empty 
-                description={
-                  <span style={{ color: '#a0aec0', fontSize: '13px' }}>
-                    暂无其他在线用户
-                  </span>
-                }
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                style={{ padding: '24px 20px' }}
-              />
-            ) : (
-              <List
-                dataSource={otherOnlineUsers}
-                style={{ padding: '0' }}
-                renderItem={(user) => {
-                  const isHovered = hoveredUserId === user.userId;
-                  const statusConfig = STATUS_CONFIG[user.status || 'online'];
-                  const roleConfig = ROLE_CONFIG[user.role || 'normal'];
-
-                  return (
-                    <List.Item
-                      key={user.userId}
-                      style={{
-                        padding: '8px 12px',
-                        borderBottom: '1px solid rgba(226, 232, 240, 0.3)',
-                        transition: 'all 0.3s ease',
-                        borderRadius: '8px',
-                        margin: '2px 8px',
-                        background: isHovered ? 'rgba(102, 126, 234, 0.05)' : 'transparent'
-                      }}
-                      onMouseEnter={() => setHoveredUserId(user.userId)}
-                      onMouseLeave={() => setHoveredUserId(null)}
-                    >
-                      <List.Item.Meta
-                        avatar={
-                          <div style={{ position: 'relative' }}>
-                            <Avatar
-                              size={36}
-                              style={{
-                                background: getAvatarGradient(user.username),
-                                fontSize: '16px',
-                                fontWeight: '600',
-                                boxShadow: isHovered 
-                                  ? `0 4px 12px ${statusConfig.color}30`
-                                  : 'none',
-                                transform: isHovered ? 'scale(1.1)' : 'scale(1)',
-                                transition: 'all 0.3s ease'
-                              }}
-                            >
-                              {user.username.charAt(0).toUpperCase()}
-                            </Avatar>
-                            <Badge
-                              status={
-                                user.status === 'online' ? 'success' :
-                                user.status === 'away' ? 'warning' : 'error'
-                              }
-                              style={{
-                                position: 'absolute',
-                                bottom: '0',
-                                right: '0',
-                                transform: 'scale(1.3)',
-                                boxShadow: '0 0 0 2px #fff'
-                              }}
-                            />
-                          </div>
-                        }
-                        title={
-                          <div style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '6px',
-                            flexWrap: 'wrap'
-                          }}>
-                            <span style={{ 
-                              fontWeight: '500', 
-                              color: isHovered ? '#667eea' : '#334155',
-                              fontSize: '13px',
-                              transition: 'all 0.3s ease'
-                            }}>
-                              {user.username}
-                            </span>
-                            
-                            {user.role !== 'normal' && (
-                              <Tag
-                                style={{
-                                  margin: 0,
-                                  fontSize: '9px',
-                                  padding: '0 4px',
-                                  height: '16px',
-                                  lineHeight: '14px',
-                                  borderRadius: '4px',
-                                  background: `${roleConfig.color}15`,
-                                  color: roleConfig.color,
-                                  border: 'none'
-                                }}
-                              >
-                                {roleConfig.icon}
-                              </Tag>
-                            )}
-                            
-                            <Tag
-                              style={{
-                                margin: 0,
-                                fontSize: '9px',
-                                padding: '0 6px',
-                                height: '16px',
-                                lineHeight: '14px',
-                                borderRadius: '8px',
-                                background: statusConfig.bgColor,
-                                color: statusConfig.color,
-                                border: 'none',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '3px'
-                              }}
-                            >
-                              {statusConfig.icon}
-                              {statusConfig.label}
-                            </Tag>
-                          </div>
-                        }
-                        description={
-                          <div style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '10px',
-                            marginTop: '2px',
-                            fontSize: '11px'
-                          }}>
-                            <span style={{ color: '#a0aec0' }}>
-                              加入于 {formatJoinTime(user.joinTime)}
-                            </span>
-                            {user.messageCount !== undefined && user.messageCount > 0 && (
-                              <span style={{ color: '#667eea', fontWeight: '500' }}>
-                                <MessageOutlined style={{ marginRight: '2px' }} />
-                                {user.messageCount} 条
-                              </span>
-                            )}
-                          </div>
-                        }
-                      />
-                    </List.Item>
-                  );
-                }}
-              />
-            )}
+            <div style={{ textAlign: 'center', padding: '24px 20px' }}>
+              <Spin size="small" />
+              <div style={{ marginTop: 8, color: '#a0aec0', fontSize: '13px' }}>加载中...</div>
+            </div>
+          ) : otherOnlineUsers.length === 0 ? (
+            <Empty 
+              description={
+                <span style={{ color: '#a0aec0', fontSize: '13px' }}>
+                  暂无其他在线用户
+                </span>
+              }
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              style={{ padding: '24px 20px' }}
+            />
+          ) : (
+            <List
+              dataSource={otherOnlineUsers}
+              style={{ padding: '0' }}
+              renderItem={renderOnlineUserItem}
+            />
+          )}
           </>
         )}
 
@@ -572,7 +755,7 @@ export const OnlineUsers: React.FC<OnlineUsersProps> = ({ roomId, socket, sendSy
           <>
             {searchText === '' && availableUsers.length > 0 && (
               <div style={{ 
-                padding: '8px 12px', 
+                padding: '6px 12px', 
                 borderBottom: '1px solid rgba(226, 232, 240, 0.3)',
                 fontSize: '11px',
                 color: '#718096'
@@ -614,176 +797,7 @@ export const OnlineUsers: React.FC<OnlineUsersProps> = ({ roomId, socket, sendSy
               <List
                 dataSource={filteredAvailableUsers}
                 style={{ padding: '0' }}
-                renderItem={(user) => {
-                  const isHovered = hoveredUserId === user.id;
-                  const statusConfig = STATUS_CONFIG[user.status || 'offline'];
-                  const roleConfig = ROLE_CONFIG[user.role || 'normal'];
-
-                  return (
-                    <List.Item
-                      key={user.id}
-                      style={{
-                        padding: '8px 12px',
-                        borderBottom: '1px solid rgba(226, 232, 240, 0.3)',
-                        transition: 'all 0.3s ease',
-                        borderRadius: '8px',
-                        margin: '2px 8px',
-                        background: isHovered ? 'rgba(102, 126, 234, 0.05)' : 'transparent'
-                      }}
-                      onMouseEnter={() => setHoveredUserId(user.id)}
-                      onMouseLeave={() => setHoveredUserId(null)}
-                      actions={[
-                        <Tooltip title={`邀请 ${user.nickname || user.username} 加入聊天室`}>
-                          <Button
-                            type="primary"
-                            icon={user.isInviting ? <LoadingOutlined /> : <UserAddOutlined />}
-                            size="small"
-                            onClick={() => handleInviteUser(user.id, user.username)}
-                            loading={user.isInviting}
-                            disabled={user.status === 'offline'}
-                            style={{
-                              borderRadius: '8px',
-                              padding: '0 12px',
-                              height: '28px',
-                              fontSize: '12px',
-                              background: user.isInviting || user.status === 'offline'
-                                ? '#cbd5e0'
-                                : 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
-                              border: 'none',
-                              boxShadow: user.isInviting || user.status === 'offline'
-                                ? 'none'
-                                : '0 2px 8px rgba(102, 126, 234, 0.3)',
-                              transition: 'all 0.3s ease'
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!user.isInviting && user.status !== 'offline') {
-                                e.currentTarget.style.transform = 'translateY(-1px)';
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.transform = 'translateY(0)';
-                              e.currentTarget.style.boxShadow = user.isInviting || user.status === 'offline'
-                                ? 'none'
-                                : '0 2px 8px rgba(102, 126, 234, 0.3)';
-                            }}
-                          >
-                            {user.isInviting ? '邀请中...' : '邀请'}
-                          </Button>
-                        </Tooltip>
-                      ]}
-                    >
-                      <List.Item.Meta
-                        avatar={
-                          <div style={{ position: 'relative' }}>
-                            <Avatar
-                              size={36}
-                              style={{
-                                background: getAvatarGradient(user.username),
-                                fontSize: '16px',
-                                fontWeight: '600',
-                                opacity: user.status === 'offline' ? 0.6 : 1,
-                                boxShadow: isHovered && user.status !== 'offline'
-                                  ? `0 4px 12px ${statusConfig.color}30`
-                                  : 'none',
-                                transform: isHovered ? 'scale(1.1)' : 'scale(1)',
-                                transition: 'all 0.3s ease',
-                                filter: user.status === 'offline' ? 'grayscale(30%)' : 'none'
-                              }}
-                            >
-                              {user.username.charAt(0).toUpperCase()}
-                            </Avatar>
-                            <Badge
-                              status={
-                                user.status === 'online' ? 'success' :
-                                user.status === 'away' ? 'warning' : 'default'
-                              }
-                              style={{
-                                position: 'absolute',
-                                bottom: '0',
-                                right: '0',
-                                transform: 'scale(1.3)',
-                                boxShadow: '0 0 0 2px #fff'
-                              }}
-                            />
-                          </div>
-                        }
-                        title={
-                          <div style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '6px',
-                            flexWrap: 'wrap'
-                          }}>
-                            <span style={{ 
-                              fontWeight: '500', 
-                              color: isHovered ? '#667eea' : '#334155',
-                              fontSize: '13px',
-                              opacity: user.status === 'offline' ? 0.6 : 1,
-                              transition: 'all 0.3s ease'
-                            }}>
-                              {user.nickname || user.username}
-                            </span>
-                            
-                            {user.role !== 'normal' && (
-                              <Tag
-                                style={{
-                                  margin: 0,
-                                  fontSize: '9px',
-                                  padding: '0 4px',
-                                  height: '16px',
-                                  lineHeight: '14px',
-                                  borderRadius: '4px',
-                                  background: `${roleConfig.color}15`,
-                                  color: roleConfig.color,
-                                  border: 'none'
-                                }}
-                              >
-                                {roleConfig.icon}
-                              </Tag>
-                            )}
-                            
-                            <Tag
-                              style={{
-                                margin: 0,
-                                fontSize: '9px',
-                                padding: '0 6px',
-                                height: '16px',
-                                lineHeight: '14px',
-                                borderRadius: '8px',
-                                background: statusConfig.bgColor,
-                                color: statusConfig.color,
-                                border: 'none',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '3px'
-                              }}
-                            >
-                              {statusConfig.label}
-                            </Tag>
-                          </div>
-                        }
-                        description={
-                          <div style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '10px',
-                            marginTop: '2px',
-                            fontSize: '11px'
-                          }}>
-                            <span style={{ color: '#a0aec0' }}>
-                              @{user.username}
-                            </span>
-                            <span style={{ color: '#718096' }}>
-                              <ClockCircleOutlined style={{ marginRight: '2px' }} />
-                              {user.lastActive}
-                            </span>
-                          </div>
-                        }
-                      />
-                    </List.Item>
-                  );
-                }}
+                renderItem={renderAvailableUserItem}
               />
             )}
           </>

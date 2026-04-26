@@ -16,10 +16,10 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
-  const [hasMoreHistory, setHasMoreHistory] = useState(true);
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
   const [totalMessageCount, setTotalMessageCount] = useState(0);
   
-  const currentPageRef = useRef(1);
+  const earliestMessageIdRef = useRef<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const userInfoRef = useRef({ roomId, userId, username, nickname });
@@ -74,11 +74,21 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
     newSocket.on('chat_history', (historyMessages: ChatMessage[]) => {
       console.log('📥 收到历史消息:', historyMessages.length, '条');
       setMessages(historyMessages);
-      currentPageRef.current = 2;
       
       if (historyMessages.length > 0) {
-        loadTotalMessageCount();
+        const sortedMessages = [...historyMessages].sort((a, b) => {
+          const aId = a.id || 0;
+          const bId = b.id || 0;
+          return aId - bId;
+        });
+        earliestMessageIdRef.current = sortedMessages[0].id || null;
+        setHasMoreHistory(historyMessages.length >= 10);
+      } else {
+        earliestMessageIdRef.current = null;
+        setHasMoreHistory(false);
       }
+      
+      loadTotalMessageCount();
     });
 
     newSocket.on('receive_chat_message', (message: ChatMessage) => {
@@ -128,8 +138,8 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
       userInfoRef.current = { roomId, userId, username, nickname };
       
       setMessages([]);
-      currentPageRef.current = 1;
-      setHasMoreHistory(true);
+      earliestMessageIdRef.current = null;
+      setHasMoreHistory(false);
       setTotalMessageCount(0);
       
       console.log('加入新房间:', roomId);
@@ -157,22 +167,34 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
       return;
     }
 
-    console.log('开始加载历史消息，页码:', currentPageRef.current);
+    console.log('开始加载历史消息，earliestMessageId:', earliestMessageIdRef.current);
     setLoadingHistory(true);
 
     try {
-      const result = await getChatHistory(roomId, currentPageRef.current, 50);
+      const result = await getChatHistory(
+        roomId, 
+        1, 
+        50, 
+        earliestMessageIdRef.current || undefined
+      );
       console.log('加载历史消息结果:', {
         count: result.messages.length,
         total: result.pagination.total,
-        hasNext: result.pagination.hasNext
+        beforeId: earliestMessageIdRef.current
       });
       
       if (result.messages.length > 0) {
-        const currentMessages = [...result.messages];
+        const sortedNewMessages = [...result.messages].sort((a, b) => {
+          const aDate = new Date(a.created_at || a.createdAt || 0);
+          const bDate = new Date(b.created_at || b.createdAt || 0);
+          return aDate.getTime() - bDate.getTime();
+        });
+        
+        earliestMessageIdRef.current = sortedNewMessages[0].id || null;
+        setHasMoreHistory(result.messages.length >= 50);
         
         setMessages(prev => {
-          const newMessages = [...currentMessages, ...prev];
+          const newMessages = [...sortedNewMessages, ...prev];
           const uniqueMessages = Array.from(
             new Map(newMessages.map(m => [m.id, m])).values()
           ).sort((a, b) => {
@@ -184,19 +206,14 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
           return uniqueMessages;
         });
         
-        currentPageRef.current += 1;
-        setHasMoreHistory(result.pagination.hasNext);
         setTotalMessageCount(result.pagination.total);
-        console.log('更新状态:', {
-          nextPage: currentPageRef.current,
-          hasMore: result.pagination.hasNext
-        });
       } else {
         setHasMoreHistory(false);
         console.log('没有更多消息，设置 hasMoreHistory = false');
       }
     } catch (error) {
       console.error('加载历史消息失败:', error);
+      setHasMoreHistory(false);
     } finally {
       setLoadingHistory(false);
     }

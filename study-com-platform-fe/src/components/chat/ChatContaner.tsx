@@ -305,21 +305,27 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         height: 'calc(100% - 44px)', 
         padding: '12px 16px',
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        overflow: 'hidden'
       }}
     >
-      <Row gutter={12} style={{ flex: 1, display: 'flex' }}>
-        <Col span={18} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <CompactMessageList 
-            roomId={roomId}
-            currentUserId={user?.id}
-            username={user?.username || ''}
-            nickname={user?.nickname}
-            onNewMessage={(message) => {
-              console.log('收到新消息:', message);
-            }}
-          />
-          <div style={{ marginTop: '12px' }}>
+      <Row gutter={12} style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+        <Col span={18} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+            <CompactMessageList 
+              roomId={roomId}
+              currentUserId={user?.id}
+              username={user?.username || ''}
+              nickname={user?.nickname}
+              onNewMessage={(message) => {
+                console.log('收到新消息:', message);
+              }}
+            />
+          </div>
+          <div style={{ 
+            marginTop: '12px',
+            flexShrink: 0
+          }}>
             <MessageInput 
               value={inputValue}
               onChange={setInputValue}
@@ -330,7 +336,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
             />
           </div>
         </Col>
-        <Col span={6} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <Col span={6} style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflow: 'hidden' }}>
           <ChatRoomSelector 
             currentRoomId={roomId}
             onRoomChange={onRoomChange}

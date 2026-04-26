@@ -60,7 +60,7 @@ export const initChatSockets = (io: Server) => {
           message: `${data.username} 加入了聊天`
         });
 
-        // 发送历史消息（最近50条）
+        // 发送历史消息（最近10条，默认不显示太多）
         console.log('开始查询房间历史消息:', data.roomId);
         const recentMessages = await ChatMessage.findAll({
           where: { room_id: data.roomId },
@@ -69,7 +69,7 @@ export const initChatSockets = (io: Server) => {
             attributes: ['id', 'username', 'nickname']
           }],
           order: [['created_at', 'DESC']],
-          limit: 50
+          limit: 10  // 只发送最近10条，用户点击加载更多再获取更早的
         });
         
         console.log(`查询到 ${recentMessages.length} 条历史消息`);
