@@ -5,7 +5,6 @@ import User from "../models/user.model";
 import { Op } from "sequelize";
 import { uploadChatFileToOss } from "../middlewares/upload.middleware";
 import { broadcastToRoom } from "../utils/socketManager";
-import axios from "axios";
 
 const ALLOWED_IMAGE_DOMAINS = [
   'weblog-dev.oss-cn-beijing.aliyuncs.com',
@@ -645,40 +644,46 @@ export const proxyImage = async (req: Request, res: Response) => {
 
     console.log(`[Image Proxy] 代理图片请求: ${url}`);
 
-    const response = await axios.get(url, {
-      responseType: 'arraybuffer',
-      maxContentLength: 10 * 1024 * 1024,
-      timeout: 30000,
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      signal: controller.signal,
       headers: {
         'Accept': 'image/*'
       }
     });
 
-    const contentType = response.headers['content-type'] || 'image/png';
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        success: false,
+        message: `图片获取失败: ${response.status} ${response.statusText}`
+      });
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const contentType = response.headers.get('content-type') || 'image/png';
     
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=86400');
     res.setHeader('Access-Control-Allow-Origin', '*');
     
-    res.send(response.data);
+    res.send(buffer);
     
-    console.log(`[Image Proxy] 图片代理成功: ${contentType}, size: ${response.data?.length || 0} bytes`);
+    console.log(`[Image Proxy] 图片代理成功: ${contentType}, size: ${buffer.length} bytes`);
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[Image Proxy] 图片代理失败:', error);
     
-    if (axios.isAxiosError(error)) {
-      if (error.response) {
-        return res.status(error.response.status).json({
-          success: false,
-          message: `图片获取失败: ${error.response.status} ${error.response.statusText}`
-        });
-      } else if (error.request) {
-        return res.status(504).json({
-          success: false,
-          message: "图片请求超时"
-        });
-      }
+    if (error instanceof Error && error.name === 'AbortError') {
+      return res.status(504).json({
+        success: false,
+        message: "图片请求超时"
+      });
     }
     
     res.status(500).json({
@@ -709,14 +714,27 @@ export const getImageBase64 = async (req: Request, res: Response) => {
 
     console.log(`[Image Base64] 获取图片: ${url}`);
 
-    const response = await axios.get(url, {
-      responseType: 'arraybuffer',
-      maxContentLength: 10 * 1024 * 1024,
-      timeout: 30000
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      signal: controller.signal
     });
 
-    const contentType = response.headers['content-type'] || 'image/png';
-    const base64Data = Buffer.from(response.data, 'binary').toString('base64');
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        success: false,
+        message: `图片获取失败: ${response.status} ${response.statusText}`
+      });
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const contentType = response.headers.get('content-type') || 'image/png';
+    const base64Data = buffer.toString('base64');
     const dataUrl = `data:${contentType};base64,${base64Data}`;
 
     console.log(`[Image Base64] 成功获取图片: ${contentType}, size: ${base64Data.length} chars`);
@@ -730,8 +748,16 @@ export const getImageBase64 = async (req: Request, res: Response) => {
       }
     });
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[Image Base64] 获取图片失败:', error);
+    
+    if (error instanceof Error && error.name === 'AbortError') {
+      return res.status(504).json({
+        success: false,
+        message: "图片请求超时"
+      });
+    }
+    
     res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : "获取图片失败"
