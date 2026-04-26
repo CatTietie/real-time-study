@@ -17,6 +17,7 @@ export interface ChatMessage {
   created_at: string;
   username?: string;
   nickname?: string;
+  avatar?: string;
   file_name?: string;
   file_size?: number;
   file_url?: string;

@@ -223,21 +223,41 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
   const handleCopyMessage = useCallback(async () => {
     if (!contextMenuMessage) return;
     
-    let textToCopy = '';
-    if (contextMenuMessage.message_type === 'text') {
-      textToCopy = contextMenuMessage.content;
-    } else if (contextMenuMessage.message_type === 'image') {
-      textToCopy = contextMenuMessage.file_url || contextMenuMessage.content;
-    } else if (contextMenuMessage.message_type === 'file') {
-      textToCopy = contextMenuMessage.file_url || contextMenuMessage.content;
-    }
-    
     try {
-      await navigator.clipboard.writeText(textToCopy);
-      message.success('已复制到剪贴板');
+      if (contextMenuMessage.message_type === 'text') {
+        await navigator.clipboard.writeText(contextMenuMessage.content);
+        message.success('文字已复制到剪贴板');
+      } else if (contextMenuMessage.message_type === 'image') {
+        const imageUrl = contextMenuMessage.file_url || contextMenuMessage.content;
+        try {
+          const response = await fetch(imageUrl);
+          const blob = await response.blob();
+          const item = new ClipboardItem({ [blob.type]: blob });
+          await navigator.clipboard.write([item]);
+          message.success('图片已复制到剪贴板');
+        } catch (clipboardError) {
+          await navigator.clipboard.writeText(imageUrl);
+          message.success('图片链接已复制到剪贴板（跨域图片无法直接复制）');
+        }
+      } else if (contextMenuMessage.message_type === 'file') {
+        const fileUrl = contextMenuMessage.file_url || contextMenuMessage.content;
+        await navigator.clipboard.writeText(fileUrl);
+        message.success('文件链接已复制到剪贴板');
+      }
     } catch (error) {
       console.error('复制失败:', error);
-      message.error('复制失败');
+      let textToCopy = '';
+      if (contextMenuMessage.message_type === 'text') {
+        textToCopy = contextMenuMessage.content;
+      } else {
+        textToCopy = contextMenuMessage.file_url || contextMenuMessage.content;
+      }
+      try {
+        await navigator.clipboard.writeText(textToCopy);
+        message.success('内容已复制到剪贴板');
+      } catch (e) {
+        message.error('复制失败，请手动复制');
+      }
     }
     
     handleCloseContextMenu();
@@ -531,6 +551,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                 username={user?.username || ''}
                 nickname={user?.nickname}
                 onContextMenu={handleContextMenu}
+                onMentionUser={handleMentionUser}
                 onNewMessage={(message) => {
                   console.log('收到新消息:', message);
                 }}

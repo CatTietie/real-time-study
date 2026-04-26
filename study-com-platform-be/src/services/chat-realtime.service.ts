@@ -7,6 +7,7 @@ interface ClientInfo {
   userId: number;
   username: string;
   nickname?: string;
+  avatar?: string;
   roomId: number;
   joinTime: Date;
   status?: 'online' | 'away' | 'busy';
@@ -37,11 +38,17 @@ export const initChatSockets = (io: Server) => {
         // 加入房间
         socket.join(`chat_${data.roomId}`);
         
+        // 查询用户头像
+        const user = await User.findByPk(data.userId, {
+          attributes: ['id', 'username', 'nickname', 'avatar']
+        });
+        
         // 记录客户端信息
         connectedClients.set(socket.id, {
           userId: data.userId,
           username: data.username,
           nickname: data.nickname,
+          avatar: (user?.toJSON() as any)?.avatar || null,
           roomId: data.roomId,
           joinTime: new Date(),
           status: 'online'
@@ -66,7 +73,7 @@ export const initChatSockets = (io: Server) => {
           where: { room_id: data.roomId },
           include: [{
             model: User,
-            attributes: ['id', 'username', 'nickname']
+            attributes: ['id', 'username', 'nickname', 'avatar']
           }],
           order: [['created_at', 'DESC']],
           limit: 10  // 只发送最近10条，用户点击加载更多再获取更早的
@@ -84,6 +91,7 @@ export const initChatSockets = (io: Server) => {
             ...msgJson,
             username: user?.username || `用户${msgJson.user_id}`,
             nickname: user?.nickname || null,
+            avatar: user?.avatar || null,
             created_at: msgJson.createdAt || msgJson.created_at
           };
           console.log('处理消息:', {
@@ -139,6 +147,8 @@ export const initChatSockets = (io: Server) => {
         const messageData = {
           ...message.toJSON(),
           username: clientInfo.nickname || clientInfo.username,
+          nickname: clientInfo.nickname,
+          avatar: clientInfo.avatar,
           user_id: clientInfo.userId,
           created_at: new Date().toISOString(),
           // 添加文件相关字段（从前端传入的数据中获取）

@@ -142,7 +142,7 @@ export const getChatHistory = async (req: Request, res: Response) => {
       where: whereCondition,
       include: [{
         model: User,
-        attributes: ['id', 'username', 'nickname']
+        attributes: ['id', 'username', 'nickname', 'avatar']
       }],
       order: [['created_at', 'DESC']],
       limit: Number(limit),
@@ -158,6 +158,7 @@ export const getChatHistory = async (req: Request, res: Response) => {
         ...msgJson,
         username: user?.username || `用户${msgJson.user_id}`,
         nickname: user?.nickname || null,
+        avatar: user?.avatar || null,
         created_at: msgJson.createdAt || msgJson.created_at
       };
     });
@@ -215,7 +216,7 @@ export const searchChatMessages = async (req: Request, res: Response) => {
       },
       include: [{
         model: User,
-        attributes: ['id', 'username', 'nickname']
+        attributes: ['id', 'username', 'nickname', 'avatar']
       }],
       order: [['created_at', 'DESC']],
       limit: Number(limit),
@@ -231,6 +232,7 @@ export const searchChatMessages = async (req: Request, res: Response) => {
         ...msgJson,
         username: user?.username || `用户${msgJson.user_id}`,
         nickname: user?.nickname || null,
+        avatar: user?.avatar || null,
         created_at: msgJson.createdAt || msgJson.created_at
       };
     });

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Spin, Button } from 'antd';
-import { HistoryOutlined, LoadingOutlined } from "@ant-design/icons";
+import { Spin, Button, Avatar, Dropdown, Tooltip, Popover } from 'antd';
+import type { MenuProps } from 'antd';
+import { HistoryOutlined, LoadingOutlined, UserOutlined } from "@ant-design/icons";
 import type { ChatMessage } from '../../types/chat';
 import { useChatSocket } from '../../hooks/useChatSocket';
 
@@ -11,7 +12,21 @@ interface CompactMessageListProps {
   username: string;
   nickname?: string;
   onContextMenu?: (e: React.MouseEvent, message: ChatMessage) => void;
+  onMentionUser?: (user: { id: number; username: string; nickname?: string }) => void;
 }
+
+const getAvatarGradient = (username: string): string => {
+  const gradients = [
+    'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+    'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+    'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+    'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+    'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)'
+  ];
+  const index = username?.charCodeAt(0) || 0;
+  return gradients[index % gradients.length];
+};
 
 const CompactMessageList: React.FC<CompactMessageListProps> = ({ 
   roomId, 
@@ -19,7 +34,8 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
   onNewMessage,
   username,
   nickname,
-  onContextMenu
+  onContextMenu,
+  onMentionUser
 }) => {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [initialScrollDone, setInitialScrollDone] = useState(false);
@@ -114,6 +130,7 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
     const isOwn = message.user_id === currentUserId;
     
     if (message.message_type === 'image') {
+      const imageUrl = message.file_url || message.content;
       return (
         <div style={{
           display: 'inline-block',
@@ -124,7 +141,7 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
           position: 'relative'
         }}>
           <img 
-            src={message.file_url || message.content}
+            src={imageUrl}
             alt={message.file_name || '图片'}
             style={{
               maxWidth: '100%',
@@ -134,7 +151,7 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
               objectFit: 'cover'
             }}
             onClick={() => {
-              window.open(message.file_url || message.content, '_blank');
+              window.open(imageUrl, '_blank');
             }}
           />
           {message.file_name && (
@@ -240,6 +257,94 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
     }
   };
 
+  const handleMentionUser = (message: ChatMessage) => {
+    if (onMentionUser && !isSystemMessage(message)) {
+      onMentionUser({
+        id: message.user_id,
+        username: message.username || `用户${message.user_id}`,
+        nickname: message.nickname
+      });
+    }
+  };
+
+  const renderMessageAvatar = (message: ChatMessage, isOwn: boolean) => {
+    if (isSystemMessage(message)) return null;
+
+    const displayName = getMessageSenderName(message);
+    const userMenuItems: MenuProps['items'] = [{
+      key: 'mention',
+      icon: <UserOutlined style={{ color: '#667eea' }} />,
+      label: '@用户',
+      onClick: () => handleMentionUser(message)
+    }];
+
+    const avatarContent = message.avatar ? (
+      <Avatar
+        size={32}
+        src={message.avatar}
+        style={{
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+          transition: 'all 0.3s ease',
+          cursor: 'pointer'
+        }}
+      />
+    ) : (
+      <Avatar
+        size={32}
+        style={{
+          background: getAvatarGradient(message.username || ''),
+          fontSize: '14px',
+          fontWeight: '600',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+          transition: 'all 0.3s ease',
+          cursor: 'pointer'
+        }}
+      >
+        {displayName.charAt(0).toUpperCase()}
+      </Avatar>
+    );
+
+    const avatarWithMenu = onMentionUser ? (
+      <Dropdown 
+        menu={{ items: userMenuItems }} 
+        trigger={['contextMenu', 'hover']}
+        placement={isOwn ? 'topRight' : 'topLeft'}
+      >
+        <Tooltip title={`右键@${displayName}`}>
+          {avatarContent}
+        </Tooltip>
+      </Dropdown>
+    ) : (
+      avatarContent
+    );
+
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '8px',
+        flexDirection: isOwn ? 'row-reverse' : 'row'
+      }}>
+        {avatarWithMenu}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: isOwn ? 'flex-end' : 'flex-start'
+        }}>
+          <span style={{ 
+            fontSize: '12px', 
+            color: '#718096', 
+            marginBottom: '4px',
+            fontWeight: '500',
+            letterSpacing: '0.5px'
+          }}>
+            {displayName}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div 
@@ -317,102 +422,104 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
               </div>
             )}
 
-            {messages.map((message) => (
-              <div 
-                key={message.id} 
-                style={{ 
-                  marginBottom: '16px',
-                  padding: '0 20px',
-                  textAlign: isSystemMessage(message) ? 'center' : 
-                           message.user_id === currentUserId ? 'right' : 'left',
-                  transition: 'all 0.3s ease'
-                }}
-                className="message-item"
-                onContextMenu={(e) => handleMessageContextMenu(e, message)}
-              >
-                {!isSystemMessage(message) && (
-                  <div style={{ 
-                    fontSize: '12px', 
-                    color: '#718096', 
-                    marginBottom: '4px',
-                    textAlign: message.user_id === currentUserId ? 'right' : 'left',
-                    fontWeight: '500',
-                    letterSpacing: '0.5px'
-                  }}>
-                    {getMessageSenderName(message)}
-                  </div>
-                )}
-                
-                {message.message_type === 'image' || message.message_type === 'file' ? (
-                  <div style={{
-                    display: 'inline-block',
-                    maxWidth: '80%',
+            {messages.map((message) => {
+              const isOwn = message.user_id === currentUserId;
+              const isSystem = isSystemMessage(message);
+
+              return (
+                <div 
+                  key={message.id} 
+                  style={{ 
+                    marginBottom: '16px',
+                    padding: '0 20px',
+                    textAlign: isSystem ? 'center' : 
+                             isOwn ? 'right' : 'left',
                     transition: 'all 0.3s ease'
-                  }}>
-                    {renderMessageContent(message)}
-                  </div>
-                ) : (
-                  <div style={{ 
-                    display: 'inline-block',
-                    maxWidth: '80%',
-                    padding: '12px 16px',
-                    borderRadius: '16px',
-                    background: isSystemMessage(message) 
-                      ? 'rgba(226, 232, 240, 0.9)'
-                      : message.user_id === currentUserId 
-                        ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                        : 'rgba(255, 255, 255, 0.98)',
-                    color: isSystemMessage(message) 
-                      ? '#4a5568'
-                      : message.user_id === currentUserId 
-                        ? '#ffffff'
-                        : '#1a202c',
-                    border: isSystemMessage(message) 
-                      ? 'none' 
-                      : message.user_id === currentUserId 
+                  }}
+                  className="message-item"
+                  onContextMenu={(e) => handleMessageContextMenu(e, message)}
+                >
+                  {!isSystem && (
+                    <div style={{
+                      marginBottom: '4px',
+                      display: isOwn ? 'flex' : 'flex',
+                      justifyContent: isOwn ? 'flex-end' : 'flex-start'
+                    }}>
+                      {renderMessageAvatar(message, isOwn)}
+                    </div>
+                  )}
+                  
+                  {message.message_type === 'image' || message.message_type === 'file' ? (
+                    <div style={{
+                      display: 'inline-block',
+                      maxWidth: '80%',
+                      transition: 'all 0.3s ease'
+                    }}>
+                      {renderMessageContent(message)}
+                    </div>
+                  ) : (
+                    <div style={{ 
+                      display: 'inline-block',
+                      maxWidth: '80%',
+                      padding: '12px 16px',
+                      borderRadius: '16px',
+                      background: isSystem 
+                        ? 'rgba(226, 232, 240, 0.9)'
+                        : isOwn 
+                          ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                          : 'rgba(255, 255, 255, 0.98)',
+                      color: isSystem 
+                        ? '#4a5568'
+                        : isOwn 
+                          ? '#ffffff'
+                          : '#1a202c',
+                      border: isSystem 
                         ? 'none' 
-                        : '1px solid rgba(160, 174, 192, 0.5)',
-                    wordWrap: 'break-word',
-                    boxShadow: message.user_id === currentUserId 
-                      ? '0 6px 20px rgba(102, 126, 234, 0.4)'
-                      : isSystemMessage(message)
-                        ? '0 2px 8px rgba(0, 0, 0, 0.05)'
-                        : '0 3px 12px rgba(0, 0, 0, 0.08)',
-                    transition: 'all 0.3s ease',
-                    cursor: 'default',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    fontWeight: '500',
-                    lineHeight: '1.6'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'scale(1.02)';
-                    e.currentTarget.style.boxShadow = message.user_id === currentUserId 
-                      ? '0 8px 25px rgba(102, 126, 234, 0.4)' 
-                      : '0 6px 20px rgba(0, 0, 0, 0.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.boxShadow = message.user_id === currentUserId 
-                      ? '0 4px 15px rgba(102, 126, 234, 0.3)' 
-                      : '0 2px 8px rgba(0, 0, 0, 0.06)';
-                  }}
-                  >
-                    {renderMessageContent(message)}
+                        : isOwn 
+                          ? 'none' 
+                          : '1px solid rgba(160, 174, 192, 0.5)',
+                      wordWrap: 'break-word',
+                      boxShadow: isOwn 
+                        ? '0 6px 20px rgba(102, 126, 234, 0.4)'
+                        : isSystem
+                          ? '0 2px 8px rgba(0, 0, 0, 0.05)'
+                          : '0 3px 12px rgba(0, 0, 0, 0.08)',
+                      transition: 'all 0.3s ease',
+                      cursor: 'default',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      fontWeight: '500',
+                      lineHeight: '1.6'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'scale(1.02)';
+                      e.currentTarget.style.boxShadow = isOwn 
+                        ? '0 8px 25px rgba(102, 126, 234, 0.4)' 
+                        : '0 6px 20px rgba(0, 0, 0, 0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'scale(1)';
+                      e.currentTarget.style.boxShadow = isOwn 
+                        ? '0 4px 15px rgba(102, 126, 234, 0.3)' 
+                        : '0 2px 8px rgba(0, 0, 0, 0.06)';
+                    }}
+                    >
+                      {renderMessageContent(message)}
+                    </div>
+                  )}
+                  
+                  <div style={{ 
+                    fontSize: '11px', 
+                    color: '#a0aec0', 
+                    marginTop: '4px',
+                    textAlign: isOwn ? 'right' : 'left',
+                    fontWeight: '400'
+                  }}>
+                    {formatTime(message.created_at)}
                   </div>
-                )}
-                
-                <div style={{ 
-                  fontSize: '11px', 
-                  color: '#a0aec0', 
-                  marginTop: '4px',
-                  textAlign: message.user_id === currentUserId ? 'right' : 'left',
-                  fontWeight: '400'
-                }}>
-                  {formatTime(message.created_at)}
                 </div>
-              </div>
-            ))}
+              );
+            })}
             
             <div style={{ height: '4px' }} />
           </>
