@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Row, Col, Dropdown, Tag, Avatar, Tooltip, Space } from 'antd';
+import { Card, Row, Col, Dropdown } from 'antd';
 import type { MenuProps } from 'antd';
 import { 
   MessageOutlined, 
@@ -234,62 +234,58 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         </div>
       } 
       extra={
-        <Space size="12">
-          <Dropdown 
-            menu={{ items: statusMenuItems }} 
-            trigger={['click']}
-            placement="bottomRight"
+        <Dropdown 
+          menu={{ items: statusMenuItems }} 
+          trigger={['click']}
+          placement="bottomRight"
+        >
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px',
+            cursor: 'pointer',
+            padding: '6px 14px',
+            borderRadius: '20px',
+            background: 'rgba(255, 255, 255, 0.2)',
+            transition: 'all 0.3s ease',
+            border: '1px solid rgba(255, 255, 255, 0.15)'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+          }}
           >
             <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px',
-              cursor: 'pointer',
-              padding: '4px 10px',
-              borderRadius: '8px',
-              background: 'rgba(255, 255, 255, 0.15)',
-              transition: 'all 0.3s ease'
+              width: '20px', 
+              height: '20px',
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}>
-              <Avatar 
-                size={24} 
-                style={{ 
-                  background: 'rgba(255, 255, 255, 0.25)',
-                  fontSize: '12px'
-                }}
-                icon={<span style={{ fontSize: '14px', color: statusConfig.color }}>{statusConfig.icon}</span>}
-              />
-              <span style={{ fontSize: '12px', color: '#fff' }}>
-                {statusConfig.label}
+              <span style={{ fontSize: '12px', color: statusConfig.color }}>
+                {statusConfig.icon}
               </span>
-              <DownOutlined style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.7)' }} />
             </div>
-          </Dropdown>
-
-          <Tooltip title={isConnected ? 'Socket 连接正常' : 'Socket 连接断开'}>
-            <Tag 
-              color={isConnected ? 'success' : 'error'}
-              style={{ 
-                margin: 0,
-                padding: '4px 12px',
-                borderRadius: '8px',
-                fontSize: '12px',
-                fontWeight: '500',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}
-            >
-              <span style={{ 
-                width: '8px', 
-                height: '8px', 
-                borderRadius: '50%',
-                background: isConnected ? '#52c41a' : '#ff4d4f',
-                animation: isConnected ? 'pulse 2s infinite' : 'none'
-              }} />
-              {isConnected ? '在线' : '离线'}
-            </Tag>
-          </Tooltip>
-        </Space>
+            <span style={{ 
+              fontSize: '13px', 
+              color: '#fff',
+              fontWeight: '500'
+            }}>
+              {statusConfig.label}
+            </span>
+            <DownOutlined style={{ 
+              fontSize: '10px', 
+              color: 'rgba(255, 255, 255, 0.8)',
+              marginLeft: '2px'
+            }} />
+          </div>
+        </Dropdown>
       }
       style={{ 
         borderRadius: '16px', 
