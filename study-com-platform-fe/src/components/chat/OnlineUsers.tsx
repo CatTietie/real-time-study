@@ -120,10 +120,10 @@ const getAvatarGradient = (username: string): string => {
 const generateLastActiveTime = (): string => {
   const minutes = Math.floor(Math.random() * 60);
   if (minutes < 5) return '刚刚';
-  if (minutes < 30) return `${minutes}分钟前';
+  if (minutes < 30) return `${minutes}分钟前`;
   const hours = Math.floor(Math.random() * 24);
   if (hours < 1) return '1小时内';
-  if (hours < 24) return `${hours}小时前';
+  if (hours < 24) return `${hours}小时前`;
   return '1天前';
 };
 
