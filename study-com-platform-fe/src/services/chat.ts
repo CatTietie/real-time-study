@@ -132,3 +132,28 @@ export const uploadChatFile = async (file: File): Promise<{
   });
   return response.data.data;
 };
+
+// 转发消息
+export const forwardMessage = async (
+  messageId: number,
+  targetRoomId: number
+): Promise<{
+  targetRoomId: number;
+  targetRoomName: string;
+  forwardedMessage: any;
+}> => {
+  const response = await api.post('/chat/forward', {
+    messageId,
+    targetRoomId
+  });
+  return response.data.data;
+};
+
+// 删除消息
+export const deleteMessage = async (messageId: number): Promise<{
+  messageId: number;
+  roomId: number;
+}> => {
+  const response = await api.delete(`/chat/messages/${messageId}`);
+  return response.data.data;
+};

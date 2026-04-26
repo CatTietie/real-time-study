@@ -21,4 +21,8 @@ router.get("/available-users/:roomId", chatController.getAvailableUsers);
 // 聊天文件上传
 router.post("/upload", uploadChatFile.single("file"), chatController.uploadFile);
 
+// 消息操作
+router.post("/forward", chatController.forwardMessage);
+router.delete("/messages/:messageId", chatController.deleteMessage);
+
 export default router;
