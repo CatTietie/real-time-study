@@ -12,6 +12,7 @@ import { checkExpiredReservations } from "./controllers/study-room.controller";
 import { initChatSockets } from './services/chat-realtime.service';
 import { initWhiteboardSockets } from './services/whiteboard-realtime.service';
 import { seedChatRooms } from './seed/chat.seed';
+import { setSocketIo } from './utils/socketManager';
 
 // 创建HTTP服务器
 const httpServer = createServer(app);
@@ -23,6 +24,9 @@ const io = new Server(httpServer, {
     credentials: true
   }
 });
+
+// 将 io 实例存储到 socketManager
+setSocketIo(io);
 
 // 初始化实时服务
 initChatSockets(io);
