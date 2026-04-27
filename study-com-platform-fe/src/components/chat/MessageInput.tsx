@@ -589,7 +589,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         alignItems: 'flex-end'
       }}>
         <TextArea
-          ref={handleTextareaRef}
+          ref={internalTextareaRef}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onPressEnter={handleKeyPress}
