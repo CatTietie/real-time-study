@@ -68,7 +68,9 @@ export const getChatHistory = async (
   roomId: number,
   page: number = 1,
   limit: number = 50,
-  beforeId?: number
+  beforeId?: number,
+  startTime?: string,
+  endTime?: string
 ): Promise<{
   messages: ChatMessage[];
   pagination: {
@@ -81,6 +83,12 @@ export const getChatHistory = async (
   const params: any = { page, limit };
   if (beforeId) {
     params.beforeId = beforeId;
+  }
+  if (startTime) {
+    params.startTime = startTime;
+  }
+  if (endTime) {
+    params.endTime = endTime;
   }
   
   const response = await api.get(`/chat/history/${roomId}`, { params });
@@ -104,6 +112,60 @@ export const searchChatMessages = async (
 }> => {
   const response = await api.get(`/chat/search/${roomId}`, {
     params: { keyword, page, limit }
+  });
+  return response.data.data;
+};
+
+// 上传聊天文件/图片
+export const uploadChatFile = async (file: File): Promise<{
+  file_name: string;
+  file_url: string;
+  file_size: number;
+}> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const response = await api.post('/chat/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return response.data.data;
+};
+
+// 转发消息
+export const forwardMessage = async (
+  messageId: number,
+  targetRoomId: number
+): Promise<{
+  targetRoomId: number;
+  targetRoomName: string;
+  forwardedMessage: any;
+}> => {
+  const response = await api.post('/chat/forward', {
+    messageId,
+    targetRoomId
+  });
+  return response.data.data;
+};
+
+// 删除消息
+export const deleteMessage = async (messageId: number): Promise<{
+  messageId: number;
+  roomId: number;
+}> => {
+  const response = await api.delete(`/chat/messages/${messageId}`);
+  return response.data.data;
+};
+
+// 获取图片 base64 数据（用于复制图片到剪贴板）
+export const getImageBase64 = async (imageUrl: string): Promise<{
+  base64: string;
+  dataUrl: string;
+  mimeType: string;
+}> => {
+  const response = await api.get('/chat/image-base64', {
+    params: { url: imageUrl }
   });
   return response.data.data;
 };
