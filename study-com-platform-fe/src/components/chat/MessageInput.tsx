@@ -60,8 +60,7 @@ interface MessageInputProps {
   onSendFile?: (fileUrl: string, fileName: string, fileSize: number) => void;
   onSendImages?: (images: PendingImage[]) => void;
   disabled?: boolean;
-  inputRef?: any;
-  setInputRef?: (ref: any) => void;
+  inputRef?: React.MutableRefObject<HTMLTextAreaElement | null>;
 }
 
 const generateId = (): string => {
@@ -76,8 +75,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   onSendFile,
   onSendImages,
   disabled = false,
-  inputRef,
-  setInputRef
+  inputRef
 }) => {
   const [isComposing, setIsComposing] = useState(false);
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
@@ -91,16 +89,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     pendingImagesRef.current = pendingImages;
   }, [pendingImages]);
 
-  const textareaRef = inputRef || internalTextareaRef;
-
-  const handleTextareaRef = useCallback((ref: HTMLTextAreaElement | null) => {
-    if (ref) {
-      internalTextareaRef.current = ref;
-      if (setInputRef) {
-        setInputRef(ref);
-      }
+  useEffect(() => {
+    if (inputRef && internalTextareaRef.current) {
+      inputRef.current = internalTextareaRef.current;
     }
-  }, [setInputRef]);
+  }, [inputRef]);
 
   const addPendingImage = useCallback((file: File) => {
     const isImage = file.type.startsWith('image/');
@@ -204,18 +197,18 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }, [disabled, pendingImages, value, onSendImages, onSend]);
 
   const insertEmoji = (emoji: string) => {
-    if (textareaRef?.current) {
-      const start = textareaRef.current.selectionStart || 0;
-      const end = textareaRef.current.selectionEnd || 0;
+    if (internalTextareaRef.current) {
+      const start = internalTextareaRef.current.selectionStart || 0;
+      const end = internalTextareaRef.current.selectionEnd || 0;
       const newValue = value.substring(0, start) + emoji + value.substring(end);
       onChange(newValue);
       
       setTimeout(() => {
-        if (textareaRef?.current) {
+        if (internalTextareaRef.current) {
           const newPos = start + emoji.length;
-          textareaRef.current.selectionStart = newPos;
-          textareaRef.current.selectionEnd = newPos;
-          textareaRef.current.focus();
+          internalTextareaRef.current.selectionStart = newPos;
+          internalTextareaRef.current.selectionEnd = newPos;
+          internalTextareaRef.current.focus();
         }
       }, 0);
     } else {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Card, 
   Row, 
@@ -101,7 +101,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
   const authState = useAppSelector(state => state.auth);
   const [userStatus, setUserStatus] = useState<UserStatus>('online');
   const [inputValue, setInputValue] = useState('');
-  const [inputRef, setInputRef] = useState<HTMLTextAreaElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   
   const [contextMenuVisible, setContextMenuVisible] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
@@ -359,14 +359,14 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     });
     
     setTimeout(() => {
-      if (inputRef) {
-        inputRef.focus();
-        inputRef.setSelectionRange(inputRef.value.length, inputRef.value.length);
+      if (inputRef.current) {
+        inputRef.current.focus();
+        inputRef.current.setSelectionRange(inputRef.current.value.length, inputRef.current.value.length);
       }
     }, 50);
     
     message.success(`已@${targetUser.nickname || targetUser.username}`);
-  }, [inputRef]);
+  }, []);
 
   const contextMenuItems: MenuProps['items'] = contextMenuMessage ? [
     {
@@ -596,7 +596,6 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                 onSendImages={handleSendImages}
                 disabled={!isConnected}
                 inputRef={inputRef}
-                setInputRef={setInputRef}
               />
             </div>
           </Col>
