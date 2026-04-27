@@ -13,6 +13,7 @@ interface CompactMessageListProps {
   nickname?: string;
   onContextMenu?: (e: React.MouseEvent, message: ChatMessage) => void;
   onMentionUser?: (user: { id: number; username: string; nickname?: string }) => void;
+  onImageClick?: (imageUrl: string, fileName?: string) => void;
 }
 
 const getAvatarGradient = (username: string): string => {
@@ -35,7 +36,8 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
   username,
   nickname,
   onContextMenu,
-  onMentionUser
+  onMentionUser,
+  onImageClick
 }) => {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [initialScrollDone, setInitialScrollDone] = useState(false);
@@ -150,8 +152,11 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
               display: 'block',
               objectFit: 'cover'
             }}
-            onClick={() => {
-              window.open(imageUrl, '_blank');
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onImageClick) {
+                onImageClick(imageUrl, message.file_name);
+              }
             }}
           />
           {message.file_name && (

@@ -11,7 +11,11 @@ import {
   Tooltip, 
   Popconfirm, 
   message,
-  Button
+  Button,
+  Input,
+  Select,
+  Empty,
+  Spin
 } from 'antd';
 import type { MenuProps } from 'antd';
 import { 
@@ -27,7 +31,11 @@ import {
   CopyOutlined,
   ShareAltOutlined,
   DeleteOutlined,
-  UserOutlined
+  UserOutlined,
+  SearchOutlined,
+  DownloadOutlined,
+  EyeOutlined,
+  CloseOutlined
 } from '@ant-design/icons';
 import CompactMessageList from './CompactMessageList';
 import { MessageInput } from './MessageInput';
@@ -36,7 +44,7 @@ import { ChatRoomSelector } from './ChatRoomSelector';
 import { useChatSocket } from '../../hooks/useChatSocket';
 import { useAppSelector } from '../../app/hooks';
 import type { ChatRoom, ChatMessage, AvailableUser } from '../../types/chat';
-import { forwardMessage, deleteMessage, getChatRooms, getImageBase64, uploadChatFile } from '../../services/chat';
+import { forwardMessage, deleteMessage, getChatRooms, getImageBase64, uploadChatFile, searchChatMessages } from '../../services/chat';
 import type { PendingImage } from './MessageInput';
 
 type UserStatus = 'online' | 'away' | 'busy';
@@ -113,6 +121,22 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [forwarding, setForwarding] = useState(false);
+  
+  const [imagePreviewVisible, setImagePreviewVisible] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState('');
+  const [previewImageName, setPreviewImageName] = useState('');
+  const [imageLoading, setImageLoading] = useState(false);
+  
+  const [searchVisible, setSearchVisible] = useState(false);
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [searchResults, setSearchResults] = useState<ChatMessage[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchPagination, setSearchPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0
+  });
+  const [showSearchResults, setShowSearchResults] = useState(false);
   
   const { role, username, userId, nickname } = authState;
   
@@ -300,6 +324,90 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     handleCloseContextMenu();
   }, [contextMenuMessage, handleCloseContextMenu]);
 
+  const handleImageClick = useCallback((imageUrl: string, fileName?: string) => {
+    setPreviewImageUrl(imageUrl);
+    setPreviewImageName(fileName || '');
+    setImagePreviewVisible(true);
+  }, []);
+
+  const handleDownloadImage = useCallback(async () => {
+    if (!previewImageUrl) return;
+    
+    try {
+      const link = document.createElement('a');
+      link.href = previewImageUrl;
+      link.download = previewImageName || `chat-image-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      message.success('图片下载中...');
+    } catch (error) {
+      console.error('下载图片失败:', error);
+      message.error('下载图片失败，请右键保存图片');
+    }
+  }, [previewImageUrl, previewImageName]);
+
+  const handleCopyPreviewImage = useCallback(async () => {
+    if (!previewImageUrl) return;
+    
+    try {
+      setImageLoading(true);
+      const imageData = await getImageBase64(previewImageUrl);
+      const blob = base64ToBlob(imageData.base64, imageData.mimeType);
+      const clipboardItem = new ClipboardItem({ [imageData.mimeType]: blob });
+      await navigator.clipboard.write([clipboardItem]);
+      message.success('图片已复制到剪贴板，可直接粘贴发送');
+    } catch (clipboardError) {
+      console.log('剪贴板复制失败，尝试复制链接:', clipboardError);
+      try {
+        await navigator.clipboard.writeText(previewImageUrl);
+        message.success('图片链接已复制到剪贴板');
+      } catch {
+        message.error('复制失败，请手动复制');
+      }
+    } finally {
+      setImageLoading(false);
+    }
+  }, [previewImageUrl, base64ToBlob]);
+
+  const handleSearch = useCallback(async (page: number = 1) => {
+    if (!searchKeyword.trim() || !roomId) return;
+    
+    setSearching(true);
+    try {
+      const result = await searchChatMessages(roomId, searchKeyword.trim(), page, searchPagination.limit);
+      setSearchResults(result.messages);
+      setSearchPagination({
+        page: result.pagination.page,
+        limit: result.pagination.limit,
+        total: result.pagination.total
+      });
+      setShowSearchResults(true);
+    } catch (error) {
+      console.error('搜索消息失败:', error);
+      message.error('搜索消息失败，请重试');
+    } finally {
+      setSearching(false);
+    }
+  }, [searchKeyword, roomId, searchPagination.limit]);
+
+  const handleClearSearch = useCallback(() => {
+    setSearchKeyword('');
+    setSearchResults([]);
+    setShowSearchResults(false);
+    setSearchPagination({
+      page: 1,
+      limit: 20,
+      total: 0
+    });
+  }, []);
+
+  const handleCloseImagePreview = useCallback(() => {
+    setImagePreviewVisible(false);
+    setPreviewImageUrl('');
+    setPreviewImageName('');
+  }, []);
+
   const handleForwardMessage = useCallback(() => {
     if (!contextMenuMessage) return;
     setForwardingMessage(contextMenuMessage);
@@ -478,58 +586,112 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
           </div>
         } 
         extra={
-          <Dropdown 
-            menu={{ items: statusMenuItems }} 
-            trigger={['click']}
-            placement="bottomRight"
-          >
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px',
-              cursor: 'pointer',
-              padding: '6px 14px',
-              borderRadius: '20px',
-              background: 'rgba(255, 255, 255, 0.2)',
-              transition: 'all 0.3s ease',
-              border: '1px solid rgba(255, 255, 255, 0.15)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
-            }}
-            >
-              <div style={{ 
-                width: '20px', 
-                height: '20px',
-                borderRadius: '50%',
-                background: 'rgba(255, 255, 255, 0.3)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <span style={{ fontSize: '12px', color: statusConfig.color }}>
-                  {statusConfig.icon}
-                </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {searchVisible ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Input.Search
+                  placeholder="搜索消息..."
+                  value={searchKeyword}
+                  onChange={(e) => setSearchKeyword(e.target.value)}
+                  onSearch={() => handleSearch(1)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSearch(1);
+                    }
+                  }}
+                  style={{ width: '250px' }}
+                  enterButton={
+                    <Button type="primary" style={{ 
+                      background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+                      border: 'none'
+                    }}>
+                      搜索
+                    </Button>
+                  }
+                  suffix={
+                    searchKeyword ? (
+                      <CloseOutlined 
+                        onClick={handleClearSearch} 
+                        style={{ cursor: 'pointer', color: '#a0aec0' }}
+                      />
+                    ) : undefined
+                  }
+                />
+                <Button 
+                  type="text" 
+                  icon={<CloseOutlined />}
+                  onClick={() => {
+                    setSearchVisible(false);
+                    handleClearSearch();
+                  }}
+                  style={{ color: '#fff' }}
+                />
               </div>
-              <span style={{ 
-                fontSize: '13px', 
-                color: '#fff',
-                fontWeight: '500'
-              }}>
-                {statusConfig.label}
-              </span>
-              <DownOutlined style={{ 
-                fontSize: '10px', 
-                color: 'rgba(255, 255, 255, 0.8)',
-                marginLeft: '2px'
-              }} />
-            </div>
-          </Dropdown>
+            ) : (
+              <>
+                <Tooltip title="搜索消息">
+                  <Button 
+                    type="text" 
+                    icon={<SearchOutlined />}
+                    onClick={() => setSearchVisible(true)}
+                    style={{ color: '#fff' }}
+                  />
+                </Tooltip>
+                <Dropdown 
+                  menu={{ items: statusMenuItems }} 
+                  trigger={['click']}
+                  placement="bottomRight"
+                >
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '8px',
+                    cursor: 'pointer',
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    transition: 'all 0.3s ease',
+                    border: '1px solid rgba(255, 255, 255, 0.15)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                  }}
+                  >
+                    <div style={{ 
+                      width: '20px', 
+                      height: '20px',
+                      borderRadius: '50%',
+                      background: 'rgba(255, 255, 255, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <span style={{ fontSize: '12px', color: statusConfig.color }}>
+                        {statusConfig.icon}
+                      </span>
+                    </div>
+                    <span style={{ 
+                      fontSize: '13px', 
+                      color: '#fff',
+                      fontWeight: '500'
+                    }}>
+                      {statusConfig.label}
+                    </span>
+                    <DownOutlined style={{ 
+                      fontSize: '10px', 
+                      color: 'rgba(255, 255, 255, 0.8)',
+                      marginLeft: '2px'
+                    }} />
+                  </div>
+                </Dropdown>
+              </>
+            )}
+          </div>
         }
         style={{ 
           borderRadius: '16px', 
@@ -564,40 +726,245 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
               height: '100%'
             }}
           >
-            <div style={{ 
-              flex: 1, 
-              display: 'flex', 
-              flexDirection: 'column', 
-              minHeight: 0, 
-              overflow: 'hidden'
-            }}>
-              <CompactMessageList 
-                roomId={roomId}
-                currentUserId={user?.id}
-                username={user?.username || ''}
-                nickname={user?.nickname}
-                onContextMenu={handleContextMenu}
-                onMentionUser={handleMentionUser}
-                onNewMessage={(message) => {
-                  console.log('收到新消息:', message);
-                }}
-              />
-            </div>
-            <div style={{ 
-              marginTop: '12px',
-              flexShrink: 0
-            }}>
-              <MessageInput 
-                value={inputValue}
-                onChange={setInputValue}
-                onSend={handleSend}
-                onSendImage={handleSendImage}
-                onSendFile={handleSendFile}
-                onSendImages={handleSendImages}
-                disabled={!isConnected}
-                inputRef={inputRef}
-              />
-            </div>
+            {showSearchResults ? (
+              <div style={{ 
+                flex: 1, 
+                display: 'flex', 
+                flexDirection: 'column', 
+                minHeight: 0, 
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  padding: '12px 16px',
+                  background: 'rgba(102, 126, 234, 0.05)',
+                  borderRadius: '12px',
+                  marginBottom: '12px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <SearchOutlined style={{ color: '#667eea' }} />
+                    <span style={{ color: '#334155', fontWeight: '500' }}>
+                      搜索结果：找到 {searchPagination.total} 条消息
+                    </span>
+                  </div>
+                  <Button
+                    type="text"
+                    size="small"
+                    onClick={handleClearSearch}
+                    style={{ color: '#667eea' }}
+                  >
+                    返回聊天
+                  </Button>
+                </div>
+
+                <div style={{
+                  flex: 1,
+                  overflowY: 'auto',
+                  background: 'linear-gradient(180deg, rgba(226, 232, 240, 0.6) 0%, rgba(203, 213, 225, 0.6) 100%)',
+                  borderRadius: '16px',
+                  padding: '12px 20px',
+                  border: '1px solid rgba(160, 174, 192, 0.3)'
+                }}>
+                  {searching ? (
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      height: '200px'
+                    }}>
+                      <Spin tip="搜索中..." />
+                    </div>
+                  ) : searchResults.length === 0 ? (
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      height: '200px',
+                      flexDirection: 'column',
+                      gap: '12px'
+                    }}>
+                      <div style={{ fontSize: '48px' }}>🔍</div>
+                      <Empty description="未找到相关消息" />
+                    </div>
+                  ) : (
+                    <div>
+                      {searchResults.map((msg) => {
+                        const isOwn = msg.user_id === user?.id;
+                        return (
+                          <div 
+                            key={msg.id} 
+                            style={{ 
+                              marginBottom: '16px',
+                              textAlign: isOwn ? 'right' : 'left',
+                              padding: '12px 16px',
+                              background: isOwn 
+                                ? 'rgba(102, 126, 234, 0.08)' 
+                                : 'rgba(255, 255, 255, 0.9)',
+                              borderRadius: '12px',
+                              border: '1px solid rgba(102, 126, 234, 0.15)',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = isOwn 
+                                ? 'rgba(102, 126, 234, 0.12)' 
+                                : '#fff';
+                              e.currentTarget.style.boxShadow = '0 2px 12px rgba(0, 0, 0, 0.08)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = isOwn 
+                                ? 'rgba(102, 126, 234, 0.08)' 
+                                : 'rgba(255, 255, 255, 0.9)';
+                              e.currentTarget.style.boxShadow = 'none';
+                            }}
+                          >
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              marginBottom: '8px',
+                              justifyContent: isOwn ? 'flex-end' : 'flex-start'
+                            }}>
+                              <Avatar size={24} src={msg.avatar} style={{
+                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                fontSize: '12px'
+                              }}>
+                                {(msg.nickname || msg.username || 'U').charAt(0)}
+                              </Avatar>
+                              <span style={{ fontSize: '12px', color: '#718096' }}>
+                                {msg.nickname || msg.username}
+                              </span>
+                              <span style={{ fontSize: '11px', color: '#a0aec0' }}>
+                                {new Date(msg.created_at).toLocaleString('zh-CN')}
+                              </span>
+                            </div>
+                            <div style={{
+                              color: '#334155',
+                              fontSize: '14px',
+                              lineHeight: '1.6',
+                              wordBreak: 'break-word'
+                            }}>
+                              {msg.message_type === 'image' ? (
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  cursor: 'pointer',
+                                  color: '#667eea'
+                                }}
+                                onClick={() => {
+                                  if (msg.file_url || msg.content) {
+                                    handleImageClick(msg.file_url || msg.content, msg.file_name);
+                                  }
+                                }}
+                                >
+                                  <span style={{ fontSize: '20px' }}>🖼️</span>
+                                  <span>[图片消息] {msg.file_name || '点击查看'}</span>
+                                </div>
+                              ) : msg.message_type === 'file' ? (
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  color: '#667eea'
+                                }}>
+                                  <span style={{ fontSize: '20px' }}>📄</span>
+                                  <span>[文件消息] {msg.file_name || '文件'}</span>
+                                </div>
+                              ) : (
+                                <span>{msg.content}</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      
+                      {searchPagination.total > searchPagination.limit && (
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          marginTop: '16px',
+                          padding: '12px'
+                        }}>
+                          <Button
+                            size="small"
+                            disabled={searchPagination.page <= 1}
+                            onClick={() => {
+                              const prevPage = searchPagination.page - 1;
+                              handleSearch(prevPage);
+                            }}
+                          >
+                            上一页
+                          </Button>
+                          <span style={{
+                            fontSize: '13px',
+                            color: '#718096',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}>
+                            第 {searchPagination.page} 页 / 共 {Math.ceil(searchPagination.total / searchPagination.limit)} 页
+                          </span>
+                          <Button
+                            size="small"
+                            disabled={searchPagination.page >= Math.ceil(searchPagination.total / searchPagination.limit)}
+                            onClick={() => {
+                              const nextPage = searchPagination.page + 1;
+                              handleSearch(nextPage);
+                            }}
+                          >
+                            下一页
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div style={{ 
+                  flex: 1, 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  minHeight: 0, 
+                  overflow: 'hidden'
+                }}>
+                  <CompactMessageList 
+                    roomId={roomId}
+                    currentUserId={user?.id}
+                    username={user?.username || ''}
+                    nickname={user?.nickname}
+                    onContextMenu={handleContextMenu}
+                    onMentionUser={handleMentionUser}
+                    onImageClick={handleImageClick}
+                    onNewMessage={(message) => {
+                      console.log('收到新消息:', message);
+                    }}
+                  />
+                </div>
+                <div style={{ 
+                  marginTop: '12px',
+                  flexShrink: 0
+                }}>
+                  <MessageInput 
+                    value={inputValue}
+                    onChange={setInputValue}
+                    onSend={handleSend}
+                    onSendImage={handleSendImage}
+                    onSendFile={handleSendFile}
+                    onSendImages={handleSendImages}
+                    disabled={!isConnected}
+                    inputRef={inputRef}
+                  />
+                </div>
+              </>
+            )}
           </Col>
           <Col 
             span={6} 
@@ -943,6 +1310,84 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                     />
                   </List.Item>
                 );
+              }}
+            />
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={imagePreviewVisible}
+        onCancel={handleCloseImagePreview}
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <Button
+              icon={<CopyOutlined />}
+              onClick={handleCopyPreviewImage}
+              loading={imageLoading}
+            >
+              复制图片
+            </Button>
+            <Button
+              type="primary"
+              icon={<DownloadOutlined />}
+              onClick={handleDownloadImage}
+              style={{
+                background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+                border: 'none'
+              }}
+            >
+              下载图片
+            </Button>
+          </div>
+        }
+        centered
+        maskClosable
+        closable
+        width={800}
+        styles={{
+          body: {
+            padding: '16px',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            minHeight: '400px',
+            background: '#1a1a1a'
+          },
+          header: {
+            background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+            color: '#fff',
+            borderBottom: 'none'
+          }
+        }}
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <EyeOutlined />
+            <span>{previewImageName || '图片预览'}</span>
+          </div>
+        }
+      >
+        {imageLoading ? (
+          <div style={{ color: '#fff', fontSize: '16px' }}>
+            <Spin tip="加载中..." />
+          </div>
+        ) : (
+          <div style={{
+            maxWidth: '100%',
+            maxHeight: '60vh',
+            overflow: 'auto',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}>
+            <img
+              src={previewImageUrl}
+              alt={previewImageName || '图片'}
+              style={{
+                maxWidth: '100%',
+                maxHeight: '60vh',
+                objectFit: 'contain',
+                borderRadius: '8px'
               }}
             />
           </div>
