@@ -137,6 +137,13 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     total: 0
   });
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  useEffect(() => {
+    if (searchVisible && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [searchVisible]);
   
   const { role, username, userId, nickname } = authState;
   
@@ -587,110 +594,112 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         } 
         extra={
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {searchVisible ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Input.Search
-                  placeholder="搜索消息..."
-                  value={searchKeyword}
-                  onChange={(e) => setSearchKeyword(e.target.value)}
-                  onSearch={() => handleSearch(1)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleSearch(1);
-                    }
-                  }}
-                  style={{ width: '250px' }}
-                  enterButton={
-                    <Button type="primary" style={{ 
-                      background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
-                      border: 'none'
-                    }}>
-                      搜索
-                    </Button>
-                  }
-                  suffix={
-                    searchKeyword ? (
-                      <CloseOutlined 
-                        onClick={handleClearSearch} 
-                        style={{ cursor: 'pointer', color: '#a0aec0' }}
-                      />
-                    ) : undefined
-                  }
-                />
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              visibility: searchVisible ? 'visible' : 'hidden',
+              opacity: searchVisible ? 1 : 0,
+              position: searchVisible ? 'static' : 'absolute',
+              transition: 'all 0.2s ease'
+            }}>
+              <Input.Search
+                ref={searchInputRef}
+                placeholder="搜索消息..."
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+                onSearch={() => handleSearch(1)}
+                style={{ width: '250px' }}
+                enterButton={
+                  <Button type="primary" style={{ 
+                    background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+                    border: 'none'
+                  }}>
+                    搜索
+                  </Button>
+                }
+              />
+              <Button 
+                type="text" 
+                icon={<CloseOutlined />}
+                onClick={() => {
+                  setSearchVisible(false);
+                  handleClearSearch();
+                }}
+                style={{ color: '#fff' }}
+              />
+            </div>
+            
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              visibility: searchVisible ? 'hidden' : 'visible',
+              opacity: searchVisible ? 0 : 1,
+              position: searchVisible ? 'absolute' : 'static',
+              transition: 'all 0.2s ease'
+            }}>
+              <Tooltip title="搜索消息">
                 <Button 
                   type="text" 
-                  icon={<CloseOutlined />}
-                  onClick={() => {
-                    setSearchVisible(false);
-                    handleClearSearch();
-                  }}
+                  icon={<SearchOutlined />}
+                  onClick={() => setSearchVisible(true)}
                   style={{ color: '#fff' }}
                 />
-              </div>
-            ) : (
-              <>
-                <Tooltip title="搜索消息">
-                  <Button 
-                    type="text" 
-                    icon={<SearchOutlined />}
-                    onClick={() => setSearchVisible(true)}
-                    style={{ color: '#fff' }}
-                  />
-                </Tooltip>
-                <Dropdown 
-                  menu={{ items: statusMenuItems }} 
-                  trigger={['click']}
-                  placement="bottomRight"
+              </Tooltip>
+              <Dropdown 
+                menu={{ items: statusMenuItems }} 
+                trigger={['click']}
+                placement="bottomRight"
+              >
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px',
+                  cursor: 'pointer',
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  transition: 'all 0.3s ease',
+                  border: '1px solid rgba(255, 255, 255, 0.15)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                }}
                 >
                   <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '8px',
-                    cursor: 'pointer',
-                    padding: '6px 14px',
-                    borderRadius: '20px',
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    transition: 'all 0.3s ease',
-                    border: '1px solid rgba(255, 255, 255, 0.15)'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
-                  }}
-                  >
-                    <div style={{ 
-                      width: '20px', 
-                      height: '20px',
-                      borderRadius: '50%',
-                      background: 'rgba(255, 255, 255, 0.3)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      <span style={{ fontSize: '12px', color: statusConfig.color }}>
-                        {statusConfig.icon}
-                      </span>
-                    </div>
-                    <span style={{ 
-                      fontSize: '13px', 
-                      color: '#fff',
-                      fontWeight: '500'
-                    }}>
-                      {statusConfig.label}
+                    width: '20px', 
+                    height: '20px',
+                    borderRadius: '50%',
+                    background: 'rgba(255, 255, 255, 0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <span style={{ fontSize: '12px', color: statusConfig.color }}>
+                      {statusConfig.icon}
                     </span>
-                    <DownOutlined style={{ 
-                      fontSize: '10px', 
-                      color: 'rgba(255, 255, 255, 0.8)',
-                      marginLeft: '2px'
-                    }} />
                   </div>
-                </Dropdown>
-              </>
-            )}
+                  <span style={{ 
+                    fontSize: '13px', 
+                    color: '#fff',
+                    fontWeight: '500'
+                  }}>
+                    {statusConfig.label}
+                  </span>
+                  <DownOutlined style={{ 
+                    fontSize: '10px', 
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    marginLeft: '2px'
+                  }} />
+                </div>
+              </Dropdown>
+            </div>
           </div>
         }
         style={{ 
