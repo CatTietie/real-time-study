@@ -17,9 +17,14 @@ interface UnreadMessageAttributes {
   last_sender_avatar: string;
   created_at?: Date;
   updated_at?: Date;
+  ChatRoom?: {
+    id: number;
+    name: string;
+    type: string;
+  };
 }
 
-interface UnreadMessageCreationAttributes extends Omit<UnreadMessageAttributes, 'id' | 'created_at' | 'updated_at'> {}
+interface UnreadMessageCreationAttributes extends Omit<UnreadMessageAttributes, 'id' | 'created_at' | 'updated_at' | 'ChatRoom'> {}
 
 class UnreadMessage extends Model<UnreadMessageAttributes, UnreadMessageCreationAttributes> 
   implements UnreadMessageAttributes {
