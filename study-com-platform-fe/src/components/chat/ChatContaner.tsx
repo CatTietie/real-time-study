@@ -118,6 +118,8 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
   currentRoom
 }) => {
   const authState = useAppSelector(state => state.auth);
+  const { role, username, userId, nickname } = authState;
+  
   const [userStatus, setUserStatus] = useState<UserStatus>('online');
   const [inputValue, setInputValue] = useState('');
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -186,8 +188,6 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
       }
     };
   }, [loadUnreadMessages]);
-  
-  const { role, username, userId, nickname } = authState;
   
   const user = username && userId ? {
     id: userId,
