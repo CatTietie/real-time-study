@@ -130,6 +130,156 @@ const EnhancedMessageList: React.FC<EnhancedMessageListProps> = ({
     return message.message_type === 'system' || message.user_id === 0;
   };
 
+  // 格式化文件大小
+  const formatFileSize = (bytes: number): string => {
+    if (!bytes) return '未知大小';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  // 获取文件图标
+  const getFileIcon = (fileName: string): string => {
+    if (!fileName) return '📄';
+    const ext = fileName.split('.').pop()?.toLowerCase() || '';
+    const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'];
+    const docExts = ['doc', 'docx', 'pdf', 'txt', 'md'];
+    const videoExts = ['mp4', 'avi', 'mov', 'mkv', 'webm'];
+    const audioExts = ['mp3', 'wav', 'flac', 'aac', 'ogg'];
+    const zipExts = ['zip', 'rar', '7z', 'tar', 'gz'];
+    
+    if (imageExts.includes(ext)) return '🖼️';
+    if (docExts.includes(ext)) return '📄';
+    if (videoExts.includes(ext)) return '🎬';
+    if (audioExts.includes(ext)) return '🎵';
+    if (zipExts.includes(ext)) return '📦';
+    return '📄';
+  };
+
+  // 渲染消息内容
+  const renderMessageContent = (message: ChatMessage) => {
+    const isOwn = message.user_id === currentUserId;
+    
+    // 图片消息
+    if (message.message_type === 'image') {
+      return (
+        <div style={{
+          display: 'inline-block',
+          maxWidth: '300px',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          cursor: 'pointer',
+          position: 'relative'
+        }}>
+          <img 
+            src={message.file_url || message.content}
+            alt={message.file_name || '图片'}
+            style={{
+              maxWidth: '100%',
+              maxHeight: '250px',
+              borderRadius: '12px',
+              display: 'block',
+              objectFit: 'cover'
+            }}
+            onClick={() => {
+              window.open(message.file_url || message.content, '_blank');
+            }}
+          />
+          {message.file_name && (
+            <div style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
+              padding: '20px 12px 8px',
+              borderRadius: '0 0 12px 12px',
+              fontSize: '12px',
+              color: '#fff'
+            }}>
+              {message.file_name}
+              {message.file_size && (
+                <span style={{ opacity: 0.8, marginLeft: '8px' }}>
+                  {formatFileSize(message.file_size)}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    // 文件消息
+    if (message.message_type === 'file') {
+      return (
+        <a 
+          href={message.file_url || message.content}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '12px 16px',
+            background: isOwn 
+              ? 'rgba(255,255,255,0.15)' 
+              : '#f5f5f5',
+            borderRadius: '12px',
+            textDecoration: 'none',
+            color: isOwn ? '#fff' : '#333',
+            border: isOwn 
+              ? 'none' 
+              : '1px solid #e8e8e8',
+            transition: 'all 0.3s ease',
+            minWidth: '200px'
+          }}
+          onMouseEnter={(e) => {
+            if (!isOwn) {
+              e.currentTarget.style.background = '#f0f0f0';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isOwn) {
+              e.currentTarget.style.background = '#f5f5f5';
+            }
+          }}
+        >
+          <div style={{
+            fontSize: '32px',
+            lineHeight: '1'
+          }}>
+            {getFileIcon(message.file_name || '')}
+          </div>
+          <div style={{
+            flex: 1,
+            minWidth: 0
+          }}>
+            <div style={{
+              fontWeight: '600',
+              fontSize: '14px',
+              marginBottom: '4px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}>
+              {message.file_name || '文件'}
+            </div>
+            <div style={{
+              fontSize: '12px',
+              opacity: 0.7
+            }}>
+              {formatFileSize(message.file_size || 0)}
+              <span style={{ marginLeft: '8px' }}>点击下载</span>
+            </div>
+          </div>
+        </a>
+      );
+    }
+    
+    // 文本消息（默认）
+    return <span>{message.content}</span>;
+  };
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* 搜索区域 */}
@@ -212,21 +362,34 @@ const EnhancedMessageList: React.FC<EnhancedMessageListProps> = ({
                   </div>
                 )}
                 
-                <div style={{ 
-                  display: 'inline-block',
-                  maxWidth: '80%',
-                  padding: '8px 12px',
-                  borderRadius: '12px',
-                  backgroundColor: isSystemMessage(message) ? '#f0f0f0' : 
-                                 message.user_id === currentUserId ? '#1890ff' : '#fff',
-                  color: isSystemMessage(message) ? '#666' : 
-                        message.user_id === currentUserId ? '#fff' : '#333',
-                  border: isSystemMessage(message) ? 'none' : '1px solid #d9d9d9',
-                  wordWrap: 'break-word',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                }}>
-                  {message.content}
-                </div>
+                {/* 消息内容 */}
+                {message.message_type === 'image' || message.message_type === 'file' ? (
+                  // 图片/文件消息：不使用气泡背景
+                  <div style={{
+                    display: 'inline-block',
+                    maxWidth: '80%',
+                    transition: 'all 0.3s ease'
+                  }}>
+                    {renderMessageContent(message)}
+                  </div>
+                ) : (
+                  // 文本/系统消息：使用气泡背景
+                  <div style={{ 
+                    display: 'inline-block',
+                    maxWidth: '80%',
+                    padding: '8px 12px',
+                    borderRadius: '12px',
+                    backgroundColor: isSystemMessage(message) ? '#f0f0f0' : 
+                                   message.user_id === currentUserId ? '#1890ff' : '#fff',
+                    color: isSystemMessage(message) ? '#666' : 
+                          message.user_id === currentUserId ? '#fff' : '#333',
+                    border: isSystemMessage(message) ? 'none' : '1px solid #d9d9d9',
+                    wordWrap: 'break-word',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                  }}>
+                    {renderMessageContent(message)}
+                  </div>
+                )}
                 
                 <div style={{ 
                   fontSize: '11px', 
