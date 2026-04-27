@@ -434,6 +434,7 @@ const CompactMessageList: React.FC<CompactMessageListProps> = ({
               return (
                 <div 
                   key={message.id} 
+                  id={`chat-message-${message.id}`}
                   style={{ 
                     marginBottom: '16px',
                     padding: '0 20px',

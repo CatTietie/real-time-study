@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import ChatRoom from "../models/chat-room.model";
 import ChatMessage from "../models/chat-message.model";
 import User from "../models/user.model";
+import UnreadMessage from "../models/unread-message.model";
 import { Op } from "sequelize";
 import { uploadChatFileToOss } from "../middlewares/upload.middleware";
 import { broadcastToRoom } from "../utils/socketManager";
@@ -761,6 +762,106 @@ export const getImageBase64 = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : "获取图片失败"
+    });
+  }
+};
+
+export const getUnreadMessages = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "用户未登录"
+      });
+    }
+
+    const unreadList = await UnreadMessage.getUserUnreadList(userId);
+    const totalCount = await UnreadMessage.getTotalUnreadCount(userId);
+
+    res.json({
+      success: true,
+      data: {
+        totalCount,
+        unreadList
+      }
+    });
+  } catch (error) {
+    console.error('获取未读消息失败:', error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "获取未读消息失败"
+    });
+  }
+};
+
+export const markRoomAsRead = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const { roomId } = req.params;
+    
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "用户未登录"
+      });
+    }
+
+    const roomIdNum = parseInt(roomId, 10);
+    if (isNaN(roomIdNum)) {
+      return res.status(400).json({
+        success: false,
+        message: "无效的聊天室ID"
+      });
+    }
+
+    await UnreadMessage.markAsRead(userId, roomIdNum);
+
+    const unreadList = await UnreadMessage.getUserUnreadList(userId);
+    const totalCount = await UnreadMessage.getTotalUnreadCount(userId);
+
+    res.json({
+      success: true,
+      message: "已标记为已读",
+      data: {
+        totalCount,
+        unreadList
+      }
+    });
+  } catch (error) {
+    console.error('标记已读失败:', error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "标记已读失败"
+    });
+  }
+};
+
+export const getTotalUnreadCount = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "用户未登录"
+      });
+    }
+
+    const totalCount = await UnreadMessage.getTotalUnreadCount(userId);
+
+    res.json({
+      success: true,
+      data: {
+        totalCount
+      }
+    });
+  } catch (error) {
+    console.error('获取未读计数失败:', error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "获取未读计数失败"
     });
   }
 };

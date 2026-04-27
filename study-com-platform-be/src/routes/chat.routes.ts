@@ -29,4 +29,9 @@ router.delete("/messages/:messageId", chatController.deleteMessage);
 router.get("/proxy-image", chatController.proxyImage);
 router.get("/image-base64", chatController.getImageBase64);
 
+// 未读消息
+router.get("/unread", chatController.getUnreadMessages);
+router.get("/unread/count", chatController.getTotalUnreadCount);
+router.post("/unread/mark-read/:roomId", chatController.markRoomAsRead);
+
 export default router;

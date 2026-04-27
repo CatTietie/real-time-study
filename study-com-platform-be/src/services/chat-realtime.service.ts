@@ -2,6 +2,7 @@ import { Server, Socket } from 'socket.io';
 import ChatMessage from '../models/chat-message.model';
 import ChatRoom from '../models/chat-room.model';
 import User from '../models/user.model';
+import UnreadMessage from '../models/unread-message.model';
 
 interface ClientInfo {
   userId: number;
@@ -59,6 +60,9 @@ export const initChatSockets = (io: Server) => {
           roomOnlineUsers.set(data.roomId, new Set());
         }
         roomOnlineUsers.get(data.roomId)!.add(data.userId);
+
+        // 标记该房间为已读
+        await UnreadMessage.markAsRead(data.userId, data.roomId);
 
         // 通知其他用户
         socket.to(`chat_${data.roomId}`).emit('user_joined', {
@@ -165,6 +169,39 @@ export const initChatSockets = (io: Server) => {
         });
         
         io.to(`chat_${data.roomId}`).emit('receive_chat_message', messageData);
+
+        // 为房间内其他用户增加未读计数
+        const roomUsers = roomOnlineUsers.get(data.roomId);
+        if (roomUsers) {
+          // 准备消息摘要
+          let messageContent = data.content;
+          let messageType = data.messageType || 'text';
+          
+          // 图片/文件消息使用文件名作为摘要
+          if (messageType === 'image' && data.file_name) {
+            messageContent = `[图片] ${data.file_name}`;
+          } else if (messageType === 'file' && data.file_name) {
+            messageContent = `[文件] ${data.file_name}`;
+          } else if (messageContent.length > 100) {
+            messageContent = messageContent.substring(0, 100) + '...';
+          }
+
+          // 遍历房间内所有用户，为非发送者增加未读计数
+          for (const userId of roomUsers) {
+            if (userId !== clientInfo.userId) {
+              await UnreadMessage.incrementUnreadCountForUser(
+                userId,
+                data.roomId,
+                messageData.id,
+                messageContent,
+                messageType,
+                clientInfo.userId,
+                clientInfo.nickname || clientInfo.username,
+                clientInfo.avatar || ''
+              );
+            }
+          }
+        }
 
       } catch (error) {
         console.error('发送消息失败:', error);

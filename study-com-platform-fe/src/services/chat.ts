@@ -169,3 +169,44 @@ export const getImageBase64 = async (imageUrl: string): Promise<{
   });
   return response.data.data;
 };
+
+export interface UnreadMessageItem {
+  id: number;
+  user_id: number;
+  room_id: number;
+  last_read_message_id: number;
+  unread_count: number;
+  last_message_id: number;
+  last_message_content: string;
+  last_message_type: string;
+  last_sender_id: number;
+  last_sender_nickname: string;
+  last_sender_avatar: string;
+  created_at: string;
+  updated_at: string;
+  room?: {
+    id: number;
+    name: string;
+    type: string;
+  };
+}
+
+export interface UnreadMessagesResponse {
+  totalCount: number;
+  unreadList: UnreadMessageItem[];
+}
+
+export const getUnreadMessages = async (): Promise<UnreadMessagesResponse> => {
+  const response = await api.get('/chat/unread');
+  return response.data.data;
+};
+
+export const getTotalUnreadCount = async (): Promise<number> => {
+  const response = await api.get('/chat/unread/count');
+  return response.data.data.totalCount;
+};
+
+export const markRoomAsRead = async (roomId: number): Promise<UnreadMessagesResponse> => {
+  const response = await api.post(`/chat/unread/mark-read/${roomId}`);
+  return response.data.data;
+};
