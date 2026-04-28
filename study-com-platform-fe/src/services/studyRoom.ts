@@ -50,6 +50,12 @@ export const leaveStudyRoom = async () => {
   return response.data;
 };
 
+// 原子化退出自习室并结束预约
+export const leaveAndEndReservation = async (reservationId: number) => {
+  const response = await api.post("/study-rooms/reservations/leave-and-end", { reservationId });
+  return response.data;
+};
+
 // 获取我的预约记录
 export const getMyReservations = async (params?: Record<string, unknown>) => {
   const response = await api.get("/study-rooms/my/reservations", { params });
