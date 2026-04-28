@@ -4,6 +4,36 @@ import type { ChatMessage } from '../types/chat';
 import { API_BASE } from '../services/api';
 import { getChatHistory } from '../services/chat';
 
+// 新消息声音提示
+const playMessageSound = () => {
+  try {
+    // 使用 Web Audio API 生成简单的提示音
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    // 设置频率和音量
+    oscillator.frequency.value = 800; // 800Hz 频率
+    oscillator.type = 'sine'; // 正弦波
+    
+    // 音量包络（淡入淡出）
+    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.15, audioContext.currentTime + 0.05);
+    gainNode.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.1);
+    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.2);
+    
+    // 播放
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.25);
+    
+  } catch (error) {
+    console.log('播放消息提示音失败:', error);
+  }
+};
+
 interface UseChatSocketProps {
   roomId: number;
   userId: number;
@@ -174,6 +204,16 @@ export const useChatSocket = ({ roomId, userId, username, nickname }: UseChatSoc
       }, 100);
       
       setTotalMessageCount(prev => prev + 1);
+      
+      // 新消息声音提醒
+      // 只在收到他人的消息时播放声音，系统消息和自己的消息不播放
+      const currentUserId = userInfoRef.current.userId;
+      const isSystemMessage = message.message_type === 'system';
+      const isOwnMessage = message.user_id === currentUserId;
+      
+      if (!isSystemMessage && !isOwnMessage) {
+        playMessageSound();
+      }
     });
 
     newSocket.on('user_joined', (data: { username: string }) => {

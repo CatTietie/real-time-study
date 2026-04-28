@@ -157,6 +157,15 @@ export const getStudyRoomDetail = async (req: Request, res: Response) => {
   }
 };
 
+// 预约错误码
+const RESERVATION_ERROR_CODES = {
+  ROOM_UNAVAILABLE: 'ROOM_UNAVAILABLE',
+  ROOM_FULL: 'ROOM_FULL',
+  DUPLICATE_RESERVATION: 'DUPLICATE_RESERVATION',
+  PAST_TIME: 'PAST_TIME',
+  SYSTEM_ERROR: 'SYSTEM_ERROR'
+} as const;
+
 // 预约自习室
 export const reserveStudyRoom = async (req: Request, res: Response) => {
   try {
@@ -170,10 +179,25 @@ export const reserveStudyRoom = async (req: Request, res: Response) => {
       endTime: string;
     };
     
+    // 检查是否是过去的时间
+    const now = new Date();
+    const startDate = new Date(startTime);
+    if (startDate < now) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "无法预约过去的时间段",
+        errorCode: RESERVATION_ERROR_CODES.PAST_TIME
+      });
+    }
+    
     // 检查自习室是否存在且可用
     const room = await StudyRoom.findByPk(roomId);
     if (!room || room.status !== 'active') {
-      return res.status(400).json({ success: false, message: "自习室不可用" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "自习室不可用",
+        errorCode: RESERVATION_ERROR_CODES.ROOM_UNAVAILABLE
+      });
     }
     
     // 检查容量：统计用户预约时间段内的已确认预约数量
@@ -199,11 +223,19 @@ export const reserveStudyRoom = async (req: Request, res: Response) => {
     });
     
     if (timeSlotReservationCount >= room.capacity) {
-      return res.status(400).json({ success: false, message: "该时间段自习室已满" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "该时间段自习室已满",
+        errorCode: RESERVATION_ERROR_CODES.ROOM_FULL,
+        data: {
+          currentCount: timeSlotReservationCount,
+          capacity: room.capacity
+        }
+      });
     }
     
     // 检查是否是同一学生同一自习室同一时间段的重复预约
-    const duplicateReservation = await RoomReservation.count({
+    const duplicateReservation = await RoomReservation.findOne({
       where: {
         user_id: req.user.id,
         room_id: roomId,
@@ -222,11 +254,26 @@ export const reserveStudyRoom = async (req: Request, res: Response) => {
             ]
           }
         ]
-      }
+      },
+      include: [{
+        model: StudyRoom,
+        attributes: ['id', 'name', 'location']
+      }]
     });
     
-    if (duplicateReservation > 0) {
-      return res.status(400).json({ success: false, message: "您在该时间段已有预约" });
+    if (duplicateReservation) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "您在该时间段已有预约",
+        errorCode: RESERVATION_ERROR_CODES.DUPLICATE_RESERVATION,
+        data: {
+          reservationId: duplicateReservation.id,
+          startTime: duplicateReservation.start_time,
+          endTime: duplicateReservation.end_time,
+          roomName: (duplicateReservation as any).StudyRoom?.name,
+          roomLocation: (duplicateReservation as any).StudyRoom?.location
+        }
+      });
     }
     
     // 创建预约，直接设为已确认状态

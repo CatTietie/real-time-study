@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { 
   Card, 
   List, 
@@ -15,7 +16,8 @@ import {
   Tooltip,
   Radio,
   Typography,
-  Empty
+  Empty,
+  Descriptions
 } from "antd";
 import { 
   SearchOutlined, 
@@ -24,7 +26,9 @@ import {
   TeamOutlined,
   ClockCircleOutlined,
   CalendarOutlined,
-  UnorderedListOutlined
+  UnorderedListOutlined,
+  ExclamationCircleOutlined,
+  InfoCircleOutlined
 } from "@ant-design/icons";
 import { getStudyRooms, reserveStudyRoom, getHourlyAvailability } from "../../services/studyRoom";
 import type { StudyRoom, TimeSlot, RoomHourlyAvailability, HourlyAvailabilityResponse } from "../../types/study-room";
@@ -36,7 +40,41 @@ const { Text } = Typography;
 
 type ViewMode = 'list' | 'timeline';
 
+// 预约错误码（与后端一致）
+const RESERVATION_ERROR_CODES = {
+  ROOM_UNAVAILABLE: 'ROOM_UNAVAILABLE',
+  ROOM_FULL: 'ROOM_FULL',
+  DUPLICATE_RESERVATION: 'DUPLICATE_RESERVATION',
+  PAST_TIME: 'PAST_TIME',
+  SYSTEM_ERROR: 'SYSTEM_ERROR'
+} as const;
+
+// 重复预约数据类型
+interface DuplicateReservationData {
+  reservationId: number;
+  startTime: string;
+  endTime: string;
+  roomName?: string;
+  roomLocation?: string;
+}
+
+// 自习室已满数据类型
+interface RoomFullData {
+  currentCount: number;
+  capacity: number;
+}
+
+// 错误详情类型
+interface ErrorDetails {
+  errorCode: string;
+  message: string;
+  duplicateData?: DuplicateReservationData;
+  roomFullData?: RoomFullData;
+}
+
 export default function StudyRoomList() {
+  const navigate = useNavigate();
+  
   const [rooms, setRooms] = useState<StudyRoom[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchParams, setSearchParams] = useState({
@@ -46,6 +84,10 @@ export default function StudyRoomList() {
   const [reserveModalVisible, setReserveModalVisible] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<StudyRoom | null>(null);
   const [reserveForm] = Form.useForm();
+  
+  // 错误弹窗相关状态
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorDetails, setErrorDetails] = useState<ErrorDetails | null>(null);
   
   // 时间轴视图相关状态
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -96,6 +138,52 @@ export default function StudyRoomList() {
   }, [viewMode, selectedDate]);
 
 
+  // 处理跳转"我的预约"页面
+  const handleNavigateToMyReservations = useCallback(() => {
+    setErrorModalVisible(false);
+    setErrorDetails(null);
+    // 关闭预约弹窗
+    setReserveModalVisible(false);
+    reserveForm.resetFields();
+    // 跳转到"我的预约"页面
+    navigate("/student/my-reservations");
+  }, [navigate]);
+
+  // 处理预约错误
+  const handleReserveError = useCallback((error: unknown) => {
+    const err = error as { 
+      response?: { 
+        data?: { 
+          message?: string;
+          errorCode?: string;
+          data?: any;
+        } 
+      } 
+    };
+    
+    const errorData = err.response?.data;
+    const errorCode = errorData?.errorCode;
+    const messageText = errorData?.message || "预约失败";
+    
+    // 构建错误详情
+    const details: ErrorDetails = {
+      errorCode: errorCode || RESERVATION_ERROR_CODES.SYSTEM_ERROR,
+      message: messageText
+    };
+    
+    // 根据错误码添加额外数据
+    if (errorCode === RESERVATION_ERROR_CODES.DUPLICATE_RESERVATION && errorData?.data) {
+      details.duplicateData = errorData.data as DuplicateReservationData;
+    }
+    
+    if (errorCode === RESERVATION_ERROR_CODES.ROOM_FULL && errorData?.data) {
+      details.roomFullData = errorData.data as RoomFullData;
+    }
+    
+    setErrorDetails(details);
+    setErrorModalVisible(true);
+  }, []);
+
   const handleReserve = async (values: unknown) => {
     if (!selectedRoom) return;
     
@@ -116,8 +204,7 @@ export default function StudyRoomList() {
         }
       }
     } catch (error: unknown) {
-      const err = error as { response?: { data?: { message?: string } } };
-      message.error(err.response?.data?.message || "预约失败");
+      handleReserveError(error);
     }
   };
 
@@ -597,6 +684,154 @@ export default function StudyRoomList() {
             </Form.Item>
           </Form>
         </div>
+      </Modal>
+      
+      {/* 预约失败错误弹窗 */}
+      <Modal
+        title={
+          <Space>
+            <ExclamationCircleOutlined style={{ color: '#ff4d4f', fontSize: 20 }} />
+            <span>预约失败</span>
+          </Space>
+        }
+        open={errorModalVisible}
+        onCancel={() => {
+          setErrorModalVisible(false);
+          setErrorDetails(null);
+        }}
+        footer={
+          errorDetails?.errorCode === RESERVATION_ERROR_CODES.DUPLICATE_RESERVATION ? (
+            <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+              <Button
+                type="primary"
+                icon={<InfoCircleOutlined />}
+                onClick={handleNavigateToMyReservations}
+              >
+                查看我的预约
+              </Button>
+              <Button
+                onClick={() => {
+                  setErrorModalVisible(false);
+                  setErrorDetails(null);
+                }}
+              >
+                关闭
+              </Button>
+            </Space>
+          ) : (
+            <Button
+              type="primary"
+              onClick={() => {
+                setErrorModalVisible(false);
+                setErrorDetails(null);
+              }}
+            >
+              关闭
+            </Button>
+          )
+        }
+        width={480}
+      >
+        {errorDetails && (
+          <div>
+            <div style={{ marginBottom: 16 }}>
+              <Text type="danger" strong style={{ fontSize: 15 }}>
+                {errorDetails.message}
+              </Text>
+            </div>
+            
+            {/* 重复预约详情 */}
+            {errorDetails.errorCode === RESERVATION_ERROR_CODES.DUPLICATE_RESERVATION && errorDetails.duplicateData && (
+              <div style={{ 
+                backgroundColor: '#fff7e6', 
+                padding: 16, 
+                borderRadius: 6,
+                border: '1px solid #ffd591'
+              }}>
+                <Text strong style={{ display: 'block', marginBottom: 12, color: '#fa8c16' }}>
+                  重复预约详情：
+                </Text>
+                <Descriptions column={1} size="small">
+                  <Descriptions.Item label="自习室">
+                    {errorDetails.duplicateData.roomName || '自习室'}
+                    {errorDetails.duplicateData.roomLocation && ` (${errorDetails.duplicateData.roomLocation})`}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="预约时间">
+                    {dayjs(errorDetails.duplicateData.startTime).format('YYYY-MM-DD HH:mm')} - 
+                    {dayjs(errorDetails.duplicateData.endTime).format('HH:mm')}
+                  </Descriptions.Item>
+                </Descriptions>
+                <Text type="secondary" style={{ fontSize: 12, marginTop: 8, display: 'block' }}>
+                  点击"查看我的预约"按钮，可查看您已有的预约记录
+                </Text>
+              </div>
+            )}
+            
+            {/* 自习室已满详情 */}
+            {errorDetails.errorCode === RESERVATION_ERROR_CODES.ROOM_FULL && errorDetails.roomFullData && (
+              <div style={{ 
+                backgroundColor: '#fff1f0', 
+                padding: 16, 
+                borderRadius: 6,
+                border: '1px solid #ffa39e'
+              }}>
+                <Descriptions column={2} size="small">
+                  <Descriptions.Item label="当前人数">
+                    <Tag color="red">{errorDetails.roomFullData.currentCount} 人</Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="自习室容量">
+                    <Tag color="blue">{errorDetails.roomFullData.capacity} 人</Tag>
+                  </Descriptions.Item>
+                </Descriptions>
+                <Text type="secondary" style={{ fontSize: 12, marginTop: 8, display: 'block' }}>
+                  该时间段已满，请选择其他时间段或其他自习室
+                </Text>
+              </div>
+            )}
+            
+            {/* 无法预约过去的时间 */}
+            {errorDetails.errorCode === RESERVATION_ERROR_CODES.PAST_TIME && (
+              <div style={{ 
+                backgroundColor: '#f6ffed', 
+                padding: 16, 
+                borderRadius: 6,
+                border: '1px solid #b7eb8f'
+              }}>
+                <Text type="secondary" style={{ fontSize: 13 }}>
+                  请选择当前时间之后的时间段进行预约。如果需要查看历史预约记录，请前往"我的预约"页面。
+                </Text>
+              </div>
+            )}
+            
+            {/* 自习室不可用 */}
+            {errorDetails.errorCode === RESERVATION_ERROR_CODES.ROOM_UNAVAILABLE && (
+              <div style={{ 
+                backgroundColor: '#f0f5ff', 
+                padding: 16, 
+                borderRadius: 6,
+                border: '1px solid #adc6ff'
+              }}>
+                <Text type="secondary" style={{ fontSize: 13 }}>
+                  该自习室当前不可用（可能处于维护或已关闭状态）。请选择其他可用的自习室。
+                </Text>
+              </div>
+            )}
+            
+            {/* 系统错误 */}
+            {errorDetails.errorCode === RESERVATION_ERROR_CODES.SYSTEM_ERROR && (
+              <div style={{ 
+                backgroundColor: '#fafafa', 
+                padding: 16, 
+                borderRadius: 6,
+                border: '1px solid #d9d9d9'
+              }}>
+                <Text type="secondary" style={{ fontSize: 13 }}>
+                  预约过程中发生系统错误，请稍后重试。如果问题持续存在，请联系管理员。
+                </Text>
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
     </div>
   );
