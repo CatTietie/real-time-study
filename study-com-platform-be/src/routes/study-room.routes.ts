@@ -4,11 +4,10 @@ import {
   getStudyRoomDetail,
   reserveStudyRoom,
   leaveStudyRoom,
-  confirmReservation,
-  completeReservation,
   endReservation,
   cancelReservation,
   getMyReservations,
+  leaveAndEndReservation,
 } from "../controllers/study-room.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { Op } from "sequelize";
@@ -27,10 +26,10 @@ router.post("/leave", leaveStudyRoom);
 router.get("/my/reservations", getMyReservations);
 
 // 预约操作接口
-router.post("/reservations/confirm", confirmReservation);
-router.post("/reservations/complete", completeReservation);
 router.post("/reservations/end", endReservation);
 router.post("/reservations/cancel", cancelReservation);
+// 原子化退出自习室并结束预约
+router.post("/reservations/leave-and-end", leaveAndEndReservation);
 
 // 管理员接口
 router.post("/check-expired", async (req, res) => {
@@ -52,20 +51,20 @@ router.post("/force-update-expired", async (req, res) => {
     
     console.log(`强制更新过期状态，当前时间: ${now.toISOString()}`);
     
-    // 首先尝试修复数据库表结构
+    // 首先尝试修复数据库表结构（移除pending和completed状态）
     try {
-      await sequelize.query("ALTER TABLE room_reservations MODIFY COLUMN status ENUM('pending', 'confirmed', 'cancelled', 'completed', 'ended') DEFAULT 'pending';");
+      await sequelize.query("ALTER TABLE room_reservations MODIFY COLUMN status ENUM('confirmed', 'cancelled', 'ended') DEFAULT 'confirmed';");
       console.log('数据库表结构修复完成');
     } catch (schemaError: any) {
       console.log('表结构已是最新的或修复失败:', schemaError.message || schemaError);
     }
     
-    // 强制将所有已过结束时间且状态为confirmed/completed的记录更新为ended
+    // 强制将所有已过结束时间且状态为confirmed的记录更新为ended
     const [updatedCount] = await RoomReservation.update(
       { status: 'ended' },
       {
         where: {
-          status: { [Op.in]: ['confirmed', 'completed'] },
+          status: 'confirmed',
           end_time: { [Op.lt]: now }
         }
       }

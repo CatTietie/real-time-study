@@ -11,16 +11,19 @@ import {
   message,
   Space,
   Progress,
-  Tag
+  Tag,
+  Tooltip
 } from "antd";
 import { 
   SearchOutlined, 
   UsergroupAddOutlined,
   EnvironmentOutlined,
-  TeamOutlined
+  TeamOutlined,
+  ClockCircleOutlined
 } from "@ant-design/icons";
 import { getStudyRooms, reserveStudyRoom } from "../../services/studyRoom";
-import type { StudyRoom } from "../../types/study-room";
+import type { StudyRoom, TimeSlot } from "../../types/study-room";
+import dayjs, { Dayjs } from "dayjs";
 
 const { Option } = Select;
 const { RangePicker } = DatePicker;
@@ -68,9 +71,10 @@ export default function StudyRoomList() {
       });
       
       if (response.success) {
-        message.success("预约成功，请等待确认");
+        message.success("预约成功");
         setReserveModalVisible(false);
         reserveForm.resetFields();
+        fetchRooms();
       }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
@@ -99,6 +103,41 @@ export default function StudyRoomList() {
       default:
         return <Tag>未知</Tag>;
     }
+  };
+
+  const formatTimeSlot = (slot: TimeSlot) => {
+    const start = dayjs(slot.start_time).format('MM-DD HH:mm');
+    const end = dayjs(slot.end_time).format('MM-DD HH:mm');
+    return `${start} ~ ${end}`;
+  };
+
+  const disabledDate = (current: Dayjs) => {
+    return current && current < dayjs().startOf('day');
+  };
+
+  const disabledDateTime = () => {
+    const now = dayjs();
+    return {
+      disabledHours: () => {
+        const hours: number[] = [];
+        for (let i = 0; i < 24; i++) {
+          if (now.hour() > i) {
+            hours.push(i);
+          }
+        }
+        return hours;
+      },
+      disabledMinutes: (hour: number) => {
+        const now = dayjs();
+        const minutes: number[] = [];
+        if (now.hour() === hour) {
+          for (let i = 0; i < now.minute(); i++) {
+            minutes.push(i);
+          }
+        }
+        return minutes;
+      },
+    };
   };
 
   return (
@@ -194,6 +233,25 @@ export default function StudyRoomList() {
                           size="small"
                         />
                       </div>
+                      {room.reserved_time_slots && room.reserved_time_slots.length > 0 && (
+                        <div style={{ marginTop: 8 }}>
+                          <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                            <div style={{ color: '#666', fontSize: 12 }}>
+                              <ClockCircleOutlined style={{ marginRight: 4 }} />
+                              已预约时间段:
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                              {room.reserved_time_slots.map((slot, index) => (
+                                <Tooltip key={index} title={formatTimeSlot(slot)}>
+                                  <Tag color="orange" style={{ margin: 0, fontSize: 11 }}>
+                                    {formatTimeSlot(slot)}
+                                  </Tag>
+                                </Tooltip>
+                              ))}
+                            </div>
+                          </Space>
+                        </div>
+                      )}
                       {room.description && (
                         <div style={{ marginTop: 8, color: '#666' }}>
                           {room.description}
@@ -228,11 +286,15 @@ export default function StudyRoomList() {
             name="timeRange"
             label="预约时间"
             rules={[{ required: true, message: '请选择预约时间' }]}
+            extra="不可选择过去的时间"
           >
             <RangePicker
               showTime
               format="YYYY-MM-DD HH:mm"
               placeholder={['开始时间', '结束时间']}
+              disabledDate={disabledDate}
+              disabledTime={disabledDateTime}
+              style={{ width: '100%' }}
             />
           </Form.Item>
           <Form.Item>
