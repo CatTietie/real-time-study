@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { Op } from "sequelize";
+import { sequelize } from "../config/sequelize";
 import StudyRoom from "../models/study-room.model";
 import RoomReservation from "../models/room-reservation.model";
 import RoomOccupancy from "../models/room-occupancy.model";
@@ -206,18 +207,18 @@ export const reserveStudyRoom = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: "时间段已被预约" });
     }
     
-    // 创建预约
+    // 创建预约，直接设为已确认状态
     const reservation = await RoomReservation.create({
       user_id: req.user.id,
       room_id: roomId,
       start_time: new Date(startTime),
       end_time: new Date(endTime),
-      status: 'pending'
+      status: 'confirmed'
     });
     
     res.json({
       success: true,
-      message: "预约成功，请等待确认",
+      message: "预约成功",
       data: reservation,
     });
   } catch (error) {
@@ -523,6 +524,80 @@ export const getMyReservations = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('获取预约记录失败:', error);
     const message = error instanceof Error ? error.message : "获取失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+// 原子化退出自习室并结束预约（合并为一个事务操作）
+export const leaveAndEndReservation = async (req: Request, res: Response) => {
+  const transaction = await sequelize.transaction();
+  
+  try {
+    if (!req.user) {
+      await transaction.rollback();
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+    
+    const { reservationId } = req.body as { reservationId: number };
+    
+    // 1. 查找用户当前 active 状态的占用记录
+    const occupancy = await RoomOccupancy.findOne({
+      where: {
+        user_id: req.user.id,
+        status: 'active'
+      },
+      order: [['join_time', 'DESC']],
+      transaction
+    });
+    
+    if (!occupancy) {
+      await transaction.rollback();
+      return res.status(400).json({ 
+        success: false, 
+        message: "您不在任何自习室中" 
+      });
+    }
+    
+    // 2. 查找预约记录
+    const reservation = await RoomReservation.findByPk(reservationId, { transaction });
+    if (!reservation) {
+      await transaction.rollback();
+      return res.status(404).json({ success: false, message: "预约记录不存在" });
+    }
+    
+    // 检查是否是当前用户的预约
+    if (reservation.user_id !== req.user.id) {
+      await transaction.rollback();
+      return res.status(403).json({ success: false, message: "无权限操作他人预约" });
+    }
+    
+    // 3. 更新占用记录状态
+    await occupancy.update({
+      status: 'left',
+      leave_time: new Date()
+    }, { transaction });
+    
+    // 4. 更新预约记录状态（如果是 completed 状态则更新为 ended）
+    if (reservation.status === 'completed') {
+      await reservation.update({ status: 'ended' }, { transaction });
+    }
+    
+    // 提交事务
+    await transaction.commit();
+    
+    res.json({
+      success: true,
+      message: "退出自习室并结束预约成功",
+      data: {
+        occupancy: occupancy.toJSON(),
+        reservation: reservation.toJSON()
+      }
+    });
+  } catch (error) {
+    // 回滚事务
+    await transaction.rollback();
+    console.error('原子化退出自习室失败:', error);
+    const message = error instanceof Error ? error.message : "退出失败";
     res.status(500).json({ success: false, message });
   }
 };
