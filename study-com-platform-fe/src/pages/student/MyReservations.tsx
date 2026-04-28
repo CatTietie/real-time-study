@@ -20,10 +20,8 @@ import type { RoomReservation } from "../../types/study-room";
 const { TabPane } = Tabs;
 
 const statusMap = {
-  pending: { text: '待确认', color: 'orange' },
   confirmed: { text: '已确认', color: 'green' },
   cancelled: { text: '已取消', color: 'red' },
-  completed: { text: '已加入', color: 'blue' },
   ended: { text: '已结束', color: 'gray' }
 };
 
@@ -103,73 +101,49 @@ export default function MyReservations() {
       key: 'action',
       render: (_: unknown, record: RoomReservation) => (
         <Space>
-          {record.status === 'pending' && (
-            <Button 
-              type="link" 
-              danger
-              icon={<CloseCircleOutlined />}
-              onClick={async () => {
-                try {
-                  const response = await cancelReservation(record.id);
-                  if (response.success) {
-                    message.success('取消预约成功');
-                    // 刷新数据
-                    fetchReservations(pagination.current, pagination.pageSize, activeTab === 'all' ? undefined : activeTab);
-                  } else {
-                    message.error(response.message || '取消预约失败');
+          {record.status === 'confirmed' && (
+            <>
+              <Button 
+                type="link" 
+                icon={<TeamOutlined />}
+                onClick={async () => {
+                  try {
+                    const response = await leaveAndEndReservation(record.id);
+                    if (response.success) {
+                      message.success('退出自习室并结束预约成功');
+                      fetchReservations(pagination.current, pagination.pageSize, activeTab === 'all' ? undefined : activeTab);
+                    } else {
+                      message.error(response.message || '退出失败');
+                    }
+                  } catch (error) {
+                    console.error('退出操作异常:', error);
+                    message.error(`退出操作失败: ${error instanceof Error ? error.message : '未知错误'}`);
                   }
-                } catch (error) {
-                  console.error('取消预约失败:', error);
-                  message.error('取消预约失败');
-                }
-              }}
-            >
-              取消
-            </Button>
-          )}
-          {record.status === 'completed' && (
-            <Button 
-              type="link" 
-              icon={<TeamOutlined />}
-              onClick={async () => {
-                try {
-                  const response = await leaveAndEndReservation(record.id);
-                  if (response.success) {
-                    message.success('退出自习室并结束预约成功');
-                    fetchReservations(pagination.current, pagination.pageSize, activeTab === 'all' ? undefined : activeTab);
-                  } else {
-                    message.error(response.message || '退出失败');
+                }}
+              >
+                退出自习室
+              </Button>
+              <Button 
+                type="link" 
+                danger
+                icon={<CloseCircleOutlined />}
+                onClick={async () => {
+                  try {
+                    const response = await cancelReservation(record.id);
+                    if (response.success) {
+                      message.success('取消预约成功');
+                      fetchReservations(pagination.current, pagination.pageSize, activeTab === 'all' ? undefined : activeTab);
+                    } else {
+                      message.error(response.message || '取消预约失败');
+                    }
+                  } catch (_error) {
+                    message.error('取消预约失败');
                   }
-                } catch (error) {
-                  console.error('退出操作异常:', error);
-                  message.error(`退出操作失败: ${error instanceof Error ? error.message : '未知错误'}`);
-                }
-              }}
-            >
-              退出自习室
-            </Button>
-          )}
-          {(record.status === 'confirmed' || record.status === 'completed') && (
-            <Button 
-              type="link" 
-              danger
-              icon={<CloseCircleOutlined />}
-              onClick={async () => {
-                try {
-                  const response = await cancelReservation(record.id);
-                  if (response.success) {
-                    message.success('取消预约成功');
-                    fetchReservations(pagination.current, pagination.pageSize, activeTab === 'all' ? undefined : activeTab);
-                  } else {
-                    message.error(response.message || '取消预约失败');
-                  }
-                } catch (_error) {
-                  message.error('取消预约失败');
-                }
-              }}
-            >
-              提前取消
-            </Button>
+                }}
+              >
+                提前取消
+              </Button>
+            </>
           )}
         </Space>
       )
@@ -211,9 +185,7 @@ export default function MyReservations() {
           }
         >
           <TabPane tab="全部" key="all" />
-          <TabPane tab="待确认" key="pending" />
           <TabPane tab="已确认" key="confirmed" />
-          <TabPane tab="已加入" key="completed" />
           <TabPane tab="已结束" key="ended" />
           <TabPane tab="已取消" key="cancelled" />
         </Tabs>

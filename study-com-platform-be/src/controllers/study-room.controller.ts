@@ -185,7 +185,7 @@ export const reserveStudyRoom = async (req: Request, res: Response) => {
     const existingReservations = await RoomReservation.count({
       where: {
         room_id: roomId,
-        status: { [Op.in]: ['pending', 'confirmed'] },
+        status: 'confirmed',
         [Op.or]: [
           {
             start_time: { [Op.between]: [startTime, endTime] }
@@ -317,7 +317,7 @@ export const checkExpiredReservations = async () => {
     // 查找所有需要检查的预约记录
     const expiringReservations = await RoomReservation.findAll({
       where: {
-        status: { [Op.in]: ['confirmed', 'completed'] },
+        status: 'confirmed',
         end_time: { [Op.lt]: now }
       },
       include: [{
@@ -336,7 +336,7 @@ export const checkExpiredReservations = async () => {
       { status: 'ended' },
       {
         where: {
-          status: { [Op.in]: ['confirmed', 'completed'] },
+          status: 'confirmed',
           end_time: { [Op.lt]: now }
         }
       }
@@ -380,9 +380,9 @@ export const endReservation = async (req: Request, res: Response) => {
       return res.status(403).json({ success: false, message: "无权限操作他人预约" });
     }
     
-    // 检查状态是否为completed
-    if (reservation.status !== 'completed') {
-      return res.status(400).json({ success: false, message: "预约状态不是已加入，无法结束" });
+    // 检查状态是否为confirmed
+    if (reservation.status !== 'confirmed') {
+      return res.status(400).json({ success: false, message: "预约状态不是已确认，无法结束" });
     }
     
     // 更新预约状态为ended
@@ -458,8 +458,8 @@ export const cancelReservation = async (req: Request, res: Response) => {
       return res.status(403).json({ success: false, message: "无权限操作他人预约" });
     }
     
-    // 检查状态是否为pending或confirmed
-    if (reservation.status !== 'pending' && reservation.status !== 'confirmed') {
+    // 检查状态是否为confirmed
+    if (reservation.status !== 'confirmed') {
       return res.status(400).json({ success: false, message: "预约状态已结束，无法取消" });
     }
     
@@ -577,8 +577,8 @@ export const leaveAndEndReservation = async (req: Request, res: Response) => {
       leave_time: new Date()
     }, { transaction });
     
-    // 4. 更新预约记录状态（如果是 completed 状态则更新为 ended）
-    if (reservation.status === 'completed') {
+    // 4. 更新预约记录状态（如果是 confirmed 状态则更新为 ended）
+    if (reservation.status === 'confirmed') {
       await reservation.update({ status: 'ended' }, { transaction });
     }
     
