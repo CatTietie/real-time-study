@@ -18,7 +18,7 @@ export interface RoomReservation {
   room_id: number;
   start_time: string;
   end_time: string;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'ended';
+  status: 'confirmed' | 'cancelled' | 'ended';
   created_at: string;
   updated_at: string;
   StudyRoom?: {
