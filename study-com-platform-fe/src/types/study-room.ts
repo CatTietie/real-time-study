@@ -1,3 +1,8 @@
+export interface TimeSlot {
+  start_time: string;
+  end_time: string;
+}
+
 export interface StudyRoom {
   id: number;
   name: string;
@@ -10,6 +15,7 @@ export interface StudyRoom {
   status: 'active' | 'maintenance' | 'closed';
   created_at: string;
   updated_at: string;
+  reserved_time_slots?: TimeSlot[];
 }
 
 export interface RoomReservation {

@@ -89,10 +89,29 @@ export const getStudyRooms = async (req: Request, res: Response) => {
         // 总占用人数 = active占用记录 + 已确认的有效预约记录
         const totalOccupancy = activeOccupancyCount + confirmedReservationCount;
         
-        // 返回包含实时占用人数的数据
+        // 查询该自习室所有未来的已确认预约时间段
+        const now = new Date();
+        const futureReservations = await RoomReservation.findAll({
+          where: {
+            room_id: room.id,
+            status: 'confirmed',
+            end_time: { [Op.gt]: now }
+          },
+          attributes: ['start_time', 'end_time'],
+          order: [['start_time', 'ASC']]
+        });
+        
+        // 格式化预约时间段
+        const reservedTimeSlots = futureReservations.map((res: any) => ({
+          start_time: res.start_time,
+          end_time: res.end_time
+        }));
+        
+        // 返回包含实时占用人数和已预约时间段的数据
         return {
           ...room.toJSON(),
-          current_occupancy: totalOccupancy
+          current_occupancy: totalOccupancy,
+          reserved_time_slots: reservedTimeSlots
         };
       })
     );
