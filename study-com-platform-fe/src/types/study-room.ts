@@ -1,3 +1,8 @@
+export interface TimeSlot {
+  start_time: string;
+  end_time: string;
+}
+
 export interface StudyRoom {
   id: number;
   name: string;
@@ -10,6 +15,7 @@ export interface StudyRoom {
   status: 'active' | 'maintenance' | 'closed';
   created_at: string;
   updated_at: string;
+  reserved_time_slots?: TimeSlot[];
 }
 
 export interface RoomReservation {
@@ -18,7 +24,7 @@ export interface RoomReservation {
   room_id: number;
   start_time: string;
   end_time: string;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'ended';
+  status: 'confirmed' | 'cancelled' | 'ended';
   created_at: string;
   updated_at: string;
   StudyRoom?: {
@@ -26,4 +32,25 @@ export interface RoomReservation {
     name: string;
     location: string;
   };
+}
+
+// 时间轴视图相关类型
+export interface HourlyData {
+  hour: number;
+  reserved: number;
+  available: number;
+}
+
+export interface RoomHourlyAvailability {
+  id: number;
+  name: string;
+  capacity: number;
+  location: string;
+  image_url: string;
+  hourlyData: HourlyData[];
+}
+
+export interface HourlyAvailabilityResponse {
+  date: string;
+  rooms: RoomHourlyAvailability[];
 }
