@@ -33,3 +33,24 @@ export interface RoomReservation {
     location: string;
   };
 }
+
+// 时间轴视图相关类型
+export interface HourlyData {
+  hour: number;
+  reserved: number;
+  available: number;
+}
+
+export interface RoomHourlyAvailability {
+  id: number;
+  name: string;
+  capacity: number;
+  location: string;
+  image_url: string;
+  hourlyData: HourlyData[];
+}
+
+export interface HourlyAvailabilityResponse {
+  date: string;
+  rooms: RoomHourlyAvailability[];
+}

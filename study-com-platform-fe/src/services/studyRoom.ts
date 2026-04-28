@@ -73,3 +73,10 @@ export const forceUpdateExpired = async () => {
   const response = await api.post("/study-rooms/force-update-expired");
   return response.data;
 };
+
+// 获取每小时可用状态（用于时间轴视图）
+export const getHourlyAvailability = async (date?: string) => {
+  const params = date ? { date } : {};
+  const response = await api.get("/study-rooms/hourly/availability", { params });
+  return response.data;
+};

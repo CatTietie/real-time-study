@@ -545,3 +545,127 @@ export const leaveAndEndReservation = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message });
   }
 };
+
+// 获取每个自习室每个小时的已预约人数（用于时间轴视图）
+export const getHourlyAvailability = async (req: Request, res: Response) => {
+  try {
+    const { date } = req.query;
+    
+    // 确定查询的日期
+    let queryDate: Date;
+    if (date && typeof date === 'string') {
+      queryDate = new Date(date);
+    } else {
+      queryDate = new Date();
+    }
+    
+    // 构建当天的开始和结束时间
+    const dayStart = new Date(queryDate);
+    dayStart.setHours(0, 0, 0, 0);
+    
+    const dayEnd = new Date(queryDate);
+    dayEnd.setHours(23, 59, 59, 999);
+    
+    // 1. 获取所有活跃的自习室
+    const rooms = await StudyRoom.findAll({
+      where: { status: 'active' },
+      attributes: ['id', 'name', 'capacity', 'location', 'image_url'],
+      order: [['id', 'ASC']]
+    });
+    
+    // 2. 获取当天所有已确认的预约（与当天有重叠的）
+    const reservations = await RoomReservation.findAll({
+      where: {
+        status: 'confirmed',
+        [Op.or]: [
+          // 预约完全在当天内
+          {
+            start_time: { [Op.gte]: dayStart },
+            end_time: { [Op.lte]: dayEnd }
+          },
+          // 预约开始在前一天，结束在当天
+          {
+            start_time: { [Op.lt]: dayStart },
+            end_time: { [Op.gt]: dayStart }
+          },
+          // 预约开始在当天，结束在后一天
+          {
+            start_time: { [Op.lt]: dayEnd },
+            end_time: { [Op.gt]: dayEnd }
+          }
+        ]
+      },
+      attributes: ['id', 'room_id', 'start_time', 'end_time'],
+      order: [['room_id', 'ASC'], ['start_time', 'ASC']]
+    });
+    
+    // 3. 按房间分组预约
+    const reservationsByRoom: Record<number, typeof reservations> = {};
+    reservations.forEach((res: any) => {
+      if (!reservationsByRoom[res.room_id]) {
+        reservationsByRoom[res.room_id] = [];
+      }
+      reservationsByRoom[res.room_id].push(res);
+    });
+    
+    // 4. 为每个房间计算每个小时的已预约人数
+    const result = rooms.map((room: any) => {
+      const roomReservations = reservationsByRoom[room.id] || [];
+      
+      // 初始化24小时的数据
+      const hourlyData: { hour: number; reserved: number; available: number }[] = [];
+      
+      for (let hour = 0; hour < 24; hour++) {
+        // 构建该小时的时间范围
+        const hourStart = new Date(queryDate);
+        hourStart.setHours(hour, 0, 0, 0);
+        
+        const hourEnd = new Date(queryDate);
+        hourEnd.setHours(hour, 59, 59, 999);
+        
+        // 计算该小时内有多少个预约
+        let reservedCount = 0;
+        
+        roomReservations.forEach((res: any) => {
+          const resStart = new Date(res.start_time);
+          const resEnd = new Date(res.end_time);
+          
+          // 检查预约时间段是否与该小时有重叠
+          // 重叠条件：预约开始 < 小时结束 且 预约结束 > 小时开始
+          if (resStart < hourEnd && resEnd > hourStart) {
+            reservedCount++;
+          }
+        });
+        
+        hourlyData.push({
+          hour,
+          reserved: reservedCount,
+          available: Math.max(0, room.capacity - reservedCount)
+        });
+      }
+      
+      return {
+        id: room.id,
+        name: room.name,
+        capacity: room.capacity,
+        location: room.location,
+        image_url: room.image_url,
+        hourlyData
+      };
+    });
+    
+    res.json({
+      success: true,
+      message: "获取成功",
+      data: {
+        date: queryDate.toISOString().split('T')[0],
+        rooms: result
+      }
+    });
+    
+  } catch (error) {
+    console.error('获取每小时可用状态失败:', error);
+    const message = error instanceof Error ? error.message : "获取失败";
+    res.status(500).json({ success: false, message });
+  }
+};

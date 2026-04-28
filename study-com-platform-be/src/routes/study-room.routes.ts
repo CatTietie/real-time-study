@@ -8,6 +8,7 @@ import {
   cancelReservation,
   getMyReservations,
   leaveAndEndReservation,
+  getHourlyAvailability,
 } from "../controllers/study-room.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { Op } from "sequelize";
@@ -17,6 +18,7 @@ const router = Router();
 // 公开接口
 router.get("/", getStudyRooms);
 router.get("/:id", getStudyRoomDetail);
+router.get("/hourly/availability", getHourlyAvailability);
 
 // 需要认证的接口
 router.use(authMiddleware);
