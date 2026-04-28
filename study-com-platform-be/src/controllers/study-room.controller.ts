@@ -176,32 +176,8 @@ export const reserveStudyRoom = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: "自习室不可用" });
     }
     
-    // 检查自习室是否已满（实时查询，包括active占用和已确认的有效预约）
-    const activeOccupancyCount = await RoomOccupancy.count({
-      where: {
-        room_id: roomId,
-        status: 'active'
-      }
-    });
-    
-    const now = new Date();
-    const confirmedReservationCount = await RoomReservation.count({
-      where: {
-        room_id: roomId,
-        status: 'confirmed',
-        start_time: { [Op.lte]: now },
-        end_time: { [Op.gt]: now }
-      }
-    });
-    
-    const totalOccupancy = activeOccupancyCount + confirmedReservationCount;
-    
-    if (totalOccupancy >= room.capacity) {
-      return res.status(400).json({ success: false, message: "自习室已满" });
-    }
-    
-    // 检查时间冲突
-    const existingReservations = await RoomReservation.count({
+    // 检查容量：统计用户预约时间段内的已确认预约数量
+    const timeSlotReservationCount = await RoomReservation.count({
       where: {
         room_id: roomId,
         status: 'confirmed',
@@ -222,8 +198,35 @@ export const reserveStudyRoom = async (req: Request, res: Response) => {
       }
     });
     
-    if (existingReservations > 0) {
-      return res.status(400).json({ success: false, message: "时间段已被预约" });
+    if (timeSlotReservationCount >= room.capacity) {
+      return res.status(400).json({ success: false, message: "该时间段自习室已满" });
+    }
+    
+    // 检查是否是同一学生同一自习室同一时间段的重复预约
+    const duplicateReservation = await RoomReservation.count({
+      where: {
+        user_id: req.user.id,
+        room_id: roomId,
+        status: 'confirmed',
+        [Op.or]: [
+          {
+            start_time: { [Op.between]: [startTime, endTime] }
+          },
+          {
+            end_time: { [Op.between]: [startTime, endTime] }
+          },
+          {
+            [Op.and]: [
+              { start_time: { [Op.lte]: startTime } },
+              { end_time: { [Op.gte]: endTime } }
+            ]
+          }
+        ]
+      }
+    });
+    
+    if (duplicateReservation > 0) {
+      return res.status(400).json({ success: false, message: "您在该时间段已有预约" });
     }
     
     // 创建预约，直接设为已确认状态
