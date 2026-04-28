@@ -182,6 +182,7 @@ class UnreadMessage extends Model<UnreadMessageAttributes, UnreadMessageCreation
         },
         include: [{
           model: ChatRoom,
+          as: 'ChatRoom',
           attributes: ['id', 'name', 'type']
         }],
         order: [['updated_at', 'DESC']]
