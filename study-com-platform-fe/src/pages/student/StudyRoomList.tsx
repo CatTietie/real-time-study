@@ -151,19 +151,61 @@ export default function StudyRoomList() {
 
   // 处理预约错误
   const handleReserveError = useCallback((error: unknown) => {
-    const err = error as { 
+    // BusinessError 类型定义，支持直接访问 errorCode 和 data
+    type BusinessErrorLike = {
+      message?: string;
+      errorCode?: string;
+      data?: any;
       response?: { 
         data?: { 
           message?: string;
           errorCode?: string;
           data?: any;
         } 
-      } 
+      };
     };
     
-    const errorData = err.response?.data;
-    const errorCode = errorData?.errorCode;
-    const messageText = errorData?.message || "预约失败";
+    const err = error as BusinessErrorLike;
+    
+    // 优先级：先尝试直接从 Error 对象获取，再从 response.data 获取
+    // 因为拦截器已经把 errorCode 和 data 直接附加到了 Error 对象上
+    let errorCode: string | undefined;
+    let errorData: any;
+    let messageText: string = "预约失败";
+    
+    // 1. 优先直接从 Error 对象获取（拦截器会把这些属性附加到 Error 上）
+    if (err.errorCode) {
+      errorCode = err.errorCode;
+    }
+    if (err.data) {
+      errorData = err.data;
+    }
+    if (err.message) {
+      messageText = err.message;
+    }
+    
+    // 2. 如果没有，再尝试从 response.data 获取（兼容旧代码）
+    if (!errorCode && err.response?.data?.errorCode) {
+      errorCode = err.response.data.errorCode;
+    }
+    if (!errorData && err.response?.data?.data) {
+      errorData = err.response.data.data;
+    }
+    if (messageText === "预约失败" && err.response?.data?.message) {
+      messageText = err.response.data.message;
+    }
+    
+    // 调试信息
+    console.log('处理预约错误:', {
+      error,
+      errorCode,
+      messageText,
+      errorData,
+      errMessage: err.message,
+      errErrorCode: err.errorCode,
+      errData: err.data,
+      errResponse: err.response
+    });
     
     // 构建错误详情
     const details: ErrorDetails = {
@@ -172,12 +214,12 @@ export default function StudyRoomList() {
     };
     
     // 根据错误码添加额外数据
-    if (errorCode === RESERVATION_ERROR_CODES.DUPLICATE_RESERVATION && errorData?.data) {
-      details.duplicateData = errorData.data as DuplicateReservationData;
+    if (errorCode === RESERVATION_ERROR_CODES.DUPLICATE_RESERVATION && errorData) {
+      details.duplicateData = errorData as DuplicateReservationData;
     }
     
-    if (errorCode === RESERVATION_ERROR_CODES.ROOM_FULL && errorData?.data) {
-      details.roomFullData = errorData.data as RoomFullData;
+    if (errorCode === RESERVATION_ERROR_CODES.ROOM_FULL && errorData) {
+      details.roomFullData = errorData as RoomFullData;
     }
     
     setErrorDetails(details);
