@@ -197,18 +197,24 @@ export default function StudyRoomList() {
       return;
     }
     
-    // 检查是否是过去的时间
     const now = dayjs();
-    const slotTime = selectedDate.hour(hour).minute(0).second(0);
-    if (slotTime.isBefore(now)) {
-      message.warning("无法预约过去的时段");
+    // 该小时的结束时间
+    const hourEndTime = selectedDate.hour(hour + 1).minute(0).second(0);
+    
+    // 检查是否是过去的时间：只有当该小时已经完全结束时才不能预约
+    // 例如：现在是 22:15，22:00-23:00 这个区间还没结束，应该可以预约
+    if (hourEndTime.isBefore(now)) {
+      message.warning("该时段已结束，请选择其他时段");
       return;
     }
     
     setSelectedRoom(roomData);
     
-    // 设置默认时间范围：从当前小时开始，到下一个整点结束
-    const startTime = selectedDate.hour(hour).minute(0).second(0);
+    // 设置默认时间范围：
+    // - 如果是当前小时：从当前时间开始，到下一个整点结束
+    // - 如果是未来小时：从整点开始，到下一个整点结束
+    const hourStartTime = selectedDate.hour(hour).minute(0).second(0);
+    const startTime = hourStartTime.isBefore(now) ? now : hourStartTime;
     const endTime = selectedDate.hour(hour + 1).minute(0).second(0);
     
     reserveForm.setFieldsValue({
@@ -315,7 +321,9 @@ export default function StudyRoomList() {
                   </td>
                   {room.hourlyData.map((hourly, index) => {
                     const colors = getSlotColor(hourly.available, room.capacity);
-                    const isPastHour = selectedDate.hour(hourly.hour).isBefore(dayjs().startOf('hour'));
+                    // 判断该小时是否已经完全结束（与 handleTimeSlotClick 逻辑一致）
+                    const hourEndTime = selectedDate.hour(hourly.hour + 1).minute(0).second(0);
+                    const isPastHour = hourEndTime.isBefore(dayjs());
                     const isDisabled = isPastHour || hourly.available === 0;
                     
                     return (
@@ -326,7 +334,7 @@ export default function StudyRoomList() {
                       }}>
                         <Tooltip title={
                           isPastHour 
-                            ? '该时段已过' 
+                            ? '该时段已结束' 
                             : hourly.available === 0 
                               ? '该时段已满' 
                               : `剩余 ${hourly.available} 个座位，点击预约`
