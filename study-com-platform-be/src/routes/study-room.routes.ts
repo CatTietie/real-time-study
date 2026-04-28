@@ -4,8 +4,6 @@ import {
   getStudyRoomDetail,
   reserveStudyRoom,
   leaveStudyRoom,
-  confirmReservation,
-  completeReservation,
   endReservation,
   cancelReservation,
   getMyReservations,
@@ -28,8 +26,6 @@ router.post("/leave", leaveStudyRoom);
 router.get("/my/reservations", getMyReservations);
 
 // 预约操作接口
-router.post("/reservations/confirm", confirmReservation);
-router.post("/reservations/complete", completeReservation);
 router.post("/reservations/end", endReservation);
 router.post("/reservations/cancel", cancelReservation);
 // 原子化退出自习室并结束预约
