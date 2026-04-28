@@ -50,6 +50,12 @@ export const leaveStudyRoom = async () => {
   return response.data;
 };
 
+// 原子化退出自习室并结束预约
+export const leaveAndEndReservation = async (reservationId: number) => {
+  const response = await api.post("/study-rooms/reservations/leave-and-end", { reservationId });
+  return response.data;
+};
+
 // 获取我的预约记录
 export const getMyReservations = async (params?: Record<string, unknown>) => {
   const response = await api.get("/study-rooms/my/reservations", { params });
@@ -65,5 +71,12 @@ export const checkExpiredReservations = async () => {
 // 强制更新过期状态
 export const forceUpdateExpired = async () => {
   const response = await api.post("/study-rooms/force-update-expired");
+  return response.data;
+};
+
+// 获取每小时可用状态（用于时间轴视图）
+export const getHourlyAvailability = async (date?: string) => {
+  const params = date ? { date } : {};
+  const response = await api.get("/study-rooms/hourly/availability", { params });
   return response.data;
 };
