@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { Op } from "sequelize";
+import { sequelize } from "../config/sequelize";
 import StudyRoom from "../models/study-room.model";
 import RoomReservation from "../models/room-reservation.model";
 import RoomOccupancy from "../models/room-occupancy.model";
@@ -88,10 +89,29 @@ export const getStudyRooms = async (req: Request, res: Response) => {
         // 总占用人数 = active占用记录 + 已确认的有效预约记录
         const totalOccupancy = activeOccupancyCount + confirmedReservationCount;
         
-        // 返回包含实时占用人数的数据
+        // 查询该自习室所有未来的已确认预约时间段
+        const now = new Date();
+        const futureReservations = await RoomReservation.findAll({
+          where: {
+            room_id: room.id,
+            status: 'confirmed',
+            end_time: { [Op.gt]: now }
+          },
+          attributes: ['start_time', 'end_time'],
+          order: [['start_time', 'ASC']]
+        });
+        
+        // 格式化预约时间段
+        const reservedTimeSlots = futureReservations.map((res: any) => ({
+          start_time: res.start_time,
+          end_time: res.end_time
+        }));
+        
+        // 返回包含实时占用人数和已预约时间段的数据
         return {
           ...room.toJSON(),
-          current_occupancy: totalOccupancy
+          current_occupancy: totalOccupancy,
+          reserved_time_slots: reservedTimeSlots
         };
       })
     );
@@ -137,6 +157,15 @@ export const getStudyRoomDetail = async (req: Request, res: Response) => {
   }
 };
 
+// 预约错误码
+const RESERVATION_ERROR_CODES = {
+  ROOM_UNAVAILABLE: 'ROOM_UNAVAILABLE',
+  ROOM_FULL: 'ROOM_FULL',
+  DUPLICATE_RESERVATION: 'DUPLICATE_RESERVATION',
+  PAST_TIME: 'PAST_TIME',
+  SYSTEM_ERROR: 'SYSTEM_ERROR'
+} as const;
+
 // 预约自习室
 export const reserveStudyRoom = async (req: Request, res: Response) => {
   try {
@@ -150,41 +179,32 @@ export const reserveStudyRoom = async (req: Request, res: Response) => {
       endTime: string;
     };
     
+    // 检查是否是过去的时间
+    const now = new Date();
+    const startDate = new Date(startTime);
+    if (startDate < now) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "无法预约过去的时间段",
+        errorCode: RESERVATION_ERROR_CODES.PAST_TIME
+      });
+    }
+    
     // 检查自习室是否存在且可用
     const room = await StudyRoom.findByPk(roomId);
     if (!room || room.status !== 'active') {
-      return res.status(400).json({ success: false, message: "自习室不可用" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "自习室不可用",
+        errorCode: RESERVATION_ERROR_CODES.ROOM_UNAVAILABLE
+      });
     }
     
-    // 检查自习室是否已满（实时查询，包括active占用和已确认的有效预约）
-    const activeOccupancyCount = await RoomOccupancy.count({
-      where: {
-        room_id: roomId,
-        status: 'active'
-      }
-    });
-    
-    const now = new Date();
-    const confirmedReservationCount = await RoomReservation.count({
+    // 检查容量：统计用户预约时间段内的已确认预约数量
+    const timeSlotReservationCount = await RoomReservation.count({
       where: {
         room_id: roomId,
         status: 'confirmed',
-        start_time: { [Op.lte]: now },
-        end_time: { [Op.gt]: now }
-      }
-    });
-    
-    const totalOccupancy = activeOccupancyCount + confirmedReservationCount;
-    
-    if (totalOccupancy >= room.capacity) {
-      return res.status(400).json({ success: false, message: "自习室已满" });
-    }
-    
-    // 检查时间冲突
-    const existingReservations = await RoomReservation.count({
-      where: {
-        room_id: roomId,
-        status: { [Op.in]: ['pending', 'confirmed'] },
         [Op.or]: [
           {
             start_time: { [Op.between]: [startTime, endTime] }
@@ -202,22 +222,72 @@ export const reserveStudyRoom = async (req: Request, res: Response) => {
       }
     });
     
-    if (existingReservations > 0) {
-      return res.status(400).json({ success: false, message: "时间段已被预约" });
+    if (timeSlotReservationCount >= room.capacity) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "该时间段自习室已满",
+        errorCode: RESERVATION_ERROR_CODES.ROOM_FULL,
+        data: {
+          currentCount: timeSlotReservationCount,
+          capacity: room.capacity
+        }
+      });
     }
     
-    // 创建预约
+    // 检查是否是同一学生同一自习室同一时间段的重复预约
+    const duplicateReservation = await RoomReservation.findOne({
+      where: {
+        user_id: req.user.id,
+        room_id: roomId,
+        status: 'confirmed',
+        [Op.or]: [
+          {
+            start_time: { [Op.between]: [startTime, endTime] }
+          },
+          {
+            end_time: { [Op.between]: [startTime, endTime] }
+          },
+          {
+            [Op.and]: [
+              { start_time: { [Op.lte]: startTime } },
+              { end_time: { [Op.gte]: endTime } }
+            ]
+          }
+        ]
+      },
+      include: [{
+        model: StudyRoom,
+        attributes: ['id', 'name', 'location']
+      }]
+    });
+    
+    if (duplicateReservation) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "您在该时间段已有预约",
+        errorCode: RESERVATION_ERROR_CODES.DUPLICATE_RESERVATION,
+        data: {
+          reservationId: duplicateReservation.id,
+          startTime: duplicateReservation.start_time,
+          endTime: duplicateReservation.end_time,
+          roomName: (duplicateReservation as any).StudyRoom?.name,
+          roomLocation: (duplicateReservation as any).StudyRoom?.location
+        }
+      });
+    }
+    
+    // 创建预约，直接设为已确认状态
     const reservation = await RoomReservation.create({
       user_id: req.user.id,
       room_id: roomId,
       start_time: new Date(startTime),
       end_time: new Date(endTime),
-      status: 'pending'
+      status: 'confirmed'
     });
     
     res.json({
       success: true,
-      message: "预约成功，请等待确认",
+      message: "预约成功",
       data: reservation,
     });
   } catch (error) {
@@ -268,45 +338,6 @@ export const leaveStudyRoom = async (req: Request, res: Response) => {
   }
 };
 
-// 确认预约
-export const confirmReservation = async (req: Request, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ success: false, message: "未授权访问" });
-    }
-    
-    const { reservationId } = req.body as { reservationId: number };
-    
-    // 查找预约记录
-    const reservation = await RoomReservation.findByPk(reservationId);
-    if (!reservation) {
-      return res.status(404).json({ success: false, message: "预约记录不存在" });
-    }
-    
-    // 检查是否是当前用户的预约
-    if (reservation.user_id !== req.user.id) {
-      return res.status(403).json({ success: false, message: "无权限操作他人预约" });
-    }
-    
-    // 检查状态是否为pending
-    if (reservation.status !== 'pending') {
-      return res.status(400).json({ success: false, message: "预约状态不是待确认，无法确认" });
-    }
-    
-    // 更新预约状态为confirmed
-    await reservation.update({ status: 'confirmed' });
-    
-    res.json({
-      success: true,
-      message: "确认成功，预约状态已更新为已确认",
-      data: reservation
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "确认失败";
-    res.status(500).json({ success: false, message });
-  }
-};
-
 // 检查并更新过期预约状态
 export const checkExpiredReservations = async () => {
   try {
@@ -316,7 +347,7 @@ export const checkExpiredReservations = async () => {
     // 查找所有需要检查的预约记录
     const expiringReservations = await RoomReservation.findAll({
       where: {
-        status: { [Op.in]: ['confirmed', 'completed'] },
+        status: 'confirmed',
         end_time: { [Op.lt]: now }
       },
       include: [{
@@ -335,7 +366,7 @@ export const checkExpiredReservations = async () => {
       { status: 'ended' },
       {
         where: {
-          status: { [Op.in]: ['confirmed', 'completed'] },
+          status: 'confirmed',
           end_time: { [Op.lt]: now }
         }
       }
@@ -379,9 +410,9 @@ export const endReservation = async (req: Request, res: Response) => {
       return res.status(403).json({ success: false, message: "无权限操作他人预约" });
     }
     
-    // 检查状态是否为completed
-    if (reservation.status !== 'completed') {
-      return res.status(400).json({ success: false, message: "预约状态不是已加入，无法结束" });
+    // 检查状态是否为confirmed
+    if (reservation.status !== 'confirmed') {
+      return res.status(400).json({ success: false, message: "预约状态不是已确认，无法结束" });
     }
     
     // 更新预约状态为ended
@@ -394,45 +425,6 @@ export const endReservation = async (req: Request, res: Response) => {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "结束预约失败";
-    res.status(500).json({ success: false, message });
-  }
-};
-
-// 完成预约（加入自习室后调用）
-export const completeReservation = async (req: Request, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ success: false, message: "未授权访问" });
-    }
-    
-    const { reservationId } = req.body as { reservationId: number };
-    
-    // 查找预约记录
-    const reservation = await RoomReservation.findByPk(reservationId);
-    if (!reservation) {
-      return res.status(404).json({ success: false, message: "预约记录不存在" });
-    }
-    
-    // 检查是否是当前用户的预约
-    if (reservation.user_id !== req.user.id) {
-      return res.status(403).json({ success: false, message: "无权限操作他人预约" });
-    }
-    
-    // 检查状态是否为confirmed
-    if (reservation.status !== 'confirmed') {
-      return res.status(400).json({ success: false, message: "预约状态不是已确认，无法完成" });
-    }
-    
-    // 更新预约状态为completed
-    await reservation.update({ status: 'completed' });
-    
-    res.json({
-      success: true,
-      message: "预约已完成",
-      data: reservation
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "完成失败";
     res.status(500).json({ success: false, message });
   }
 };
@@ -457,8 +449,8 @@ export const cancelReservation = async (req: Request, res: Response) => {
       return res.status(403).json({ success: false, message: "无权限操作他人预约" });
     }
     
-    // 检查状态是否为pending或confirmed
-    if (reservation.status !== 'pending' && reservation.status !== 'confirmed') {
+    // 检查状态是否为confirmed
+    if (reservation.status !== 'confirmed') {
       return res.status(400).json({ success: false, message: "预约状态已结束，无法取消" });
     }
     
@@ -522,6 +514,204 @@ export const getMyReservations = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('获取预约记录失败:', error);
+    const message = error instanceof Error ? error.message : "获取失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+// 原子化退出自习室并结束预约（合并为一个事务操作）
+export const leaveAndEndReservation = async (req: Request, res: Response) => {
+  const transaction = await sequelize.transaction();
+  
+  try {
+    if (!req.user) {
+      await transaction.rollback();
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+    
+    const { reservationId } = req.body as { reservationId: number };
+    
+    // 1. 查找用户当前 active 状态的占用记录
+    const occupancy = await RoomOccupancy.findOne({
+      where: {
+        user_id: req.user.id,
+        status: 'active'
+      },
+      order: [['join_time', 'DESC']],
+      transaction
+    });
+    
+    if (!occupancy) {
+      await transaction.rollback();
+      return res.status(400).json({ 
+        success: false, 
+        message: "您不在任何自习室中" 
+      });
+    }
+    
+    // 2. 查找预约记录
+    const reservation = await RoomReservation.findByPk(reservationId, { transaction });
+    if (!reservation) {
+      await transaction.rollback();
+      return res.status(404).json({ success: false, message: "预约记录不存在" });
+    }
+    
+    // 检查是否是当前用户的预约
+    if (reservation.user_id !== req.user.id) {
+      await transaction.rollback();
+      return res.status(403).json({ success: false, message: "无权限操作他人预约" });
+    }
+    
+    // 3. 更新占用记录状态
+    await occupancy.update({
+      status: 'left',
+      leave_time: new Date()
+    }, { transaction });
+    
+    // 4. 更新预约记录状态（如果是 confirmed 状态则更新为 ended）
+    if (reservation.status === 'confirmed') {
+      await reservation.update({ status: 'ended' }, { transaction });
+    }
+    
+    // 提交事务
+    await transaction.commit();
+    
+    res.json({
+      success: true,
+      message: "退出自习室并结束预约成功",
+      data: {
+        occupancy: occupancy.toJSON(),
+        reservation: reservation.toJSON()
+      }
+    });
+  } catch (error) {
+    // 回滚事务
+    await transaction.rollback();
+    console.error('原子化退出自习室失败:', error);
+    const message = error instanceof Error ? error.message : "退出失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+// 获取每个自习室每个小时的已预约人数（用于时间轴视图）
+export const getHourlyAvailability = async (req: Request, res: Response) => {
+  try {
+    const { date } = req.query;
+    
+    // 确定查询的日期
+    let queryDate: Date;
+    if (date && typeof date === 'string') {
+      queryDate = new Date(date);
+    } else {
+      queryDate = new Date();
+    }
+    
+    // 构建当天的开始和结束时间
+    const dayStart = new Date(queryDate);
+    dayStart.setHours(0, 0, 0, 0);
+    
+    const dayEnd = new Date(queryDate);
+    dayEnd.setHours(23, 59, 59, 999);
+    
+    // 1. 获取所有活跃的自习室
+    const rooms = await StudyRoom.findAll({
+      where: { status: 'active' },
+      attributes: ['id', 'name', 'capacity', 'location', 'image_url'],
+      order: [['id', 'ASC']]
+    });
+    
+    // 2. 获取当天所有已确认的预约（与当天有重叠的）
+    const reservations = await RoomReservation.findAll({
+      where: {
+        status: 'confirmed',
+        [Op.or]: [
+          // 预约完全在当天内
+          {
+            start_time: { [Op.gte]: dayStart },
+            end_time: { [Op.lte]: dayEnd }
+          },
+          // 预约开始在前一天，结束在当天
+          {
+            start_time: { [Op.lt]: dayStart },
+            end_time: { [Op.gt]: dayStart }
+          },
+          // 预约开始在当天，结束在后一天
+          {
+            start_time: { [Op.lt]: dayEnd },
+            end_time: { [Op.gt]: dayEnd }
+          }
+        ]
+      },
+      attributes: ['id', 'room_id', 'start_time', 'end_time'],
+      order: [['room_id', 'ASC'], ['start_time', 'ASC']]
+    });
+    
+    // 3. 按房间分组预约
+    const reservationsByRoom: Record<number, typeof reservations> = {};
+    reservations.forEach((res: any) => {
+      if (!reservationsByRoom[res.room_id]) {
+        reservationsByRoom[res.room_id] = [];
+      }
+      reservationsByRoom[res.room_id].push(res);
+    });
+    
+    // 4. 为每个房间计算每个小时的已预约人数
+    const result = rooms.map((room: any) => {
+      const roomReservations = reservationsByRoom[room.id] || [];
+      
+      // 初始化24小时的数据
+      const hourlyData: { hour: number; reserved: number; available: number }[] = [];
+      
+      for (let hour = 0; hour < 24; hour++) {
+        // 构建该小时的时间范围
+        const hourStart = new Date(queryDate);
+        hourStart.setHours(hour, 0, 0, 0);
+        
+        const hourEnd = new Date(queryDate);
+        hourEnd.setHours(hour, 59, 59, 999);
+        
+        // 计算该小时内有多少个预约
+        let reservedCount = 0;
+        
+        roomReservations.forEach((res: any) => {
+          const resStart = new Date(res.start_time);
+          const resEnd = new Date(res.end_time);
+          
+          // 检查预约时间段是否与该小时有重叠
+          // 重叠条件：预约开始 < 小时结束 且 预约结束 > 小时开始
+          if (resStart < hourEnd && resEnd > hourStart) {
+            reservedCount++;
+          }
+        });
+        
+        hourlyData.push({
+          hour,
+          reserved: reservedCount,
+          available: Math.max(0, room.capacity - reservedCount)
+        });
+      }
+      
+      return {
+        id: room.id,
+        name: room.name,
+        capacity: room.capacity,
+        location: room.location,
+        image_url: room.image_url,
+        hourlyData
+      };
+    });
+    
+    res.json({
+      success: true,
+      message: "获取成功",
+      data: {
+        date: queryDate.toISOString().split('T')[0],
+        rooms: result
+      }
+    });
+    
+  } catch (error) {
+    console.error('获取每小时可用状态失败:', error);
     const message = error instanceof Error ? error.message : "获取失败";
     res.status(500).json({ success: false, message });
   }
