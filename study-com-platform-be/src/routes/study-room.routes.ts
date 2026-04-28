@@ -9,6 +9,7 @@ import {
   endReservation,
   cancelReservation,
   getMyReservations,
+  leaveAndEndReservation,
 } from "../controllers/study-room.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { Op } from "sequelize";
@@ -31,6 +32,8 @@ router.post("/reservations/confirm", confirmReservation);
 router.post("/reservations/complete", completeReservation);
 router.post("/reservations/end", endReservation);
 router.post("/reservations/cancel", cancelReservation);
+// 原子化退出自习室并结束预约
+router.post("/reservations/leave-and-end", leaveAndEndReservation);
 
 // 管理员接口
 router.post("/check-expired", async (req, res) => {
