@@ -84,6 +84,39 @@ const STATUS_CONFIG: Record<UserStatus, StatusConfig> = {
   }
 };
 
+const formatDate = (dateValue: any, format: 'full' | 'short' = 'short'): string => {
+  if (!dateValue) {
+    return '刚刚';
+  }
+  
+  let date: Date;
+  
+  if (dateValue instanceof Date) {
+    date = dateValue;
+  } else if (typeof dateValue === 'string') {
+    date = new Date(dateValue);
+  } else if (typeof dateValue === 'number') {
+    date = new Date(dateValue);
+  } else {
+    return '刚刚';
+  }
+  
+  if (isNaN(date.getTime())) {
+    return '刚刚';
+  }
+  
+  if (format === 'full') {
+    return date.toLocaleString('zh-CN');
+  }
+  
+  return date.toLocaleString('zh-CN', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
 interface ChatContainerProps {
   roomId: number;
   onRoomChange: (roomId: number) => void;
@@ -807,12 +840,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                                       fontSize: '11px', 
                                       color: '#999'
                                     }}>
-                                      {new Date(item.updated_at).toLocaleString('zh-CN', {
-                                        month: 'short',
-                                        day: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit'
-                                      })}
+                                      {formatDate(item.updated_at)}
                                     </span>
                                   </div>
                                 }
@@ -1134,7 +1162,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                                 {msg.nickname || msg.username}
                               </span>
                               <span style={{ fontSize: '11px', color: '#a0aec0' }}>
-                                {new Date(msg.created_at).toLocaleString('zh-CN')}
+                                {formatDate(msg.created_at, 'full')}
                               </span>
                             </div>
                             <div style={{
