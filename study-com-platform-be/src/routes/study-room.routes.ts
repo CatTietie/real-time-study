@@ -5,6 +5,7 @@ import {
   reserveStudyRoom,
   leaveStudyRoom,
   endReservation,
+  earlyExitReservation,
   cancelReservation,
   getMyReservations,
   leaveAndEndReservation,
@@ -29,6 +30,7 @@ router.get("/my/reservations", getMyReservations);
 
 // 预约操作接口
 router.post("/reservations/end", endReservation);
+router.post("/reservations/early-exit", earlyExitReservation);
 router.post("/reservations/cancel", cancelReservation);
 // 原子化退出自习室并结束预约
 router.post("/reservations/leave-and-end", leaveAndEndReservation);
@@ -44,7 +46,7 @@ router.post("/check-expired", async (req, res) => {
   }
 });
 
-// 强制更新过期状态接口（临时解决方案）
+// 强制更新过期状态接口（支持新的状态 in_progress）
 router.post("/force-update-expired", async (req, res) => {
   try {
     const { RoomReservation } = await import('../models/room-reservation.model');
@@ -53,16 +55,42 @@ router.post("/force-update-expired", async (req, res) => {
     
     console.log(`强制更新过期状态，当前时间: ${now.toISOString()}`);
     
-    // 首先尝试修复数据库表结构（移除pending和completed状态）
+    // 首先尝试修复数据库表结构（添加 in_progress 状态）
     try {
-      await sequelize.query("ALTER TABLE room_reservations MODIFY COLUMN status ENUM('confirmed', 'cancelled', 'ended') DEFAULT 'confirmed';");
-      console.log('数据库表结构修复完成');
+      await sequelize.query("ALTER TABLE room_reservations MODIFY COLUMN status ENUM('confirmed', 'in_progress', 'ended', 'cancelled') DEFAULT 'confirmed';");
+      console.log('数据库表结构更新完成（添加 in_progress 状态）');
     } catch (schemaError: any) {
       console.log('表结构已是最新的或修复失败:', schemaError.message || schemaError);
     }
     
-    // 强制将所有已过结束时间且状态为confirmed的记录更新为ended
-    const [updatedCount] = await RoomReservation.update(
+    // 1. 第一阶段：将已到开始时间的 confirmed 状态转换为 in_progress
+    const [inProgressUpdatedCount] = await RoomReservation.update(
+      { status: 'in_progress' },
+      {
+        where: {
+          status: 'confirmed',
+          start_time: { [Op.lte]: now }
+        }
+      }
+    );
+    
+    console.log(`已将 ${inProgressUpdatedCount} 条 confirmed 记录转换为 in_progress`);
+    
+    // 2. 第二阶段：将已到结束时间的 in_progress 状态转换为 ended
+    const [endedUpdatedCount] = await RoomReservation.update(
+      { status: 'ended' },
+      {
+        where: {
+          status: 'in_progress',
+          end_time: { [Op.lt]: now }
+        }
+      }
+    );
+    
+    console.log(`已将 ${endedUpdatedCount} 条 in_progress 记录转换为 ended`);
+    
+    // 3. 兼容旧数据：将已到结束时间的 confirmed 状态转换为 ended
+    const [legacyUpdatedCount] = await RoomReservation.update(
       { status: 'ended' },
       {
         where: {
@@ -72,11 +100,18 @@ router.post("/force-update-expired", async (req, res) => {
       }
     );
     
-    console.log(`强制更新了 ${updatedCount} 条记录`);
+    const totalUpdated = inProgressUpdatedCount + endedUpdatedCount + legacyUpdatedCount;
+    
+    console.log(`总计更新了 ${totalUpdated} 条记录`);
     
     res.json({ 
       success: true, 
-      message: `强制更新完成，共更新 ${updatedCount} 条记录` 
+      message: `强制更新完成，共更新 ${totalUpdated} 条记录`,
+      details: {
+        confirmedToInProgress: inProgressUpdatedCount,
+        inProgressToEnded: endedUpdatedCount,
+        confirmedToEnded: legacyUpdatedCount
+      }
     });
   } catch (error: any) {
     console.error('强制更新失败:', error);

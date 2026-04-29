@@ -6,21 +6,15 @@ export const getStudyRooms = async (params?: Record<string, unknown>) => {
   return response.data;
 };
 
-// 确认预约
-export const confirmReservation = async (reservationId: number) => {
-  const response = await api.post("/study-rooms/reservations/confirm", { reservationId });
-  return response.data;
-};
-
-// 完成预约
-export const completeReservation = async (reservationId: number) => {
-  const response = await api.post("/study-rooms/reservations/complete", { reservationId });
-  return response.data;
-};
-
 // 结束预约
 export const endReservation = async (reservationId: number) => {
   const response = await api.post("/study-rooms/reservations/end", { reservationId });
+  return response.data;
+};
+
+// 提前退出预约
+export const earlyExitReservation = async (reservationId: number) => {
+  const response = await api.post("/study-rooms/reservations/early-exit", { reservationId });
   return response.data;
 };
 

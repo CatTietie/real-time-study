@@ -53,13 +53,13 @@ export const getStudyRooms = async (req: Request, res: Response) => {
             }
           });
           
-          // 查询该用户在该自习室中状态为confirmed且在预约时间段内的预约记录数
+          // 查询该用户在该自习室中状态为confirmed或in_progress且在预约时间段内的预约记录数
           const now = new Date();
           confirmedReservationCount = await RoomReservation.count({
             where: {
               room_id: room.id,
               user_id: Number(userId),
-              status: 'confirmed',
+              status: { [Op.in]: ['confirmed', 'in_progress'] },
               start_time: { [Op.lte]: now },
               end_time: { [Op.gt]: now }
             }
@@ -74,12 +74,12 @@ export const getStudyRooms = async (req: Request, res: Response) => {
             }
           });
           
-          // 查询该自习室中状态为confirmed且在预约时间段内的预约记录数
+          // 查询该自习室中状态为confirmed或in_progress且在预约时间段内的预约记录数
           const now = new Date();
           confirmedReservationCount = await RoomReservation.count({
             where: {
               room_id: room.id,
-              status: 'confirmed',
+              status: { [Op.in]: ['confirmed', 'in_progress'] },
               start_time: { [Op.lte]: now },
               end_time: { [Op.gt]: now }
             }
@@ -89,12 +89,12 @@ export const getStudyRooms = async (req: Request, res: Response) => {
         // 总占用人数 = active占用记录 + 已确认的有效预约记录
         const totalOccupancy = activeOccupancyCount + confirmedReservationCount;
         
-        // 查询该自习室所有未来的已确认预约时间段
+        // 查询该自习室所有未来的已确认和已进入状态的预约时间段
         const now = new Date();
         const futureReservations = await RoomReservation.findAll({
           where: {
             room_id: room.id,
-            status: 'confirmed',
+            status: { [Op.in]: ['confirmed', 'in_progress'] },
             end_time: { [Op.gt]: now }
           },
           attributes: ['start_time', 'end_time'],
@@ -200,11 +200,11 @@ export const reserveStudyRoom = async (req: Request, res: Response) => {
       });
     }
     
-    // 检查容量：统计用户预约时间段内的已确认预约数量
+    // 检查容量：统计用户预约时间段内的已确认和已进入状态的预约数量
     const timeSlotReservationCount = await RoomReservation.count({
       where: {
         room_id: roomId,
-        status: 'confirmed',
+        status: { [Op.in]: ['confirmed', 'in_progress'] },
         [Op.or]: [
           {
             start_time: { [Op.between]: [startTime, endTime] }
@@ -239,7 +239,7 @@ export const reserveStudyRoom = async (req: Request, res: Response) => {
       where: {
         user_id: req.user.id,
         room_id: roomId,
-        status: 'confirmed',
+        status: { [Op.in]: ['confirmed', 'in_progress'] },
         [Op.or]: [
           {
             start_time: { [Op.between]: [startTime, endTime] }
@@ -338,14 +338,77 @@ export const leaveStudyRoom = async (req: Request, res: Response) => {
   }
 };
 
-// 检查并更新过期预约状态
+// 检查并更新预约状态（自动转换）
+// 状态转换：confirmed -> in_progress -> ended
+// - 当时间 >= start_time 时，从 confirmed 转换为 in_progress
+// - 当时间 >= end_time 时，从 in_progress 转换为 ended
 export const checkExpiredReservations = async () => {
   try {
     const now = new Date();
-    console.log(`开始检查过期预约状态，当前时间: ${now.toISOString()}`);
+    console.log(`开始检查预约状态，当前时间: ${now.toISOString()}`);
     
-    // 查找所有需要检查的预约记录
-    const expiringReservations = await RoomReservation.findAll({
+    // 1. 第一阶段：将已到开始时间的 confirmed 状态转换为 in_progress
+    const confirmedToInProgress = await RoomReservation.findAll({
+      where: {
+        status: 'confirmed',
+        start_time: { [Op.lte]: now }
+      },
+      include: [{
+        model: StudyRoom,
+        attributes: ['name']
+      }]
+    });
+    
+    console.log(`找到 ${confirmedToInProgress.length} 条已到开始时间的 confirmed 状态预约`);
+    confirmedToInProgress.forEach((record: any) => {
+      console.log(`准备转换: ID=${record.id}, 状态=confirmed, 开始时间=${record.start_time}, 自习室=${record.StudyRoom?.name}`);
+    });
+    
+    // 执行状态转换：confirmed -> in_progress
+    const [inProgressUpdatedCount] = await RoomReservation.update(
+      { status: 'in_progress' },
+      {
+        where: {
+          status: 'confirmed',
+          start_time: { [Op.lte]: now }
+        }
+      }
+    );
+    
+    console.log(`更新了 ${inProgressUpdatedCount} 条预约记录为 in_progress 状态`);
+    
+    // 2. 第二阶段：将已到结束时间的 in_progress 状态转换为 ended
+    const inProgressToEnded = await RoomReservation.findAll({
+      where: {
+        status: 'in_progress',
+        end_time: { [Op.lt]: now }
+      },
+      include: [{
+        model: StudyRoom,
+        attributes: ['name']
+      }]
+    });
+    
+    console.log(`找到 ${inProgressToEnded.length} 条已过期的 in_progress 状态预约`);
+    inProgressToEnded.forEach((record: any) => {
+      console.log(`准备转换: ID=${record.id}, 状态=in_progress, 结束时间=${record.end_time}, 自习室=${record.StudyRoom?.name}`);
+    });
+    
+    // 执行状态转换：in_progress -> ended
+    const [endedUpdatedCount] = await RoomReservation.update(
+      { status: 'ended' },
+      {
+        where: {
+          status: 'in_progress',
+          end_time: { [Op.lt]: now }
+        }
+      }
+    );
+    
+    console.log(`更新了 ${endedUpdatedCount} 条预约记录为 ended 状态`);
+    
+    // 3. 兼容旧数据：将已到结束时间的 confirmed 状态转换为 ended
+    const confirmedToEnded = await RoomReservation.findAll({
       where: {
         status: 'confirmed',
         end_time: { [Op.lt]: now }
@@ -356,25 +419,27 @@ export const checkExpiredReservations = async () => {
       }]
     });
     
-    console.log(`找到 ${expiringReservations.length} 条过期预约记录`);
-    expiringReservations.forEach((record: any) => {
-      console.log(`过期记录: ID=${record.id}, 状态=${record.status}, 结束时间=${record.end_time}, 自习室=${record.StudyRoom?.name}`);
-    });
-    
-    // 将已结束的预约状态更新为'ended'
-    const [updatedCount] = await RoomReservation.update(
-      { status: 'ended' },
-      {
-        where: {
-          status: 'confirmed',
-          end_time: { [Op.lt]: now }
+    if (confirmedToEnded.length > 0) {
+      console.log(`找到 ${confirmedToEnded.length} 条已过期的 confirmed 状态预约（兼容旧数据）`);
+      confirmedToEnded.forEach((record: any) => {
+        console.log(`准备转换: ID=${record.id}, 状态=confirmed, 结束时间=${record.end_time}, 自习室=${record.StudyRoom?.name}`);
+      });
+      
+      // 执行状态转换：confirmed -> ended
+      const [legacyUpdatedCount] = await RoomReservation.update(
+        { status: 'ended' },
+        {
+          where: {
+            status: 'confirmed',
+            end_time: { [Op.lt]: now }
+          }
         }
-      }
-    );
+      );
+      
+      console.log(`更新了 ${legacyUpdatedCount} 条旧数据预约记录为 ended 状态`);
+    }
     
-    console.log(`更新了 ${updatedCount} 条预约记录为已结束状态`);
-    
-    // 删除超过一天的已结束预约
+    // 4. 删除超过一天的已结束预约
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const deletedCount = await RoomReservation.destroy({
       where: {
@@ -391,6 +456,7 @@ export const checkExpiredReservations = async () => {
 };
 
 // 结束预约（用户主动退出时立即调用）
+// 此函数已被 earlyExitReservation 替代，保留以兼容旧代码
 export const endReservation = async (req: Request, res: Response) => {
   try {
     if (!req.user) {
@@ -410,9 +476,9 @@ export const endReservation = async (req: Request, res: Response) => {
       return res.status(403).json({ success: false, message: "无权限操作他人预约" });
     }
     
-    // 检查状态是否为confirmed
-    if (reservation.status !== 'confirmed') {
-      return res.status(400).json({ success: false, message: "预约状态不是已确认，无法结束" });
+    // 检查状态：只能在 confirmed 或 in_progress 状态下结束
+    if (reservation.status !== 'confirmed' && reservation.status !== 'in_progress') {
+      return res.status(400).json({ success: false, message: "预约状态不允许结束操作" });
     }
     
     // 更新预约状态为ended
@@ -429,7 +495,51 @@ export const endReservation = async (req: Request, res: Response) => {
   }
 };
 
+// 提前退出预约（用户主动提前结束预约）
+// 可以在 confirmed 或 in_progress 状态下调用
+export const earlyExitReservation = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+    
+    const { reservationId } = req.body as { reservationId: number };
+    
+    // 查找预约记录
+    const reservation = await RoomReservation.findByPk(reservationId);
+    if (!reservation) {
+      return res.status(404).json({ success: false, message: "预约记录不存在" });
+    }
+    
+    // 检查是否是当前用户的预约
+    if (reservation.user_id !== req.user.id) {
+      return res.status(403).json({ success: false, message: "无权限操作他人预约" });
+    }
+    
+    // 检查状态：只能在 confirmed 或 in_progress 状态下提前退出
+    if (reservation.status !== 'confirmed' && reservation.status !== 'in_progress') {
+      return res.status(400).json({ 
+        success: false, 
+        message: "只有已确认或已进入状态的预约才能提前退出" 
+      });
+    }
+    
+    // 更新预约状态为ended
+    await reservation.update({ status: 'ended' });
+    
+    res.json({
+      success: true,
+      message: "提前退出成功",
+      data: reservation
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "提前退出失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
 // 取消预约
+// 只能在 confirmed 状态下取消（预约已确认但还未开始）
 export const cancelReservation = async (req: Request, res: Response) => {
   try {
     if (!req.user) {
@@ -449,9 +559,15 @@ export const cancelReservation = async (req: Request, res: Response) => {
       return res.status(403).json({ success: false, message: "无权限操作他人预约" });
     }
     
-    // 检查状态是否为confirmed
+    // 检查状态：只能在 confirmed 状态下取消
     if (reservation.status !== 'confirmed') {
-      return res.status(400).json({ success: false, message: "预约状态已结束，无法取消" });
+      if (reservation.status === 'in_progress') {
+        return res.status(400).json({ 
+          success: false, 
+          message: "预约已开始，无法取消，请使用提前退出功能" 
+        });
+      }
+      return res.status(400).json({ success: false, message: "预约状态不允许取消" });
     }
     
     // 更新预约状态为cancelled
@@ -568,8 +684,8 @@ export const leaveAndEndReservation = async (req: Request, res: Response) => {
       leave_time: new Date()
     }, { transaction });
     
-    // 4. 更新预约记录状态（如果是 confirmed 状态则更新为 ended）
-    if (reservation.status === 'confirmed') {
+    // 4. 更新预约记录状态（如果是 confirmed 或 in_progress 状态则更新为 ended）
+    if (reservation.status === 'confirmed' || reservation.status === 'in_progress') {
       await reservation.update({ status: 'ended' }, { transaction });
     }
     
@@ -620,10 +736,10 @@ export const getHourlyAvailability = async (req: Request, res: Response) => {
       order: [['id', 'ASC']]
     });
     
-    // 2. 获取当天所有已确认的预约（与当天有重叠的）
+    // 2. 获取当天所有已确认和已进入状态的预约（与当天有重叠的）
     const reservations = await RoomReservation.findAll({
       where: {
-        status: 'confirmed',
+        status: { [Op.in]: ['confirmed', 'in_progress'] },
         [Op.or]: [
           // 预约完全在当天内
           {

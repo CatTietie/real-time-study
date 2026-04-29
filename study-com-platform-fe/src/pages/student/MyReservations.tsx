@@ -12,15 +12,17 @@ import {
   CalendarOutlined,
   CloseCircleOutlined,
   ClockCircleOutlined,
-  TeamOutlined
+  TeamOutlined,
+  LogoutOutlined
 } from "@ant-design/icons";
-import { getMyReservations, cancelReservation, leaveAndEndReservation, forceUpdateExpired } from "../../services/studyRoom";
+import { getMyReservations, cancelReservation, leaveAndEndReservation, forceUpdateExpired, earlyExitReservation } from "../../services/studyRoom";
 import type { RoomReservation } from "../../types/study-room";
 
 const { TabPane } = Tabs;
 
-const statusMap = {
-  confirmed: { text: '已确认', color: 'green' },
+const statusMap: Record<string, { text: string; color: string }> = {
+  confirmed: { text: '已确认', color: 'blue' },
+  in_progress: { text: '已进入', color: 'green' },
   cancelled: { text: '已取消', color: 'red' },
   ended: { text: '已结束', color: 'gray' }
 };
@@ -105,26 +107,6 @@ export default function MyReservations() {
             <>
               <Button 
                 type="link" 
-                icon={<TeamOutlined />}
-                onClick={async () => {
-                  try {
-                    const response = await leaveAndEndReservation(record.id);
-                    if (response.success) {
-                      message.success('退出自习室并结束预约成功');
-                      fetchReservations(pagination.current, pagination.pageSize, activeTab === 'all' ? undefined : activeTab);
-                    } else {
-                      message.error(response.message || '退出失败');
-                    }
-                  } catch (error) {
-                    console.error('退出操作异常:', error);
-                    message.error(`退出操作失败: ${error instanceof Error ? error.message : '未知错误'}`);
-                  }
-                }}
-              >
-                退出自习室
-              </Button>
-              <Button 
-                type="link" 
                 danger
                 icon={<CloseCircleOutlined />}
                 onClick={async () => {
@@ -141,7 +123,31 @@ export default function MyReservations() {
                   }
                 }}
               >
-                提前取消
+                取消预约
+              </Button>
+            </>
+          )}
+          {record.status === 'in_progress' && (
+            <>
+              <Button 
+                type="link" 
+                icon={<LogoutOutlined />}
+                onClick={async () => {
+                  try {
+                    const response = await earlyExitReservation(record.id);
+                    if (response.success) {
+                      message.success('提前退出成功');
+                      fetchReservations(pagination.current, pagination.pageSize, activeTab === 'all' ? undefined : activeTab);
+                    } else {
+                      message.error(response.message || '退出失败');
+                    }
+                  } catch (error) {
+                    console.error('提前退出操作异常:', error);
+                    message.error(`退出操作失败: ${error instanceof Error ? error.message : '未知错误'}`);
+                  }
+                }}
+              >
+                提前退出
               </Button>
             </>
           )}
@@ -186,6 +192,7 @@ export default function MyReservations() {
         >
           <TabPane tab="全部" key="all" />
           <TabPane tab="已确认" key="confirmed" />
+          <TabPane tab="已进入" key="in_progress" />
           <TabPane tab="已结束" key="ended" />
           <TabPane tab="已取消" key="cancelled" />
         </Tabs>
