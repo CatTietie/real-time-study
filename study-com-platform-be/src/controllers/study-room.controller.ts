@@ -182,10 +182,24 @@ export const reserveStudyRoom = async (req: Request, res: Response) => {
     // 检查是否是过去的时间
     const now = new Date();
     const startDate = new Date(startTime);
-    if (startDate < now) {
+    const endDate = new Date(endTime);
+    
+    // 允许开始时间在当前时间的前60秒内（考虑到网络延迟和前端时间填充）
+    // 但必须确保结束时间在当前时间之后
+    const timeTolerance = 60 * 1000; // 60秒容差
+    if (startDate < now && (now.getTime() - startDate.getTime()) > timeTolerance) {
       return res.status(400).json({ 
         success: false, 
         message: "无法预约过去的时间段",
+        errorCode: RESERVATION_ERROR_CODES.PAST_TIME
+      });
+    }
+    
+    // 确保结束时间在当前时间之后
+    if (endDate <= now) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "预约结束时间必须在当前时间之后",
         errorCode: RESERVATION_ERROR_CODES.PAST_TIME
       });
     }
