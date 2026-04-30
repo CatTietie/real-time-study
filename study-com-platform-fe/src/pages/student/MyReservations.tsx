@@ -326,17 +326,74 @@ function StatsTab() {
 
   const PieCustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
+      const data = payload[0];
+      const total = getPieChartData().reduce((sum, item) => sum + item.value, 0);
+      const percentage = total > 0 ? ((data.value / total) * 100).toFixed(1) : 0;
+      
       return (
         <div style={{
           backgroundColor: '#fff',
-          padding: '12px',
-          border: '1px solid #e5e7eb',
-          borderRadius: '8px',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+          padding: '16px 20px',
+          border: 'none',
+          borderRadius: '12px',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+          minWidth: '180px'
         }}>
-          <p style={{ margin: 0, fontWeight: 'bold', marginBottom: '4px' }}>{payload[0].name}</p>
-          <p style={{ margin: 0, color: '#667eea' }}>{`学习时长: ${payload[0].value} 小时`}</p>
-          <p style={{ margin: 0, color: '#764ba2' }}>{`使用次数: ${payload[0].payload.count} 次`}</p>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '12px',
+            paddingBottom: '10px',
+            borderBottom: '1px solid #f0f0f0'
+          }}>
+            <div style={{
+              width: '12px',
+              height: '12px',
+              borderRadius: '3px',
+              backgroundColor: data.color || '#667eea'
+            }} />
+            <span style={{
+              fontWeight: 'bold',
+              fontSize: '15px',
+              color: '#1f2937'
+            }}>
+              {data.name}
+            </span>
+          </div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#6b7280', fontSize: '13px' }}>学习时长</span>
+              <span style={{ 
+                fontWeight: '600', 
+                color: '#667eea',
+                fontSize: '14px'
+              }}>
+                {data.value} 小时
+              </span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#6b7280', fontSize: '13px' }}>使用次数</span>
+              <span style={{ 
+                fontWeight: '600', 
+                color: '#764ba2',
+                fontSize: '14px'
+              }}>
+                {data.payload.count} 次
+              </span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#6b7280', fontSize: '13px' }}>占比</span>
+              <span style={{ 
+                fontWeight: '600', 
+                color: '#f093fb',
+                fontSize: '14px'
+              }}>
+                {percentage}%
+              </span>
+            </div>
+          </div>
         </div>
       );
     }
@@ -475,13 +532,12 @@ function StatsTab() {
                       data={getPieChartData()}
                       cx="50%"
                       cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={100}
-                      innerRadius={50}
+                      outerRadius={120}
+                      innerRadius={60}
                       fill="#8884d8"
                       dataKey="value"
-                      paddingAngle={2}
+                      paddingAngle={3}
+                      cursor="pointer"
                     >
                       {getPieChartData().map((_, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
