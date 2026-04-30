@@ -4,6 +4,39 @@ interface TokenPayload {
     username: string;
     role: string;
 }
+export interface LoginResult {
+    id: number;
+    username: string;
+    nickname: string;
+    avatar?: string;
+    role: string;
+    token: string;
+    expiresIn: string;
+    failedAttempts?: number;
+    remainingAttempts?: number;
+    isLocked?: boolean;
+    lockUntil?: Date;
+}
+/**
+ * 检查账号是否被锁定
+ */
+export declare const checkAccountLock: (user: User) => {
+    isLocked: boolean;
+    remainingMinutes?: number;
+};
+/**
+ * 记录登录失败
+ */
+export declare const recordFailedLogin: (user: User) => Promise<{
+    failedAttempts: number;
+    remainingAttempts: number;
+    isLocked: boolean;
+    lockUntil?: Date;
+}>;
+/**
+ * 重置登录失败次数
+ */
+export declare const resetFailedLoginAttempts: (user: User) => Promise<void>;
 /**
  * 生成 JWT Token（7天有效期）
  */
@@ -19,15 +52,7 @@ export declare const verifyToken: (token: string) => TokenPayload | null;
 /**
  * 管理员登录
  */
-export declare const adminLogin: (username: string, password: string) => Promise<{
-    id: number;
-    username: string;
-    nickname: string;
-    avatar: string | undefined;
-    role: "admin" | "super_admin";
-    token: string;
-    expiresIn: string;
-}>;
+export declare const adminLogin: (username: string, password: string) => Promise<LoginResult>;
 /**
  * 获取管理员信息
  */
