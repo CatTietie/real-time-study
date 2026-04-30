@@ -1,6 +1,5 @@
 import {
   Button,
-  Card,
   Form,
   Input,
   Radio,
@@ -11,7 +10,7 @@ import {
   message,
 } from "antd";
 import type { UploadFile } from "antd";
-import { useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppSelector } from "../../app/hooks";
 import type { RootState } from "../../app/store";
@@ -34,7 +33,55 @@ import {
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
-const CATEGORY_OPTIONS = ["学习心得", "问题求助", "经验分享", "聊天交友"];
+const CATEGORY_OPTIONS = [
+  { 
+    value: "学习心得", 
+    label: "学习心得", 
+    placeholder: "分享你的学习感悟和心得体会...",
+    isStructured: false
+  },
+  { 
+    value: "问题求助", 
+    label: "问题求助", 
+    template: "请描述你的问题：\n\n1. 问题背景：\n2. 遇到的困难：\n3. 已尝试的方法：\n4. 期望的结果：",
+    placeholder: "请按模板描述您的问题...",
+    isStructured: true
+  },
+  { 
+    value: "经验分享", 
+    label: "经验分享", 
+    template: "分享你的经验和技巧：\n\n1. 资源/方法介绍：\n2. 适用人群：\n3. 使用建议：\n4. 注意事项：",
+    placeholder: "请按模板分享您的经验...",
+    isStructured: true
+  },
+  { 
+    value: "聊天交友", 
+    label: "聊天交友", 
+    placeholder: "在这里分享你的日常，寻找志同道合的朋友...",
+    isStructured: false
+  }
+];
+
+// 默认占位文案
+const DEFAULT_PLACEHOLDER = "分享你的经验/问题背景...";
+
+// 根据分类获取占位文案
+const getPlaceholderByCategory = (category: string): string => {
+  const option = CATEGORY_OPTIONS.find(opt => opt.value === category);
+  if (option) {
+    return option.placeholder || DEFAULT_PLACEHOLDER;
+  }
+  return DEFAULT_PLACEHOLDER;
+};
+
+// 根据分类获取结构化模板内容
+const getTemplateByCategory = (category: string): string | null => {
+  const option = CATEGORY_OPTIONS.find(opt => opt.value === category);
+  if (option && option.isStructured && option.template) {
+    return option.template;
+  }
+  return null;
+};
 
 type PublishForm = {
   title: string;
@@ -52,8 +99,60 @@ export default function PublishPost() {
   const [submitting, setSubmitting] = useState(false);
   const [tagOptions, setTagOptions] = useState<string[]>([]);
   const [tagFetching, setTagFetching] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [isScrolled, setIsScrolled] = useState(false);
+  // 记录最后一次自动填充的模板内容，用于判断用户是否修改了内容
+  const lastAutoFilledTemplateRef = useRef<string | null>(null);
   const tagTimerRef = useRef<number | null>(null);
   const watchedTags = Form.useWatch("tags", form) || [];
+  const watchedCategory = Form.useWatch("category", form) || "";
+
+  // 监听滚动事件，改变顶部栏样式
+  const handleScroll = () => {
+    const scrollTop = window.scrollY;
+    setIsScrolled(scrollTop > 20);
+  };
+
+  // 添加和移除滚动监听
+  React.useEffect(() => {
+    window.addEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  // 监听分类变化，更新内容模板
+  React.useEffect(() => {
+    if (watchedCategory && watchedCategory !== selectedCategory) {
+      setSelectedCategory(watchedCategory);
+      
+      // 获取当前内容
+      const currentContent = form.getFieldValue('content') || '';
+      const lastTemplate = lastAutoFilledTemplateRef.current;
+      
+      // 判断是否应该自动填充模板：
+      // 1. 当前内容为空
+      // 2. 或者当前内容等于上一次自动填充的模板（说明用户没有修改）
+      const shouldAutoFill = !currentContent.trim() || 
+        (lastTemplate !== null && currentContent === lastTemplate);
+      
+      if (shouldAutoFill) {
+        // 获取新分类的模板
+        const newTemplate = getTemplateByCategory(watchedCategory);
+        
+        if (newTemplate) {
+          // 对于结构化模板（问题求助、经验分享），自动填充内容
+          form.setFieldsValue({ content: newTemplate });
+          // 记录这次自动填充的模板
+          lastAutoFilledTemplateRef.current = newTemplate;
+        } else {
+          // 对于非结构化模板（学习心得、聊天交友），清空内容（使用placeholder）
+          form.setFieldsValue({ content: '' });
+          lastAutoFilledTemplateRef.current = null;
+        }
+      }
+    }
+  }, [watchedCategory, selectedCategory, form]);
 
   const handleSubmit = async (values: PublishForm) => {
     if (!token) {
@@ -121,649 +220,513 @@ export default function PublishPost() {
   };
 
   return (
-    <div 
-      className="page-container"
-      style={{
-        minHeight: "100vh",
-        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-        padding: "24px 16px",
-        position: "relative"
-      }}
-    >
+    <div className="min-h-screen bg-gray-50">
       {contextHolder}
       
-      {/* 装饰背景 */}
-      <div style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        height: 200,
-        background: "linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 100%)"
-      }} />
-      
-      <div style={{
-        maxWidth: 1400,
-        margin: "0 auto",
-        position: "relative",
-        zIndex: 1
-      }}>
-        {/* 返回按钮 */}
-        <Button
-          type="text"
-          icon={<HomeOutlined />}
-          onClick={() => navigate('/community')}
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            zIndex: 10,
-            background: "rgba(255, 255, 255, 0.95)",
-            backdropFilter: "blur(10px)",
-            border: "1px solid rgba(255, 255, 255, 0.3)",
-            borderRadius: 12,
-            padding: "12px 16px",
-            color: "#667eea",
-            fontWeight: 600,
-            boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
-            transition: "all 0.3s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "white";
-            e.currentTarget.style.transform = "translateY(-2px)";
-            e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.15)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(255, 255, 255, 0.95)";
-            e.currentTarget.style.transform = "translateY(0)";
-            e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.1)";
-          }}
-        >
-          返回社区
-        </Button>
-        
-        {/* 标题区域 */}
-        <div style={{
-          textAlign: "center",
-          marginBottom: 32,
-          paddingTop: 16
-        }}>
-          <div style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 12,
-            background: "rgba(255, 255, 255, 0.95)",
-            padding: "16px 32px",
-            borderRadius: 20,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
-            marginBottom: 16,
-            backdropFilter: "blur(10px)",
-            border: "1px solid rgba(255, 255, 255, 0.3)"
-          }}>
-            <EditOutlined style={{
-              fontSize: 28,
-              color: "#667eea",
-              filter: "drop-shadow(0 2px 4px rgba(102, 126, 234, 0.3))"
-            }} />
-            <Title
-              level={2}
-              style={{
-                margin: 0,
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                fontWeight: 800,
-                fontSize: 32
-              }}
-            >
-              发布新帖
-            </Title>
-            <TrophyOutlined style={{
-              fontSize: 28,
-              color: "#F59E0B",
-              filter: "drop-shadow(0 2px 4px rgba(245, 158, 11, 0.3))"
-            }} />
-          </div>
-          
-          <Text type="secondary" style={{
-            color: "rgba(255, 255, 255, 0.9)",
-            fontSize: 15,
-            maxWidth: 600,
-            margin: "0 auto",
-            display: "block"
-          }}>
-            分享你的知识和经验，让更多人受益，优质内容有机会登上排行榜！
-          </Text>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 1fr) 360px",
-            gap: 24,
-          }}
-          className="publish-grid"
-        >
-          <Card
-            style={{
-              borderRadius: 24,
-              boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
-              border: "none",
-              background: "white",
-              overflow: "hidden"
-            }}
-            styles={{ body: { padding: 32 } }}
+      {/* 固定顶部导航栏 - 滚动时保持可见 */}
+      <div 
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+          isScrolled 
+            ? 'bg-white/95 backdrop-blur-sm shadow-sm border-b border-gray-100' 
+            : 'bg-transparent'
+        }`}
+      >
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+          <Button
+            type="text"
+            icon={<HomeOutlined />}
+            onClick={() => navigate('/community')}
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
           >
-            <div style={{
-              marginBottom: 24,
-              paddingBottom: 16,
-              borderBottom: "2px solid #F3F4F6"
-            }}>
-              <div style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                marginBottom: 8
-              }}>
-                <div style={{
-                  width: 8,
-                  height: 32,
-                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                  borderRadius: 4
-                }} />
-                <Title level={3} style={{ margin: 0, color: "#1F2937" }}>
-                  创作内容
-                </Title>
-              </div>
-              <Text type="secondary">填写以下信息来发布你的精彩内容</Text>
-            </div>
-            <Form form={form} layout="vertical" onFinish={handleSubmit}>
-              <Form.Item
-                label={
-                  <span style={{ fontWeight: 600, color: "#374151" }}>
-                    <FileTextOutlined style={{ marginRight: 8, color: "#667eea" }} />
-                    标题
-                  </span>
-                }
-                name="title"
-                rules={[
-                  { required: true, message: "请输入标题" },
-                  { min: 2, max: 100, message: "标题长度为2-100字符" },
-                ]}
-              >
-                <Input
-                  placeholder="在此输入帖子标题，2-100字符"
-                  maxLength={100}
-                  showCount
-                  size="large"
-                  style={{
-                    borderRadius: 12,
-                    borderColor: "#E5E7EB",
-                    transition: "all 0.3s ease",
-                    background: "#FAFAFA"
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = "#667eea";
-                    e.target.style.boxShadow = "0 0 0 2px rgba(102, 126, 234, 0.2)";
-                    e.target.style.background = "white";
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = "#E5E7EB";
-                    e.target.style.boxShadow = "none";
-                    e.target.style.background = "#FAFAFA";
-                  }}
-                />
-              </Form.Item>
+            返回社区
+          </Button>
+          
+          <Button
+            type="primary"
+            htmlType="submit"
+            loading={submitting}
+            onClick={() => form.submit()}
+            className="bg-blue-600 hover:bg-blue-700 border-none px-6 shadow-md"
+            icon={<SendOutlined />}
+          >
+            发布
+          </Button>
+        </div>
+      </div>
+      
+      {/* 主内容区域 - 增加顶部边距以容纳固定导航栏 */}
+      <div className="max-w-4xl mx-auto px-4 py-6 pt-16">
 
+        {/* 主编辑区域 - 白色卡片，与灰色背景形成对比 */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+          <Form form={form} layout="vertical" onFinish={handleSubmit}>
+            {/* 标题输入区域 - 顶部区域，有内边距 */}
+            <div className="px-6 pt-6 pb-4">
+              <div className="title-input-wrapper">
+                <Form.Item
+                  name="title"
+                  rules={[
+                    { required: true, message: "请输入标题" },
+                    { min: 2, max: 100, message: "标题长度为2-100字符" },
+                  ]}
+                  className="mb-0"
+                >
+                  <Input
+                    placeholder="请输入标题"
+                    maxLength={100}
+                    className="title-input-field"
+                    style={{
+                      fontSize: '32px',
+                      fontWeight: 700,
+                      border: 'none',
+                      boxShadow: 'none',
+                      outline: 'none',
+                      paddingLeft: 0,
+                      paddingRight: 0,
+                      paddingTop: '12px',
+                      paddingBottom: '12px',
+                      backgroundColor: 'transparent',
+                      transition: 'all 0.3s ease',
+                    }}
+                  />
+                </Form.Item>
+                {/* 标题输入框底部边框 - 聚焦时高亮 */}
+                <div className="title-input-border h-0.5 bg-gray-100 transition-all duration-300 mt-1" />
+              </div>
+            </div>
+
+            {/* 分隔线 - 区分标题和正文区域 */}
+            <div className="h-px bg-gray-100 mx-6" />
+
+            {/* 分类选择区域 - 浅色背景区分 */}
+            <div className="px-6 py-5 bg-gray-50/50">
+              <div className="flex items-center gap-2 mb-3">
+                <TagsOutlined className="text-blue-500" />
+                <span className="text-sm font-medium text-gray-700">选择分类</span>
+                <span className="text-xs text-red-500">（必选）</span>
+              </div>
               <Form.Item
-                label={
-                  <span style={{ fontWeight: 600, color: "#374151" }}>
-                    <TagsOutlined style={{ marginRight: 8, color: "#10B981" }} />
-                    分类选择
-                  </span>
-                }
                 name="category"
                 rules={[{ required: true, message: "请选择分类" }]}
+                className="mb-0"
               >
-                <Radio.Group optionType="button" buttonStyle="solid" size="large">
+                <Radio.Group 
+                  optionType="button" 
+                  buttonStyle="solid" 
+                  className="category-button-group flex flex-wrap gap-3"
+                >
                   {CATEGORY_OPTIONS.map((item) => (
                     <Radio.Button 
-                      key={item} 
-                      value={item}
-                      style={{
-                        borderRadius: 12,
-                        margin: "6px 8px 6px 0",
-                        border: "2px solid #E5E7EB",
-                        transition: "all 0.3s ease",
-                        background: "#FAFAFA",
-                        padding: "8px 20px"
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = "translateY(-2px)";
-                        e.currentTarget.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.2)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "none";
-                      }}
+                      key={item.value} 
+                      value={item.value}
+                      className="category-button"
                     >
-                      <span style={{ fontWeight: 500 }}>{item}</span>
+                      <span className="text-sm font-medium">{item.label}</span>
                     </Radio.Button>
                   ))}
                 </Radio.Group>
               </Form.Item>
+              {/* 分类选择提示 */}
+              {!watchedCategory && (
+                <div className="mt-2 text-xs text-orange-500 flex items-center gap-1">
+                  <span>⚠️</span>
+                  <span>请选择一个分类后再发布</span>
+                </div>
+              )}
+            </div>
 
+            {/* 分隔线 */}
+            <div className="h-px bg-gray-100 mx-6" />
+
+            {/* 正文编辑区域 - 主要内容区域，有更多内边距 */}
+            <div className="px-6 py-6">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <EditOutlined className="text-blue-500" />
+                  <span className="text-sm font-medium text-gray-700">正文内容</span>
+                  {watchedCategory && (
+                    <span className="text-xs text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">
+                      {watchedCategory}
+                    </span>
+                  )}
+                </div>
+              </div>
               <Form.Item
-                label={
-                  <span style={{ fontWeight: 600, color: "#374151" }}>
-                    <EditOutlined style={{ marginRight: 8, color: "#8B5CF6" }} />
-                    内容编辑区
-                  </span>
-                }
                 name="content"
                 rules={[{ required: true, message: "请输入内容" }]}
+                className="mb-0"
               >
                 <TextArea
-                  placeholder="在这里写下你的精彩内容，让更多人看到你的想法..."
+                  placeholder={watchedCategory 
+                    ? getPlaceholderByCategory(watchedCategory)
+                    : DEFAULT_PLACEHOLDER
+                  }
                   maxLength={5000}
-                  autoSize={{ minRows: 12 }}
-                  style={{ 
-                    minHeight: 320,
-                    borderRadius: 12,
-                    borderColor: "#E5E7EB",
-                    transition: "all 0.3s ease",
-                    background: "#FAFAFA"
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = "#8B5CF6";
-                    e.target.style.boxShadow = "0 0 0 2px rgba(139, 92, 246, 0.2)";
-                    e.target.style.background = "white";
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = "#E5E7EB";
-                    e.target.style.boxShadow = "none";
-                    e.target.style.background = "#FAFAFA";
+                  autoSize={{ minRows: 16, maxRows: 40 }}
+                  className="border-none shadow-none outline-none focus:ring-0 px-0 py-2 text-base text-gray-700 placeholder:text-gray-300 resize-none"
+                  style={{
+                    border: 'none',
+                    boxShadow: 'none',
+                    outline: 'none',
+                    paddingLeft: 0,
+                    paddingRight: 0,
+                    backgroundColor: 'transparent',
+                    fontSize: '16px',
+                    lineHeight: '2',
+                    resize: 'none',
+                    minHeight: '320px',
                   }}
                 />
               </Form.Item>
-
-              <Form.Item 
-                label={
-                  <span style={{ fontWeight: 600, color: "#374151" }}>
-                    <StarOutlined style={{ marginRight: 8, color: "#F59E0B" }} />
-                    标签
+              {/* 分类模板提示 */}
+              {watchedCategory && (
+                <div className="mt-3 text-xs text-gray-400 flex items-center gap-1">
+                  <span>💡</span>
+                  <span>
+                    {watchedCategory === '问题求助' && '已为您填充问题模板，请按结构填写您的问题'}
+                    {watchedCategory === '经验分享' && '已为您填充经验模板，请按结构分享您的经验'}
+                    {watchedCategory === '学习心得' && '分享您的学习感悟和心得体会'}
+                    {watchedCategory === '聊天交友' && '分享您的日常，寻找志同道合的朋友'}
                   </span>
-                } 
-                name="tags"
-              >
-                <Select
-                  mode="tags"
-                  maxTagCount={5}
-                  placeholder="输入标签，按Enter添加，帮助更多人发现你的内容"
-                  options={tagOptions.map((tag) => ({ label: tag, value: tag }))}
-                  onSearch={handleTagSearch}
-                  onChange={handleTagsChange}
-                  loading={tagFetching}
-                  size="large"
-                  style={{ 
-                    borderRadius: 12,
-                    background: "#FAFAFA"
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.parentElement.parentElement.style.borderColor = "#F59E0B";
-                    e.currentTarget.parentElement.parentElement.style.boxShadow = "0 0 0 2px rgba(245, 158, 11, 0.2)";
-                    e.currentTarget.parentElement.parentElement.style.background = "white";
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.parentElement.parentElement.style.borderColor = "#E5E7EB";
-                    e.currentTarget.parentElement.parentElement.style.boxShadow = "none";
-                    e.currentTarget.parentElement.parentElement.style.background = "#FAFAFA";
-                  }}
-                />
-              </Form.Item>
-              <div style={{ marginBottom: 24 }}>
-                <Text type="secondary" style={{ fontSize: 13 }}>
-                  💡 已添加：
-                  {watchedTags.length
-                    ? watchedTags.map((tag: string) => (
-                        <span 
-                          key={tag}
-                          style={{
-                            background: "#E0F2FE",
-                            color: "#0369A1",
-                            padding: "2px 8px",
-                            borderRadius: 12,
-                            marginLeft: 8,
-                            fontSize: 12,
-                            fontWeight: 500
-                          }}
-                        >
-                          #{tag}
-                        </span>
-                      ))
-                    : <span style={{ color: "#9CA3AF" }}>-</span>}
-                </Text>
-              </div>
+                </div>
+              )}
+            </div>
 
-              <Form.Item 
-                label={
-                  <span style={{ fontWeight: 600, color: "#374151" }}>
-                    <PictureOutlined style={{ marginRight: 8, color: "#10B981" }} />
-                    图片上传（最多4张，可选）
-                  </span>
-                }
-              >
-                <Upload
-                  listType="picture-card"
-                  fileList={fileList}
-                  onChange={({ fileList: next }) => setFileList(next.slice(0, 4))}
-                  beforeUpload={(file) => {
-                    const isImage = file.type.startsWith("image/");
-                    if (!isImage) {
-                      messageApi.error("仅支持图片格式");
-                      return Upload.LIST_IGNORE;
-                    }
-                    return false;
-                  }}
-                  maxCount={4}
-                  accept="image/*"
-                  style={{
-                    borderRadius: 12
-                  }}
+            {/* 分隔线 */}
+            <div className="h-px bg-gray-100 mx-6" />
+
+            {/* 底部辅助区域 - 标签和图片上传 */}
+            <div className="px-6 py-5 bg-gray-50/80">
+              {/* 标签选择 */}
+              <div className="mb-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <TagsOutlined className="text-yellow-500" />
+                  <span className="text-sm font-medium text-gray-700">添加标签</span>
+                  <span className="text-xs text-gray-400">（最多5个）</span>
+                </div>
+                <Form.Item 
+                  name="tags"
+                  className="mb-0"
                 >
-                  {fileList.length >= 4 ? null : (
-                    <div style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      color: "#6B7280"
-                    }}>
-                      <PictureOutlined style={{ fontSize: 24, marginBottom: 8 }} />
-                      <div style={{ fontSize: 14 }}>上传图片</div>
-                    </div>
-                  )}
-                </Upload>
-              </Form.Item>
-
-              <div style={{
-                textAlign: "center",
-                marginTop: 32,
-                paddingTop: 24,
-                borderTop: "1px solid #F3F4F6",
-                position: "relative"
-              }}>
-                <Button 
-                  type="primary" 
-                  htmlType="submit" 
-                  loading={submitting}
-                  size="large"
-                  style={{
-                    padding: "0 48px",
-                    height: 48,
-                    fontSize: 16,
-                    fontWeight: 600,
-                    borderRadius: 24,
-                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                    border: "none",
-                    boxShadow: "0 4px 16px rgba(102, 126, 234, 0.3)",
-                    transition: "all 0.3s ease"
-                  }}
-                  icon={<SendOutlined />}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                    e.currentTarget.style.boxShadow = "0 8px 24px rgba(102, 126, 234, 0.4)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "0 4px 16px rgba(102, 126, 234, 0.3)";
-                  }}
-                >
-                  {submitting ? "发布中..." : "发布帖子"}
-                </Button>
-                <div style={{
-                  marginTop: 16,
-                  fontSize: 13,
-                  color: "#6B7280",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 6
-                }}>
-                  <span>✨</span>
-                  <span>优质内容有机会登上社区排行榜</span>
-                </div>
+                  <Select
+                    mode="tags"
+                    maxTagCount={5}
+                    placeholder="输入标签后按 Enter 添加"
+                    options={tagOptions.map((tag) => ({ label: tag, value: tag }))}
+                    onSearch={handleTagSearch}
+                    onChange={handleTagsChange}
+                    loading={tagFetching}
+                    className="w-full"
+                    style={{
+                      borderRadius: '8px',
+                    }}
+                  />
+                </Form.Item>
+                {watchedTags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <Text type="secondary" className="text-xs">已添加：</Text>
+                    {watchedTags.map((tag: string) => (
+                      <span 
+                        key={tag}
+                        className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-medium"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
-            </Form>
-          </Card>
 
-          <Space direction="vertical" style={{ width: "100%" }} size={24}>
-            <Card 
-              title={
-                <span>
-                  <StarOutlined style={{ marginRight: 8, color: "#F59E0B" }} />
-                  发布指南
-                </span>
-              }
-              style={{
-                borderRadius: 16,
-                boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
-                border: "1px solid #E5E7EB"
-              }}
-            >
-              <Space direction="vertical" size={12}>
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "12px 16px",
-                  background: "#EFF6FF",
-                  borderRadius: 12,
-                  border: "1px solid #BFDBFE"
-                }}>
-                  <span style={{ fontSize: 18 }}>📌</span>
-                  <Text strong style={{ color: "#1E40AF" }}>标题要明确具体</Text>
+              {/* 图片上传 */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <PictureOutlined className="text-green-500" />
+                  <span className="text-sm font-medium text-gray-700">上传图片</span>
+                  <span className="text-xs text-gray-400">（最多4张）</span>
                 </div>
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "12px 16px",
-                  background: "#F0FDF4",
-                  borderRadius: 12,
-                  border: "1px solid #BBF7D0"
-                }}>
-                  <span style={{ fontSize: 18 }}>📝</span>
-                  <Text strong style={{ color: "#166534" }}>内容需详细完整</Text>
-                </div>
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "12px 16px",
-                  background: "#FEF3C7",
-                  borderRadius: 12,
-                  border: "1px solid #FDE68A"
-                }}>
-                  <span style={{ fontSize: 18 }}>🏷️</span>
-                  <Text strong style={{ color: "#B45309" }}>选择合适分类和标签</Text>
-                </div>
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "12px 16px",
-                  background: "#F3E8FF",
-                  borderRadius: 12,
-                  border: "1px solid #DDD6FE"
-                }}>
-                  <span style={{ fontSize: 18 }}>🏆</span>
-                  <Text strong style={{ color: "#7C3AED" }}>优质内容有机会登上排行榜</Text>
-                </div>
-              </Space>
-            </Card>
-            
-            <Card 
-              title={
-                <span>
-                  <EditOutlined style={{ marginRight: 8, color: "#667eea" }} />
-                  格式示例
-                </span>
-              }
-              style={{
-                borderRadius: 16,
-                boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
-                border: "1px solid #E5E7EB"
-              }}
-            >
-              <div style={{
-                background: "#F9FAFB",
-                padding: 16,
-                borderRadius: 12,
-                border: "1px solid #E5E7EB"
-              }}>
-                <Text strong style={{ color: "#667eea", display: "block", marginBottom: 12 }}>
-                  【问题求助】
-                </Text>
-                <div style={{ paddingLeft: 16, marginBottom: 16 }}>
-                  <Text>1. 🔍 问题描述</Text><br/>
-                  <Text>2. 🛠️ 已尝试的解决方案</Text><br/>
-                  <Text>3. 🎯 期望结果</Text>
-                </div>
-                
-                <Text strong style={{ color: "#10B981", display: "block", marginBottom: 12 }}>
-                  【经验分享】
-                </Text>
-                <div style={{ paddingLeft: 16 }}>
-                  <Text>1. 📚 资源介绍</Text><br/>
-                  <Text>2. 👥 适用人群</Text><br/>
-                  <Text>3. 💡 使用建议</Text>
-                </div>
+                <Form.Item className="mb-0">
+                  <div className="flex flex-wrap gap-3">
+                    <Upload
+                      listType="picture-card"
+                      fileList={fileList}
+                      onChange={({ fileList: next }) => setFileList(next.slice(0, 4))}
+                      beforeUpload={(file) => {
+                        const isImage = file.type.startsWith("image/");
+                        if (!isImage) {
+                          messageApi.error("仅支持图片格式");
+                          return Upload.LIST_IGNORE;
+                        }
+                        return false;
+                      }}
+                      maxCount={4}
+                      accept="image/*"
+                    >
+                      {fileList.length >= 4 ? null : (
+                        <div className="flex flex-col items-center justify-center text-gray-400 py-2">
+                          <PictureOutlined className="text-lg mb-1" />
+                          <span className="text-xs">上传图片</span>
+                        </div>
+                      )}
+                    </Upload>
+                  </div>
+                </Form.Item>
               </div>
-            </Card>
-            
-            <Card 
-              title={
-                <span>
-                  <TrophyOutlined style={{ marginRight: 8, color: "#F59E0B" }} />
-                  社区规则
-                </span>
-              }
-              style={{
-                borderRadius: 16,
-                boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
-                border: "1px solid #E5E7EB"
-              }}
-            >
-              <Space direction="vertical" size={12}>
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "12px 16px",
-                  background: "#FEF2F2",
-                  borderRadius: 12,
-                  border: "1px solid #FECACA"
-                }}>
-                  <span style={{ fontSize: 18, color: "#EF4444" }}>🚫</span>
-                  <Text style={{ color: "#B91C1C" }}>禁止发布广告内容</Text>
-                </div>
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "12px 16px",
-                  background: "#FEF2F2",
-                  borderRadius: 12,
-                  border: "1px solid #FECACA"
-                }}>
-                  <span style={{ fontSize: 18, color: "#EF4444" }}>😡</span>
-                  <Text style={{ color: "#B91C1C" }}>禁止人身攻击和辱骂</Text>
-                </div>
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "12px 16px",
-                  background: "#EFF6FF",
-                  borderRadius: 12,
-                  border: "1px solid #BFDBFE"
-                }}>
-                  <span style={{ fontSize: 18, color: "#3B82F6" }}>⚖️</span>
-                  <Text style={{ color: "#1E40AF" }}>尊重他人知识产权</Text>
-                </div>
-              </Space>
-            </Card>
-          </Space>
+            </div>
+
+            {/* 底部提示栏 */}
+            <div className="px-6 py-5 border-t border-gray-200 bg-white rounded-b-xl">
+              <div className="flex items-center justify-center gap-2 text-gray-400 text-sm">
+                <span>💡</span>
+                <span>优质内容有机会登上社区排行榜</span>
+              </div>
+            </div>
+          </Form>
         </div>
 
-        {/* 自定义样式覆盖 */}
-        <style>
-          {`
-            /* 分类选择按钮样式调整 */
-            .ant-radio-group.ant-radio-group-large .ant-radio-button-wrapper {
-              border-color: #E5E7EB !important;
-              background: #FAFAFA !important;
-              color: #374151 !important;
-            }
-            
-            .ant-radio-group.ant-radio-group-large .ant-radio-button-wrapper:hover {
-              border-color: #667eea !important;
-              background: white !important;
-              color: #667eea !important;
-            }
-            
-            .ant-radio-group.ant-radio-group-large .ant-radio-button-wrapper-checked {
-              border-color: #667eea !important;
-              background: white !important;
-              color: #667eea !important;
-              box-shadow: none !important;
-            }
-            
-            .ant-radio-group.ant-radio-group-large .ant-radio-button-wrapper-checked:hover {
-              border-color: #667eea !important;
-              background: white !important;
-              color: #667eea !important;
-            }
-            
-            /* 响应式样式 */
-            @media (max-width: 768px) {
-              .publish-grid {
-                grid-template-columns: 1fr !important;
-                gap: 16px !important;
-              }
-              
-              .ant-card {
-                margin-bottom: 16px !important;
-              }
-              
-              .ant-form-item-label {
-                padding-bottom: 8px !important;
-              }
-            }
-            
-            @media (max-width: 480px) {
-              .page-container {
-                padding: 12px 8px !important;
-              }
-              
-              .ant-card-body {
-                padding: 16px !important;
-              }
-            }
-          `}
-        </style>
+        {/* 右侧辅助卡片 - 简化版，只在大屏幕显示 */}
+        <div className="hidden lg:block mt-8">
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+              <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+                <StarOutlined className="text-yellow-500" />
+                <span className="font-medium text-gray-800">发布指南</span>
+              </div>
+              <ul className="text-sm text-gray-600 space-y-3">
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 mt-0.5">📌</span>
+                  <span>标题要明确具体</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">📝</span>
+                  <span>内容需详细完整</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-yellow-500 mt-0.5">🏷️</span>
+                  <span>选择合适分类和标签</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+              <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+                <EditOutlined className="text-blue-500" />
+                <span className="font-medium text-gray-800">格式示例</span>
+              </div>
+              <div className="text-sm text-gray-600 space-y-4">
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <span className="font-medium text-blue-600">【问题求助】</span>
+                  <p className="text-xs text-gray-500 mt-2 leading-relaxed">1. 问题描述<br/>2. 已尝试的方案<br/>3. 期望结果</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <span className="font-medium text-green-600">【经验分享】</span>
+                  <p className="text-xs text-gray-500 mt-2 leading-relaxed">1. 资源介绍<br/>2. 适用人群<br/>3. 使用建议</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+              <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+                <TrophyOutlined className="text-yellow-500" />
+                <span className="font-medium text-gray-800">社区规则</span>
+              </div>
+              <ul className="text-sm text-gray-600 space-y-3">
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">🚫</span>
+                  <span>禁止发布广告内容</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">😡</span>
+                  <span>禁止人身攻击和辱骂</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-500 mt-0.5">⚖️</span>
+                  <span>尊重他人知识产权</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
 
         <CommunityFooter
-          style={{
-            marginTop: 48,
-            background: "rgba(255, 255, 255, 0.1)",
-            backdropFilter: "blur(10px)",
-            borderRadius: 16,
-            padding: 24,
-            border: "1px solid rgba(255, 255, 255, 0.2)"
-          }}
+          className="mt-12 text-center text-gray-400 text-sm"
         />
       </div>
+
+      {/* 自定义样式覆盖 */}
+      <style>
+        {`
+          /* 移除 Ant Design Input 默认边框和阴影 */
+          .ant-input,
+          .ant-input-affix-wrapper {
+            border: none !important;
+            box-shadow: none !important;
+            outline: none !important;
+          }
+          
+          .ant-input:focus,
+          .ant-input-focused,
+          .ant-input-affix-wrapper:focus,
+          .ant-input-affix-wrapper-focused {
+            border: none !important;
+            box-shadow: none !important;
+            outline: none !important;
+          }
+          
+          /* 标题输入框样式 */
+          .title-input-field {
+            font-size: 32px !important;
+            font-weight: 700 !important;
+            padding: 12px 0 !important;
+            color: #111827 !important;
+          }
+          
+          .title-input-field::placeholder {
+            color: #d1d5db !important;
+            font-weight: 500 !important;
+          }
+          
+          /* 标题输入框聚焦时的边框高亮效果 */
+          .title-input-wrapper:focus-within .title-input-border {
+            background-color: #3b82f6 !important;
+            height: 2px !important;
+          }
+          
+          /* 正文区域样式 */
+          textarea.ant-input {
+            font-size: 16px !important;
+            line-height: 2 !important;
+            padding: 8px 0 !important;
+            resize: none !important;
+            color: #374151 !important;
+          }
+          
+          textarea.ant-input::placeholder {
+            color: #9ca3af !important;
+          }
+          
+          /* 分类按钮样式 - 增强版 */
+          .category-button-group .ant-radio-button-wrapper {
+            border: 2px solid #e5e7eb !important;
+            background: white !important;
+            color: #6b7280 !important;
+            border-radius: 8px !important;
+            margin: 0 4px 8px 0 !important;
+            padding: 0 20px !important;
+            height: 40px !important;
+            line-height: 36px !important;
+            font-weight: 500 !important;
+            transition: all 0.2s ease !important;
+          }
+          
+          .category-button-group .ant-radio-button-wrapper:hover {
+            border-color: #93c5fd !important;
+            color: #2563eb !important;
+            background: #eff6ff !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15) !important;
+          }
+          
+          .category-button-group .ant-radio-button-wrapper-checked {
+            border-color: #3b82f6 !important;
+            background: #3b82f6 !important;
+            color: white !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+          }
+          
+          .category-button-group .ant-radio-button-wrapper-checked:hover {
+            border-color: #2563eb !important;
+            background: #2563eb !important;
+            color: white !important;
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4) !important;
+          }
+          
+          /* 移除 Radio Group 之间的边框 */
+          .ant-radio-group-solid .ant-radio-button-wrapper:not(:first-child)::before {
+            background-color: transparent !important;
+          }
+          
+          /* 移除 Radio Button 的默认圆角问题 */
+          .ant-radio-button-wrapper:first-child {
+            border-start-start-radius: 8px !important;
+            border-end-start-radius: 8px !important;
+          }
+          
+          .ant-radio-button-wrapper:last-child {
+            border-start-end-radius: 8px !important;
+            border-end-end-radius: 8px !important;
+          }
+          
+          /* Select 样式 */
+          .ant-select-selector {
+            border: 1px solid #e5e7eb !important;
+            border-radius: 8px !important;
+            box-shadow: none !important;
+            min-height: 40px !important;
+            padding: 4px 12px !important;
+          }
+          
+          .ant-select-focused .ant-select-selector,
+          .ant-select-selector:focus,
+          .ant-select-selector:active,
+          .ant-select-open .ant-select-selector {
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
+          }
+          
+          /* Upload 样式 */
+          .ant-upload.ant-upload-select-picture-card {
+            width: 88px !important;
+            height: 88px !important;
+            border: 1px dashed #d1d5db !important;
+            border-radius: 12px !important;
+            background: #f9fafb !important;
+            margin-right: 12px !important;
+            margin-bottom: 12px !important;
+          }
+          
+          .ant-upload.ant-upload-select-picture-card:hover {
+            border-color: #3b82f6 !important;
+            background: #eff6ff !important;
+          }
+          
+          .ant-upload-list-picture-card .ant-upload-list-item {
+            width: 88px !important;
+            height: 88px !important;
+            border-radius: 12px !important;
+            margin-right: 12px !important;
+            margin-bottom: 12px !important;
+            border: 1px solid #e5e7eb !important;
+          }
+          
+          /* 固定顶部导航栏的间距 */
+          .pt-16 {
+            padding-top: 4rem !important;
+          }
+          
+          /* 响应式样式 */
+          @media (max-width: 768px) {
+            .title-input-field {
+              font-size: 24px !important;
+            }
+            
+            .category-button-group .ant-radio-button-wrapper {
+              padding: 0 16px !important;
+              font-size: 14px !important;
+              height: 36px !important;
+              line-height: 32px !important;
+            }
+            
+            .ant-upload.ant-upload-select-picture-card,
+            .ant-upload-list-picture-card .ant-upload-list-item {
+              width: 72px !important;
+              height: 72px !important;
+              margin-right: 8px !important;
+              margin-bottom: 8px !important;
+            }
+          }
+        `}
+      </style>
     </div>
   );
 }
