@@ -75,6 +75,7 @@ type CommentRow = {
   like_count: number;
   parent_id: number | null;
   post_id: number;
+  is_deleted?: number;
   Post?: {
     id: number;
     title: string;
@@ -197,8 +198,6 @@ const statusOptions = [
   { label: "全部状态", value: "all" },
   { label: "已发布", value: "published" },
   { label: "草稿", value: "draft" },
-  { label: "审核中", value: "pending" },
-  { label: "已退回", value: "rejected" },
 ];
 
 const sortOptions = [
@@ -688,8 +687,8 @@ export default function PostsList() {
   const filteredPosts = filterPosts(postsData);
   const filteredComments = filterComments(commentsData);
 
-  const postCount = postsTotal;
-  const commentCount = commentsTotal;
+  const postCount = filteredPosts.length;
+  const commentCount = filteredComments.length;
 
   const tabItems = [
     {
@@ -1033,6 +1032,104 @@ export default function PostsList() {
     const hasPost = item.Post?.id;
     const isSelected = selectedCommentIds.includes(item.id);
     const isDeleting = deletingIds.includes(item.id);
+    const isDeleted = item.is_deleted === 1;
+
+    if (isDeleted) {
+      return (
+        <Card
+          key={item.id}
+          loading={isDeleting}
+          style={{
+            borderRadius: 16,
+            marginBottom: 16,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+            border: "1px solid rgba(0,0,0,0.04)",
+            transition: "all 0.3s ease",
+            opacity: 0.6,
+          }}
+          styles={{ body: { padding: 20 } }}
+        >
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: manageMode ? "auto 1fr" : "1fr",
+              gap: 20,
+              alignItems: "flex-start",
+            }}
+          >
+            {manageMode && (
+              <div style={{ flexShrink: 0, paddingTop: 4 }}>
+                <Checkbox
+                  checked={isSelected}
+                  disabled={true}
+                />
+              </div>
+            )}
+
+            <div style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  marginBottom: 16,
+                  padding: "12px 16px",
+                  background: "#FFF5F5",
+                  borderRadius: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                }}
+              >
+                <Tag color="red" style={{ fontSize: 11, margin: 0, flexShrink: 0 }}>
+                  已删除
+                </Tag>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    color: "#EF4444",
+                    fontWeight: 500,
+                  }}
+                >
+                  该评论已被删除
+                </Text>
+              </div>
+
+              <Paragraph
+                style={{
+                  color: "#9CA3AF",
+                  fontSize: 15,
+                  lineHeight: 1.8,
+                  margin: "8px 0 16px 0",
+                  padding: "0 4px",
+                  textDecoration: "line-through",
+                }}
+              >
+                {item.content || "（内容已删除）"}
+              </Paragraph>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingTop: 12,
+                  borderTop: "1px solid #F3F4F6",
+                }}
+              >
+                <Space wrap size={16} style={{ color: "#D1D5DB", fontSize: 13 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <CalendarOutlined />
+                    <span>{formatTime(item.created_at)}</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <HeartOutlined />
+                    <span>{item.like_count || 0}</span>
+                  </div>
+                </Space>
+              </div>
+            </div>
+          </div>
+        </Card>
+      );
+    }
 
     return (
       <Card
