@@ -848,9 +848,9 @@ export default function Leaderboard() {
                 if (diffHours < 1) {
                     return "活跃中";
                 } else if (diffHours < 24) {
-                    return `${Math.floor(diffHours)}小时前";
+                    return `${Math.floor(diffHours)}小时前`;
                 } else {
-                    return `${Math.floor(diffHours / 24)}天前";
+                    return `${Math.floor(diffHours / 24)}天前`;
                 }
             };
             
