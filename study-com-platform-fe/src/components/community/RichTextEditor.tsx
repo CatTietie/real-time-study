@@ -19,7 +19,7 @@ import {
   PictureOutlined,
   UnorderedListOutlined,
   OrderedListOutlined,
-  QuoteLeftOutlined,
+  QuoteOutlined,
   RedoOutlined,
   UndoOutlined,
 } from '@ant-design/icons';
@@ -475,7 +475,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           <Button
             type="text"
             size="small"
-            icon={<QuoteLeftOutlined />}
+            icon={<QuoteOutlined />}
             onClick={toggleBlockquote}
             className={editor.isActive('blockquote') ? 'bg-blue-100 text-blue-600' : ''}
           />
