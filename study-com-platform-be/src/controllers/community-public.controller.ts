@@ -977,16 +977,16 @@ export const getCommunityLeaderboard = async (req: Request, res: Response) => {
       // 热门内容榜 - 返回帖子相关信息，按热度排序
       const where: any = { status: 1, publish_status: 1 };
 
-      // 时间筛选
+      // 时间筛选 - 必须明确指定 Post.created_at，因为 User 表也有 created_at 字段
       if (timeRange === "today") {
         where[Op.and] = [
-          Sequelize.where(Sequelize.col("created_at"), {
+          Sequelize.where(Sequelize.col("Post.created_at"), {
             [Op.gte]: getStartOfDay(),
           }),
         ];
       } else if (timeRange === "week") {
         where[Op.and] = [
-          Sequelize.where(Sequelize.col("created_at"), {
+          Sequelize.where(Sequelize.col("Post.created_at"), {
             [Op.gte]: getStartOfWeek(),
           }),
         ];
@@ -999,8 +999,8 @@ export const getCommunityLeaderboard = async (req: Request, res: Response) => {
           attributes: ["id", "nickname", "username", "avatar"]
         }],
         order: [
-          [Sequelize.literal(`(view_count * 0.5 + like_count * 2 + comment_count)`), "DESC"],
-          [Sequelize.col("created_at"), "DESC"]
+          [Sequelize.literal(`(Post.view_count * 0.5 + Post.like_count * 2 + Post.comment_count)`), "DESC"],
+          [Sequelize.col("Post.created_at"), "DESC"]
         ],
         limit: 50,
       });
