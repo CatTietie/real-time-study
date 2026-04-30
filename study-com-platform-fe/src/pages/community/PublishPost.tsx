@@ -11,7 +11,7 @@ import {
   message,
 } from "antd";
 import type { UploadFile } from "antd";
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppSelector } from "../../app/hooks";
 import type { RootState } from "../../app/store";
