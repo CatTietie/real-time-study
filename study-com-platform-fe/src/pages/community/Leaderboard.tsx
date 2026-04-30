@@ -74,8 +74,10 @@ type CachedData = {
         timestamp: number;
     };
     comments: {
-        data: LeaderboardRow[];
-        timestamp: number;
+        [commentPeriod: string]: {
+            data: LeaderboardRow[];
+            timestamp: number;
+        };
     };
 };
 
@@ -86,7 +88,7 @@ const CACHE_EXPIRE_TIME = 5 * 60 * 1000;
 const initialCache: CachedData = {
     posts: {},
     users: { data: [], timestamp: 0 },
-    comments: { data: [], timestamp: 0 },
+    comments: {},
 };
 
 export default function Leaderboard() {
@@ -96,6 +98,7 @@ export default function Leaderboard() {
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState("posts");
     const [timeRange, setTimeRange] = useState<string>("all");
+    const [commentPeriod, setCommentPeriod] = useState<string>("7days"); // "7days" 或 "all"
     const [heatRules, setHeatRules] = useState<HeatRules | null>(null);
     const [cache, setCache] = useState<CachedData>(initialCache);
     const [tabTransitioning, setTabTransitioning] = useState(false);
@@ -137,8 +140,9 @@ export default function Leaderboard() {
                     return;
                 }
             } else if (activeTab === "comments") {
-                if (cache.comments.data.length > 0 && isValidCache(cache.comments.timestamp)) {
-                    setData(cache.comments.data.slice(0, 10));
+                const cached = cache.comments[commentPeriod];
+                if (cached && isValidCache(cached.timestamp)) {
+                    setData(cached.data.slice(0, 10));
                     return;
                 }
             }
@@ -152,9 +156,11 @@ export default function Leaderboard() {
                 };
 
                 const actualTimeRange = activeTab === "posts" ? timeRange : undefined;
+                const actualCommentPeriod = activeTab === "comments" ? commentPeriod : undefined;
                 const res = await fetchCommunityLeaderboardByType(
                     typeMap[activeTab as keyof typeof typeMap], 
-                    actualTimeRange
+                    actualTimeRange,
+                    actualCommentPeriod
                 );
 
                 if (activeTab === "posts" && res?.heat_rules) {
@@ -199,8 +205,11 @@ export default function Leaderboard() {
                     setCache(prev => ({
                         ...prev,
                         comments: {
-                            data: fullList,
-                            timestamp: now,
+                            ...prev.comments,
+                            [commentPeriod]: {
+                                data: fullList,
+                                timestamp: now,
+                            },
                         },
                     }));
                 }
@@ -210,7 +219,7 @@ export default function Leaderboard() {
                 setLoading(false);
             }
         },
-        [activeTab, timeRange, cache],
+        [activeTab, timeRange, commentPeriod, cache],
     );
 
     useEffect(() => {
@@ -1409,6 +1418,45 @@ export default function Leaderboard() {
                                             border: "none",
                                             borderLeft: "1px solid rgba(255, 255, 255, 0.2)",
                                             color: timeRange === "all" ? "#1F2937" : "rgba(255, 255, 255, 0.85)",
+                                            fontWeight: 500,
+                                            borderRadius: "6px",
+                                        }}>
+                                            全部
+                                        </Radio.Button>
+                                    </Radio.Group>
+                                </div>
+                            )}
+                            
+                            {/* 评论数筛选 - 仅评论之星榜显示 */}
+                            {activeTab === "comments" && (
+                                <div style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                }}>
+                                    <Radio.Group 
+                                        value={commentPeriod} 
+                                        onChange={(e) => setCommentPeriod(e.target.value)}
+                                        buttonStyle="solid"
+                                        style={{
+                                            background: "rgba(255, 255, 255, 0.15)",
+                                            borderRadius: "8px",
+                                            padding: "2px",
+                                        }}
+                                    >
+                                        <Radio.Button value="7days" style={{
+                                            background: "transparent",
+                                            border: "none",
+                                            color: commentPeriod === "7days" ? "#1F2937" : "rgba(255, 255, 255, 0.85)",
+                                            fontWeight: 500,
+                                            borderRadius: "6px",
+                                        }}>
+                                            近7天
+                                        </Radio.Button>
+                                        <Radio.Button value="all" style={{
+                                            background: "transparent",
+                                            border: "none",
+                                            borderLeft: "1px solid rgba(255, 255, 255, 0.2)",
+                                            color: commentPeriod === "all" ? "#1F2937" : "rgba(255, 255, 255, 0.85)",
                                             fontWeight: 500,
                                             borderRadius: "6px",
                                         }}>

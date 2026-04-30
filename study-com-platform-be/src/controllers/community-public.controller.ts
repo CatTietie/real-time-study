@@ -916,14 +916,20 @@ export const createCommunityReport = async (req: Request, res: Response) => {
 
 export const getCommunityComments = async (req: Request, res: Response) => {
   try {
-    const { page = 1, pageSize = 10 } = req.query;
+    const { page = 1, pageSize = 10, userId } = req.query;
+
+    // 构建 where 条件
+    const where: any = { status: 1 };
+    if (userId) {
+      where.user_id = Number(userId);
+    }
 
     const result = await Comment.findAndCountAll({
-      where: { status: 1 },
+      where,
       include: [
         {
           model: User,
-          attributes: ["id", "username", "nickname"],
+          attributes: ["id", "username", "nickname", "avatar"],
         },
         {
           model: Post,
@@ -1056,6 +1062,7 @@ export const getCommunityLeaderboard = async (req: Request, res: Response) => {
     if (type === "comment_count") {
       // 评论之星榜 - 区分总评论数和周期（近7天）评论数
       const sevenDaysAgo = getStartOfNDaysAgo(7);
+      const commentPeriod = String((req.query as any)?.commentPeriod || "7days"); // "7days" 或 "all"
       
       // 1. 先查询所有有评论的用户的基础数据（总评论数）
       const totalRows = await Comment.findAll({
@@ -1093,12 +1100,17 @@ export const getCommunityLeaderboard = async (req: Request, res: Response) => {
         periodMap.set(Number(item.user_id), Number(item.period_comment_count || 0));
       });
       
-      // 4. 组合数据并按周期评论数排序
+      // 4. 组合数据
       const combinedData = totalRows.map((row: any) => {
         const rawData = row.toJSON();
         const userId = Number(rawData.user_id);
         const totalCount = Number(rawData.total_comment_count || 0);
         const periodCount = periodMap.get(userId) || 0;
+        
+        // 根据参数决定使用哪个作为主要排序字段
+        const mainCommentCount = commentPeriod === "all" ? totalCount : periodCount;
+        const periodType = commentPeriod === "all" ? "all" : "7days";
+        const periodLabel = commentPeriod === "all" ? "全部" : "近7天";
         
         return {
           id: userId,
@@ -1107,20 +1119,24 @@ export const getCommunityLeaderboard = async (req: Request, res: Response) => {
           avatar: rawData.User?.avatar,
           points: Number(rawData.User?.points || 0),
           level: calculateLevel(Number(rawData.User?.points || 0)),
-          // 周期评论数（近7天）- 默认用这个排序
-          comment_count: periodCount,
+          // 主要评论数（用于排序和显示）
+          comment_count: mainCommentCount,
           period_comment_count: periodCount,
           total_comment_count: totalCount,
           // 最新评论时间
           last_comment_time: rawData.last_comment_time,
           // 周期类型
-          period_type: "7days",
-          period_label: "近7天",
+          period_type: periodType,
+          period_label: periodLabel,
         };
       });
       
-      // 按周期评论数降序排序
-      combinedData.sort((a, b) => b.period_comment_count - a.period_comment_count);
+      // 按选择的评论数降序排序
+      if (commentPeriod === "all") {
+        combinedData.sort((a, b) => b.total_comment_count - a.total_comment_count);
+      } else {
+        combinedData.sort((a, b) => b.period_comment_count - a.period_comment_count);
+      }
       
       // 只取前50条
       const data = combinedData.slice(0, 50);
@@ -1130,9 +1146,11 @@ export const getCommunityLeaderboard = async (req: Request, res: Response) => {
         message: "获取排行榜成功", 
         data,
         meta: {
-          period_type: "7days",
-          period_label: "近7天",
-          description: "评论之星榜默认按近7天评论数排序，更公平地反映近期活跃度"
+          period_type: commentPeriod === "all" ? "all" : "7days",
+          period_label: commentPeriod === "all" ? "全部" : "近7天",
+          description: commentPeriod === "all" 
+            ? "评论之星榜按历史总评论数排序" 
+            : "评论之星榜按近7天评论数排序，更公平地反映近期活跃度"
         }
       });
     }

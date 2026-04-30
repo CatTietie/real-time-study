@@ -1,17 +1,16 @@
 import { 
   Avatar, 
-  Space, 
   Typography,
   Tag,
   message,
   Button,
   Spin,
+  Tabs,
 } from "antd";
 import { 
   UserOutlined,
   FireOutlined,
   EditOutlined,
-  ReloadOutlined,
   ArrowRightOutlined,
   MessageOutlined,
   HeartOutlined,
@@ -23,6 +22,7 @@ import { useEffect, useState } from "react";
 import { useAppSelector } from "../../app/hooks";
 import type { RootState } from "../../app/store";
 import api from "../../services/api";
+import { fetchCommunityComments, fetchCommunityPosts } from "../../services/communityPublic";
 import { useNavigate, useParams } from "react-router-dom";
 import "../../styles/student-dashboard.css";
 
@@ -54,6 +54,19 @@ interface PostItem {
   publish_status: number;
 }
 
+interface CommentItem {
+  id: number;
+  content: string;
+  created_at: string;
+  like_count: number;
+  parent_id: number | null;
+  post_id: number;
+  Post?: {
+    id: number;
+    title: string;
+  };
+}
+
 const { Title, Text } = Typography;
 
 export default function UserProfile() {
@@ -65,8 +78,12 @@ export default function UserProfile() {
   
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<string>("posts"); // "posts" | "comments"
+  
   const [userPosts, setUserPosts] = useState<PostItem[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
+  const [userComments, setUserComments] = useState<CommentItem[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
   
   const targetUserId = parseInt(userId || "0", 10);
   const isSelf = currentUserId && currentUserId === targetUserId;
@@ -127,9 +144,9 @@ export default function UserProfile() {
     
     setPostsLoading(true);
     try {
-      const response = await api.get(`/community/posts?userId=${targetUserId}&page=1&pageSize=5`);
-      if (response.data.success) {
-        setUserPosts(response.data.data || []);
+      const response = await fetchCommunityPosts({ userId: targetUserId, page: 1, pageSize: 10 });
+      if (response.success) {
+        setUserPosts(response.data || []);
       }
     } catch (error) {
       console.error('获取用户帖子失败:', error);
@@ -138,30 +155,54 @@ export default function UserProfile() {
     }
   };
   
-  useEffect(() => {
-    if (userProfile?.id) {
-      fetchUserPosts();
-    }
-  }, [userProfile?.id]);
-
-  const handleRefresh = async () => {
-    setLoading(true);
+  const fetchUserComments = async () => {
+    if (!targetUserId) return;
+    
+    setCommentsLoading(true);
     try {
-      const response = await api.get(`/user/profile/${targetUserId}`);
-      if (response.data.success) {
-        setUserProfile(response.data.data);
-        message.success('数据已刷新');
+      const response = await fetchCommunityComments({ userId: targetUserId, page: 1, pageSize: 10 });
+      if (response.success) {
+        setUserComments(response.data || []);
       }
-    } catch (_err) {
-      message.error('刷新失败');
+    } catch (error) {
+      console.error('获取用户评论失败:', error);
     } finally {
-      setLoading(false);
+      setCommentsLoading(false);
     }
   };
+  
+  useEffect(() => {
+    if (userProfile?.id) {
+      if (activeTab === "posts") {
+        fetchUserPosts();
+      } else if (activeTab === "comments") {
+        fetchUserComments();
+      }
+    }
+  }, [userProfile?.id, activeTab]);
 
   const handleGoBack = () => {
     navigate(-1);
   };
+
+  const tabItems = [
+    {
+      key: "posts",
+      label: (
+        <span style={{ fontSize: 15, fontWeight: 500 }}>
+          📝 TA的帖子
+        </span>
+      ),
+    },
+    {
+      key: "comments",
+      label: (
+        <span style={{ fontSize: 15, fontWeight: 500 }}>
+          💬 TA的评论
+        </span>
+      ),
+    },
+  ];
 
   if (loading) {
     return (
@@ -170,6 +211,207 @@ export default function UserProfile() {
       </div>
     );
   }
+
+  // 渲染帖子列表
+  const renderPostsList = () => {
+    if (postsLoading) {
+      return (
+        <div style={{ textAlign: 'center', padding: '60px' }}>
+          <Spin />
+        </div>
+      );
+    }
+    
+    if (userPosts.length === 0) {
+      return (
+        <div className="posts-empty" style={{ padding: '60px' }}>
+          <div className="posts-empty-icon" style={{ fontSize: 48, marginBottom: 16 }}>📭</div>
+          <div className="posts-empty-text" style={{ fontSize: 15, color: '#9CA3AF' }}>暂无帖子</div>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="posts-list">
+        {userPosts.map((post) => (
+          <div
+            key={post.id}
+            className="post-item-card"
+            onClick={() => navigate(`/community?postId=${post.id}`)}
+            style={{
+              padding: '16px 20px',
+              borderBottom: '1px solid #F3F4F6',
+              cursor: 'pointer',
+              transition: 'background 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#FAFAFA';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <div className="post-header" style={{ marginBottom: 10 }}>
+              <div className="post-title">
+                <span className="post-title-text" style={{
+                  fontSize: 15,
+                  fontWeight: 600,
+                  color: '#1F2937',
+                }}>
+                  {post.title}
+                </span>
+              </div>
+              <div className="post-tags" style={{ marginLeft: 'auto' }}>
+                {post.is_top && (
+                  <Tag color="red" style={{ marginLeft: 8 }}>置顶</Tag>
+                )}
+                <Tag color={post.publish_status === 1 ? "green" : "orange"} style={{ marginLeft: 8 }}>
+                  {post.publish_status === 1 ? '已发布' : '草稿'}
+                </Tag>
+              </div>
+            </div>
+            <div className="post-meta" style={{ display: 'flex', gap: 20, color: '#6B7280', fontSize: 13 }}>
+              <div className="post-meta-item" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <CalendarOutlined className="post-meta-icon" />
+                <span className="post-meta-value">
+                  {new Date(post.created_at).toLocaleDateString()}
+                </span>
+              </div>
+              <div className="post-meta-item" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <EyeOutlined className="post-meta-icon" />
+                <span className="post-meta-value">{post.view_count || 0}</span>
+              </div>
+              <div className="post-meta-item" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <MessageOutlined className="post-meta-icon" />
+                <span className="post-meta-value">{post.comment_count || 0}</span>
+              </div>
+              <div className="post-meta-item" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <HeartOutlined className="post-meta-icon" />
+                <span className="post-meta-value">{post.like_count || 0}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // 渲染评论列表
+  const renderCommentsList = () => {
+    if (commentsLoading) {
+      return (
+        <div style={{ textAlign: 'center', padding: '60px' }}>
+          <Spin />
+        </div>
+      );
+    }
+    
+    if (userComments.length === 0) {
+      return (
+        <div className="posts-empty" style={{ padding: '60px' }}>
+          <div className="posts-empty-icon" style={{ fontSize: 48, marginBottom: 16 }}>💭</div>
+          <div className="posts-empty-text" style={{ fontSize: 15, color: '#9CA3AF' }}>暂无评论</div>
+        </div>
+      );
+    }
+    
+    return (
+      <div>
+        {userComments.map((comment) => (
+          <div
+            key={comment.id}
+            style={{
+              padding: '18px 20px',
+              borderBottom: '1px solid #F3F4F6',
+              cursor: comment.Post?.id ? 'pointer' : 'default',
+              transition: 'background 0.2s ease',
+            }}
+            onClick={() => {
+              if (comment.Post?.id) {
+                navigate(`/community?postId=${comment.Post.id}`);
+              }
+            }}
+            onMouseEnter={(e) => {
+              if (comment.Post?.id) {
+                e.currentTarget.style.background = '#FAFAFA';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            {/* 评论来源帖子 */}
+            {comment.Post && (
+              <div style={{
+                marginBottom: 10,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}>
+                <Tag color="blue" style={{
+                  fontSize: 11,
+                  margin: 0,
+                }}>
+                  评论于
+                </Tag>
+                <Text style={{
+                  fontSize: 13,
+                  color: '#3B82F6',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                }} onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/community?postId=${comment.Post!.id}`);
+                }}>
+                  {comment.Post.title}
+                </Text>
+                <ArrowRightOutlined style={{ 
+                  fontSize: 12, 
+                  color: '#9CA3AF',
+                  marginLeft: 4,
+                }} />
+              </div>
+            )}
+            
+            {/* 评论内容 */}
+            <div style={{
+              fontSize: 14,
+              color: '#374151',
+              lineHeight: 1.7,
+              marginBottom: 12,
+            }}>
+              {comment.content}
+            </div>
+            
+            {/* 评论元信息 */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 16,
+              color: '#9CA3AF',
+              fontSize: 12,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <CalendarOutlined />
+                <span>{new Date(comment.created_at).toLocaleString()}</span>
+              </div>
+              {comment.like_count > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <HeartOutlined style={{ color: '#F43F5E' }} />
+                  <span>{comment.like_count}</span>
+                </div>
+              )}
+              {comment.parent_id && (
+                <Tag color="default" style={{ fontSize: 11, margin: 0 }}>
+                  回复
+                </Tag>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="student-dashboard">
@@ -264,83 +506,26 @@ export default function UserProfile() {
             </div>
           </div>
 
-          {/* 我的帖子 */}
+          {/* 内容标签页（帖子 / 评论） */}
           <div className="dashboard-card">
-            <div className="dashboard-card-header">
-              <div className="dashboard-card-title">
-                <div
-                  className="dashboard-card-title-icon"
-                  style={{
-                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                    color: '#fff'
-                  }}
-                >
-                  📝
-                </div>
-                <span>TA的帖子</span>
-              </div>
-              <span
-                className="view-all-btn"
-                onClick={() => navigate(`/community/posts?userId=${targetUserId}`)}
-              >
-                查看全部 <ArrowRightOutlined />
-              </span>
-            </div>
-            <div className="dashboard-card-body">
-              {postsLoading ? (
-                <div style={{ textAlign: 'center', padding: '40px' }}>
-                  <Spin />
-                </div>
-              ) : userPosts.length > 0 ? (
-                <div className="posts-list">
-                  {userPosts.map((post) => (
-                    <div
-                      key={post.id}
-                      className="post-item-card"
-                      onClick={() => navigate(`/community?postId=${post.id}`)}
-                    >
-                      <div className="post-header">
-                        <div className="post-title">
-                          <span className="post-title-text">{post.title}</span>
-                        </div>
-                        <div className="post-tags">
-                          {post.is_top && (
-                            <span className="post-tag top">置顶</span>
-                          )}
-                          <span className={`post-tag ${post.publish_status === 1 ? 'published' : 'draft'}`}>
-                            {post.publish_status === 1 ? '已发布' : '草稿'}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="post-meta">
-                        <div className="post-meta-item">
-                          <CalendarOutlined className="post-meta-icon" />
-                          <span className="post-meta-value">
-                            {new Date(post.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <div className="post-meta-item">
-                          <EyeOutlined className="post-meta-icon" />
-                          <span className="post-meta-value">{post.view_count || 0}</span>
-                        </div>
-                        <div className="post-meta-item">
-                          <MessageOutlined className="post-meta-icon" />
-                          <span className="post-meta-value">{post.comment_count || 0}</span>
-                        </div>
-                        <div className="post-meta-item">
-                          <HeartOutlined className="post-meta-icon" />
-                          <span className="post-meta-value">{post.like_count || 0}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="posts-empty">
-                  <div className="posts-empty-icon">📭</div>
-                  <div className="posts-empty-text">暂无帖子</div>
-                </div>
-              )}
+            <Tabs
+              activeKey={activeTab}
+              onChange={setActiveTab}
+              items={tabItems}
+              style={{
+                borderBottom: 'none',
+              }}
+              tabBarStyle={{
+                paddingLeft: 24,
+                paddingRight: 24,
+                marginBottom: 0,
+                borderBottom: '1px solid #F3F4F6',
+              }}
+            />
+            
+            <div style={{ padding: '0 4px' }}>
+              {activeTab === "posts" && renderPostsList()}
+              {activeTab === "comments" && renderCommentsList()}
             </div>
           </div>
         </div>
