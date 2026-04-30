@@ -1049,14 +1049,39 @@ export default function CommunityLanding() {
                                                 )}
 
                                                 {/* 标题 - 如果是转发帖，可能标题是"转发: xxx"，但我们已经通过引用卡片展示了，所以可以简化或保留 */}
-                                                <Text strong style={{fontSize: 18, display: "block"}}>
+                                                <Text
+                                                    strong
+                                                    style={{
+                                                        fontSize: 18,
+                                                        display: "block",
+                                                        cursor: "pointer",
+                                                        transition: "color 0.2s ease",
+                                                        color: "#1F2937",
+                                                    }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        openPostDetail(item.id);
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.color = "#1890ff";
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.color = "#1F2937";
+                                                    }}
+                                                >
                                                     {item.title}
                                                 </Text>
 
                                                 {/* 正文摘要 */}
-                                                <Paragraph ellipsis={{rows: 2}} style={{marginBottom: 8, margin: 0}}>
-                                                    {summary}
-                                                    {summary.length >= 120 ? "...【阅读更多】" : ""}
+                                                <Paragraph
+                                                    ellipsis={{rows: 2}}
+                                                    style={{
+                                                        marginBottom: 8,
+                                                        margin: 0,
+                                                        color: "#6B7280",
+                                                    }}
+                                                >
+                                                    {stripText(item.content) || "暂无内容"}
                                                 </Paragraph>
 
                                                 {/* 标签模块 */}

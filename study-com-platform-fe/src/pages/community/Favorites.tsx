@@ -737,7 +737,7 @@ export default function Favorites() {
                       <div
                         style={{
                           marginBottom: 16,
-                          minHeight: 88,
+                          minHeight: 45,
                           overflow: "hidden",
                         }}
                       >
@@ -748,7 +748,7 @@ export default function Favorites() {
                             lineHeight: 1.55,
                             color: "#6B7280",
                             display: "-webkit-box",
-                            WebkitLineClamp: 4,
+                            WebkitLineClamp: 2,
                             WebkitBoxOrient: "vertical",
                             overflow: "hidden",
                             margin: 0,
