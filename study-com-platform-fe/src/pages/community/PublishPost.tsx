@@ -34,10 +34,32 @@ const { Title, Text } = Typography;
 const { TextArea } = Input;
 
 const CATEGORY_OPTIONS = [
-  { value: "学习心得", label: "学习心得", template: "分享你的学习感悟和心得体会..." },
-  { value: "问题求助", label: "问题求助", template: "请描述你的问题：\n\n1. 问题背景：\n2. 遇到的困难：\n3. 已尝试的方法：\n4. 期望的结果：" },
-  { value: "经验分享", label: "经验分享", template: "分享你的经验和技巧：\n\n1. 资源/方法介绍：\n2. 适用人群：\n3. 使用建议：\n4. 注意事项：" },
-  { value: "聊天交友", label: "聊天交友", template: "在这里分享你的日常，寻找志同道合的朋友..." }
+  { 
+    value: "学习心得", 
+    label: "学习心得", 
+    placeholder: "分享你的学习感悟和心得体会...",
+    isStructured: false
+  },
+  { 
+    value: "问题求助", 
+    label: "问题求助", 
+    template: "请描述你的问题：\n\n1. 问题背景：\n2. 遇到的困难：\n3. 已尝试的方法：\n4. 期望的结果：",
+    placeholder: "请按模板描述您的问题...",
+    isStructured: true
+  },
+  { 
+    value: "经验分享", 
+    label: "经验分享", 
+    template: "分享你的经验和技巧：\n\n1. 资源/方法介绍：\n2. 适用人群：\n3. 使用建议：\n4. 注意事项：",
+    placeholder: "请按模板分享您的经验...",
+    isStructured: true
+  },
+  { 
+    value: "聊天交友", 
+    label: "聊天交友", 
+    placeholder: "在这里分享你的日常，寻找志同道合的朋友...",
+    isStructured: false
+  }
 ];
 
 // 默认占位文案
@@ -46,7 +68,19 @@ const DEFAULT_PLACEHOLDER = "分享你的经验/问题背景...";
 // 根据分类获取占位文案
 const getPlaceholderByCategory = (category: string): string => {
   const option = CATEGORY_OPTIONS.find(opt => opt.value === category);
-  return option ? option.template : DEFAULT_PLACEHOLDER;
+  if (option) {
+    return option.placeholder || DEFAULT_PLACEHOLDER;
+  }
+  return DEFAULT_PLACEHOLDER;
+};
+
+// 根据分类获取结构化模板内容
+const getTemplateByCategory = (category: string): string | null => {
+  const option = CATEGORY_OPTIONS.find(opt => opt.value === category);
+  if (option && option.isStructured && option.template) {
+    return option.template;
+  }
+  return null;
 };
 
 type PublishForm = {
@@ -67,6 +101,8 @@ export default function PublishPost() {
   const [tagFetching, setTagFetching] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [isScrolled, setIsScrolled] = useState(false);
+  // 记录最后一次自动填充的模板内容，用于判断用户是否修改了内容
+  const lastAutoFilledTemplateRef = useRef<string | null>(null);
   const tagTimerRef = useRef<number | null>(null);
   const watchedTags = Form.useWatch("tags", form) || [];
   const watchedCategory = Form.useWatch("category", form) || "";
@@ -89,14 +125,30 @@ export default function PublishPost() {
   React.useEffect(() => {
     if (watchedCategory && watchedCategory !== selectedCategory) {
       setSelectedCategory(watchedCategory);
+      
       // 获取当前内容
-      const currentContent = form.getFieldValue('content');
-      // 只有当内容为空或只有默认占位时才自动填充模板
-      if (!currentContent || currentContent.trim() === '') {
-        const template = getPlaceholderByCategory(watchedCategory);
-        if (watchedCategory === '问题求助' || watchedCategory === '经验分享') {
-          // 对于问题求助和经验分享，直接设置内容为模板
-          form.setFieldsValue({ content: template });
+      const currentContent = form.getFieldValue('content') || '';
+      const lastTemplate = lastAutoFilledTemplateRef.current;
+      
+      // 判断是否应该自动填充模板：
+      // 1. 当前内容为空
+      // 2. 或者当前内容等于上一次自动填充的模板（说明用户没有修改）
+      const shouldAutoFill = !currentContent.trim() || 
+        (lastTemplate !== null && currentContent === lastTemplate);
+      
+      if (shouldAutoFill) {
+        // 获取新分类的模板
+        const newTemplate = getTemplateByCategory(watchedCategory);
+        
+        if (newTemplate) {
+          // 对于结构化模板（问题求助、经验分享），自动填充内容
+          form.setFieldsValue({ content: newTemplate });
+          // 记录这次自动填充的模板
+          lastAutoFilledTemplateRef.current = newTemplate;
+        } else {
+          // 对于非结构化模板（学习心得、聊天交友），清空内容（使用placeholder）
+          form.setFieldsValue({ content: '' });
+          lastAutoFilledTemplateRef.current = null;
         }
       }
     }
@@ -306,9 +358,7 @@ export default function PublishPost() {
               >
                 <TextArea
                   placeholder={watchedCategory 
-                    ? (watchedCategory === '问题求助' || watchedCategory === '经验分享' 
-                        ? '' 
-                        : getPlaceholderByCategory(watchedCategory))
+                    ? getPlaceholderByCategory(watchedCategory)
                     : DEFAULT_PLACEHOLDER
                   }
                   maxLength={5000}
