@@ -10,6 +10,7 @@ import studyRoomRoutes from "./study-room.routes";
 import chatRoutes from "./chat.routes";  // 新增
 import whiteboardRoutes from "./whiteboard.routes";  // 新增
 import userManagementRoutes from "./user-management.routes";  // 用户管理
+import notificationRoutes from "./notification.routes";  // 通知路由
 
 const router = Router();
 
@@ -23,5 +24,6 @@ router.use("/study-rooms", studyRoomRoutes);
 router.use("/chat", chatRoutes);  // 新增
 router.use("/whiteboard", whiteboardRoutes);  // 新增
 router.use("/user-management", userManagementRoutes);  // 用户管理
+router.use("/notifications", notificationRoutes);  // 通知路由
 
 export default router;
