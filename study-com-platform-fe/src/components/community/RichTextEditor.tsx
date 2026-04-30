@@ -5,8 +5,6 @@ import Underline from '@tiptap/extension-underline';
 import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
-import TextStyle from '@tiptap/extension-text-style';
-import Highlight from '@tiptap/extension-highlight';
 import { Button, Tooltip, Upload, message, Modal, Input } from 'antd';
 import {
   BoldOutlined,
@@ -19,7 +17,7 @@ import {
   PictureOutlined,
   UnorderedListOutlined,
   OrderedListOutlined,
-  QuoteOutlined,
+  MessageOutlined,
   RedoOutlined,
   UndoOutlined,
 } from '@ant-design/icons';
@@ -125,8 +123,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         gapcursor: true,
       }),
       Underline,
-      TextStyle,
-      Highlight,
       Link.configure({
         openOnClick: false,
         HTMLAttributes: {
@@ -475,7 +471,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           <Button
             type="text"
             size="small"
-            icon={<QuoteOutlined />}
+            icon={<MessageOutlined />}
             onClick={toggleBlockquote}
             className={editor.isActive('blockquote') ? 'bg-blue-100 text-blue-600' : ''}
           />
