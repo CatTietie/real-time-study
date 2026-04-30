@@ -1715,7 +1715,7 @@ export default function CommunityLanding() {
                 onCancel={closePostDetail}
                 footer={null}
                 width="800px"
-                destroyOnClose={true}
+                destroyOnHidden={true}
                 closable={true}
                 maskClosable={true}
                 className="post-detail-modal"
