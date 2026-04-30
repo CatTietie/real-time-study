@@ -35,8 +35,7 @@ import {
   SearchOutlined,
   DownloadOutlined,
   EyeOutlined,
-  CloseOutlined,
-  BellOutlined
+  CloseOutlined
 } from '@ant-design/icons';
 import CompactMessageList from './CompactMessageList';
 import { MessageInput } from './MessageInput';
@@ -51,10 +50,7 @@ import {
   getChatRooms, 
   getImageBase64, 
   uploadChatFile, 
-  searchChatMessages,
-  getUnreadMessages,
-  markRoomAsRead,
-  type UnreadMessageItem
+  searchChatMessages
 } from '../../services/chat';
 import type { PendingImage } from './MessageInput';
 
@@ -185,42 +181,11 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
   const [showSearchResults, setShowSearchResults] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   
-  const [unreadList, setUnreadList] = useState<UnreadMessageItem[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [notificationLoading, setNotificationLoading] = useState(false);
-  const unreadPollingRef = useRef<NodeJS.Timeout | null>(null);
-  
   useEffect(() => {
     if (searchVisible && searchInputRef.current) {
       searchInputRef.current.focus();
     }
   }, [searchVisible]);
-  
-  const loadUnreadMessages = useCallback(async () => {
-    if (!userId) return;
-    
-    try {
-      const result = await getUnreadMessages();
-      setUnreadCount(result.totalCount);
-      setUnreadList(result.unreadList);
-    } catch (error) {
-      console.error('加载未读消息失败:', error);
-    }
-  }, [userId]);
-  
-  useEffect(() => {
-    loadUnreadMessages();
-    
-    unreadPollingRef.current = setInterval(() => {
-      loadUnreadMessages();
-    }, 5000);
-    
-    return () => {
-      if (unreadPollingRef.current) {
-        clearInterval(unreadPollingRef.current);
-      }
-    };
-  }, [loadUnreadMessages]);
   
   const user = username && userId ? {
     id: userId,
@@ -484,33 +449,6 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     });
   }, []);
 
-  const handleClickUnreadMessage = useCallback(async (item: UnreadMessageItem) => {
-    const targetRoomId = item.room_id;
-    
-    try {
-      await markRoomAsRead(targetRoomId);
-      loadUnreadMessages();
-    } catch (error) {
-      console.error('标记已读失败:', error);
-    }
-    
-    onRoomChange(targetRoomId);
-    
-    setTimeout(() => {
-      const messageElement = document.getElementById(`chat-message-${item.last_message_id}`);
-      if (messageElement) {
-        messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        messageElement.style.backgroundColor = 'rgba(102, 126, 234, 0.15)';
-        setTimeout(() => {
-          if (messageElement) {
-            messageElement.style.transition = 'background-color 0.5s ease';
-            messageElement.style.backgroundColor = 'transparent';
-          }
-        }, 2000);
-      }
-    }, 500);
-  }, [onRoomChange, loadUnreadMessages]);
-
   const handleCloseImagePreview = useCallback(() => {
     setImagePreviewVisible(false);
     setPreviewImageUrl('');
@@ -741,217 +679,6 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
               position: searchVisible ? 'absolute' : 'static',
               transition: 'all 0.2s ease'
             }}>
-              <Dropdown
-                dropdownRender={() => (
-                  <div style={{
-                    minWidth: '350px',
-                    maxHeight: '400px',
-                    overflow: 'hidden',
-                    background: '#fff',
-                    borderRadius: '12px',
-                    boxShadow: '0 6px 24px rgba(0, 0, 0, 0.15)'
-                  }}>
-                    <div style={{
-                      padding: '12px 16px',
-                      borderBottom: '1px solid #f0f0f0',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}>
-                      <span style={{ fontWeight: '600', fontSize: '14px', color: '#333' }}>
-                        未读消息
-                      </span>
-                      {unreadCount > 0 && (
-                        <Tag color="error" style={{ margin: 0 }}>
-                          {unreadCount} 条未读
-                        </Tag>
-                      )}
-                    </div>
-                    <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
-                      {unreadList.length === 0 ? (
-                        <div style={{
-                          padding: '40px 20px',
-                          textAlign: 'center',
-                          color: '#999'
-                        }}>
-                          <div style={{ fontSize: '40px', marginBottom: '8px' }}>📭</div>
-                          <div>暂无未读消息</div>
-                        </div>
-                      ) : (
-                        <List
-                          dataSource={unreadList}
-                          renderItem={(item) => (
-                            <List.Item
-                              style={{
-                                padding: '12px 16px',
-                                cursor: 'pointer',
-                                borderBottom: '1px solid #f5f5f5',
-                                transition: 'background-color 0.2s ease'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#f9f9f9';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = 'transparent';
-                              }}
-                              onClick={() => handleClickUnreadMessage(item)}
-                            >
-                              <List.Item.Meta
-                                avatar={
-                                  <div style={{ position: 'relative' }}>
-                                    <Avatar 
-                                      src={item.last_sender_avatar} 
-                                      size={40}
-                                      style={{
-                                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                        fontSize: '16px',
-                                        fontWeight: '600'
-                                      }}
-                                    >
-                                      {(item.last_sender_nickname || 'U').charAt(0)}
-                                    </Avatar>
-                                    <div style={{
-                                      position: 'absolute',
-                                      top: 0,
-                                      right: 0,
-                                      width: '12px',
-                                      height: '12px',
-                                      borderRadius: '50%',
-                                      background: '#ff4d4f',
-                                      border: '2px solid #fff'
-                                    }} />
-                                  </div>
-                                }
-                                title={
-                                  <div style={{ 
-                                    display: 'flex', 
-                                    justifyContent: 'space-between', 
-                                    alignItems: 'center',
-                                    marginBottom: '4px'
-                                  }}>
-                                    <span style={{ 
-                                      fontWeight: '600', 
-                                      color: '#333',
-                                      fontSize: '14px'
-                                    }}>
-                                      {item.last_sender_nickname}
-                                    </span>
-                                    <span style={{ 
-                                      fontSize: '11px', 
-                                      color: '#999'
-                                    }}>
-                                      {formatDate(item.updated_at)}
-                                    </span>
-                                  </div>
-                                }
-                                description={
-                                  <div style={{ marginTop: '4px' }}>
-                                    <div style={{
-                                      fontSize: '12px',
-                                      color: '#667eea',
-                                      marginBottom: '4px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px'
-                                    }}>
-                                      <MessageOutlined style={{ fontSize: '11px' }} />
-                                      {item.room?.name || `聊天室 ${item.room_id}`}
-                                    </div>
-                                    <div style={{
-                                      fontSize: '13px',
-                                      color: '#666',
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis',
-                                      whiteSpace: 'nowrap',
-                                      maxWidth: '280px'
-                                    }}>
-                                      {item.last_message_type === 'image' ? (
-                                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                          <span>🖼️</span>
-                                          <span style={{ color: '#667eea' }}>[图片消息]</span>
-                                        </span>
-                                      ) : item.last_message_type === 'file' ? (
-                                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                          <span>📄</span>
-                                          <span style={{ color: '#667eea' }}>[文件消息]</span>
-                                        </span>
-                                      ) : (
-                                        item.last_message_content
-                                      )}
-                                    </div>
-                                    {item.unread_count > 1 && (
-                                      <Tag 
-                                        color="error" 
-                                        style={{ 
-                                          marginTop: '6px',
-                                          fontSize: '11px',
-                                          padding: '1px 6px'
-                                        }}
-                                      >
-                                        {item.unread_count} 条消息
-                                      </Tag>
-                                    )}
-                                  </div>
-                                }
-                              />
-                            </List.Item>
-                          )}
-                        />
-                      )}
-                    </div>
-                  </div>
-                )}
-                trigger={['click']}
-                placement="bottomRight"
-              >
-                <Tooltip title={unreadCount > 0 ? `有 ${unreadCount} 条未读消息` : '暂无未读消息'}>
-                  <div style={{
-                    position: 'relative',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    padding: '8px',
-                    borderRadius: '8px',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                  }}
-                  >
-                    <BellOutlined style={{ 
-                      fontSize: '18px', 
-                      color: '#fff' 
-                    }} />
-                    {unreadCount > 0 && (
-                      <span style={{
-                        position: 'absolute',
-                        top: '2px',
-                        right: '2px',
-                        minWidth: '18px',
-                        height: '18px',
-                        borderRadius: '9px',
-                        background: '#ff4d4f',
-                        color: '#fff',
-                        fontSize: '11px',
-                        fontWeight: '600',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        lineHeight: '18px',
-                        padding: '0 4px',
-                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
-                      }}>
-                        {unreadCount > 99 ? '99+' : unreadCount}
-                      </span>
-                    )}
-                  </div>
-                </Tooltip>
-              </Dropdown>
-              
               <Tooltip title="搜索消息">
                 <Button 
                   type="text" 

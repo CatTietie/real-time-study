@@ -258,47 +258,14 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       }
     });
 
-    newSocket.on('receive_chat_message', (msg: ChatMessage) => {
-      console.log('收到全局聊天消息:', msg);
-      
-      if (msg.message_type === 'system') {
-        return;
-      }
-      
-      if (msg.user_id === userInfoRef.current.userId) {
-        return;
-      }
-      
-      playMessageSound();
-      
-      setUnreadCount(prev => prev + 1);
-      
-      const newNotification: Notification = {
-        id: Date.now(),
-        user_id: userInfoRef.current.userId,
-        title: `新消息: ${msg.sender_nickname || msg.sender_username || '有人'}`,
-        content: msg.content.substring(0, 100) + (msg.content.length > 100 ? '...' : ''),
-        notification_type: 'chat_message',
-        reservation_id: null,
-        chat_room_id: msg.room_id,
-        is_read: false,
-        metadata: {
-          message_type: msg.message_type,
-          sender_id: msg.user_id,
-          sender_nickname: msg.sender_nickname,
-          room_name: msg.room_name
-        },
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      
-      setNotifications(prev => [newNotification, ...prev]);
-      
-      message.info(`收到新消息: ${msg.sender_nickname || '有人'}`);
-    });
-
     newSocket.on('notification', (data: { type: string; data: any }) => {
       console.log('收到系统通知:', data);
+      
+      if (data.type === 'chat_message' && data.data) {
+        playMessageSound();
+        message.info(`收到新消息: ${data.data.senderName || '有人'}`);
+      }
+      
       fetchNotifications();
     });
 

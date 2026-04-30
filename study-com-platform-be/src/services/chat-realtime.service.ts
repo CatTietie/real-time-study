@@ -277,12 +277,9 @@ export const initChatSockets = (io: Server) => {
             }
           });
           
-          // 3. 广播到用户个人房间（实时推送）
-          io.to(`user_${userId}`).emit('receive_chat_message', {
-            ...messageData,
-            room_name: roomName
-          });
-          
+          // 3. 广播到用户个人房间（实时推送通知）
+          // 只发送 notification 事件，由前端调用 fetchNotifications() 获取最新通知列表
+          // 避免重复提醒
           io.to(`user_${userId}`).emit('notification', {
             type: 'chat_message',
             data: {
