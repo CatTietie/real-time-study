@@ -26,6 +26,7 @@ import {
   removeCommunityClient,
 } from "../services/community-realtime.service";
 import { recordView, getUserTodayViews } from "../services/view-record.service";
+import { uploadFilesToOss } from "../middlewares/upload.middleware";
 
 const parseTags = (tags?: string[] | string) => {
   const parsed = Array.isArray(tags)
@@ -78,9 +79,19 @@ const canDeletePost = async (user: { id: number; role: string }) => {
   return Boolean(permission);
 };
 
+type ViewMode = "latest" | "hot" | "zeroReply";
+
 export const getCommunityPosts = async (req: Request, res: Response) => {
   try {
-    const { page = 1, pageSize = 10, category, keyword, order, userId } = req.query;
+    const { page = 1, pageSize = 10, category, keyword, order, userId, viewMode } = req.query;
+
+    console.log('getCommunityPosts - 接收到的参数:', {
+      viewMode,
+      order,
+      category,
+      keyword,
+      userId
+    });
 
     const where: any = {
       status: 1,
@@ -92,25 +103,76 @@ export const getCommunityPosts = async (req: Request, res: Response) => {
       where.user_id = Number(userId);
     }
 
-    if (category) {
+    // 处理视图模式
+    const mode = (viewMode as ViewMode) || "latest";
+    console.log('getCommunityPosts - 确定的视图模式:', mode);
+    
+    // 零回复模式：仅显示"问题求助"分类且评论数为0的帖子
+    if (mode === "zeroReply") {
+      where.category = "问题求助";
+      // 处理 comment_count 可能为 null 或 0 的情况
+      where[Op.or] = [
+        { comment_count: 0 },
+        { comment_count: null },
+      ];
+    } else if (category) {
+      // 非零回复模式时，才应用用户选择的分类
       where.category = category;
     }
 
     if (keyword) {
-      where[Op.or] = [
-        { title: { [Op.like]: `%${keyword}%` } },
-        { content: { [Op.like]: `%${keyword}%` } },
-      ];
+      // 如果已有 where[Op.or]（来自零回复模式），需要合并
+      if (where[Op.or]) {
+        // 零回复模式下的 keyword 搜索：在 comment_count 为 0/null 且 category="问题求助" 的基础上，添加 keyword 条件
+        const existingOr = where[Op.or];
+        delete where[Op.or];
+        where[Op.and] = [
+          { [Op.or]: existingOr },
+          {
+            [Op.or]: [
+              { title: { [Op.like]: `%${keyword}%` } },
+              { content: { [Op.like]: `%${keyword}%` } },
+            ],
+          },
+        ];
+      } else {
+        where[Op.or] = [
+          { title: { [Op.like]: `%${keyword}%` } },
+          { content: { [Op.like]: `%${keyword}%` } },
+        ];
+      }
     }
 
-    const orderBy: any =
-      order === "hot"
-        ? [
-            [Sequelize.col("like_count"), "DESC"],
-            [Sequelize.col("comment_count"), "DESC"],
-            [Sequelize.col("created_at"), "DESC"],
-          ]
-        : [[Sequelize.col("created_at"), "DESC"]];
+    // 根据视图模式确定排序
+    let orderBy: any;
+    
+    if (mode === "hot") {
+      // 热门推荐：综合算法排序 - 点赞(权重3) + 评论(权重2) + 浏览量(权重1)
+      console.log('getCommunityPosts - 使用热门排序');
+      orderBy = [
+        [Sequelize.literal(`(like_count * 3 + comment_count * 2 + view_count)`), "DESC"],
+        ["created_at", "DESC"],
+      ];
+    } else if (mode === "zeroReply") {
+      // 零回复模式：按创建时间倒序，最新的问题优先
+      console.log('getCommunityPosts - 使用零回复排序');
+      orderBy = [["created_at", "DESC"]];
+    } else {
+      // 最新发布（默认）：按创建时间倒序
+      // 同时支持旧的 order 参数（兼容历史代码）
+      console.log('getCommunityPosts - 使用最新发布排序');
+      orderBy =
+        order === "hot"
+          ? [
+              ["like_count", "DESC"],
+              ["comment_count", "DESC"],
+              ["created_at", "DESC"],
+            ]
+          : [["created_at", "DESC"]];
+    }
+
+    console.log('getCommunityPosts - 最终 orderBy:', JSON.stringify(orderBy));
+    console.log('getCommunityPosts - 最终 where:', JSON.stringify(where));
 
     const result = await Post.findAndCountAll({
       where,
@@ -119,11 +181,40 @@ export const getCommunityPosts = async (req: Request, res: Response) => {
           model: User,
           attributes: ["id", "username", "nickname"],
         },
+        {
+          model: Post,
+          as: "ForwardPost",
+          attributes: ["id", "title", "content", "like_count", "comment_count", "user_id"],
+          include: [
+            {
+              model: User,
+              attributes: ["id", "username", "nickname"],
+            },
+          ],
+        },
+        {
+          model: User,
+          as: "ForwardUser",
+          attributes: ["id", "username", "nickname"],
+        },
       ],
       order: orderBy,
       offset: (Number(page) - 1) * Number(pageSize),
       limit: Number(pageSize),
     });
+
+    console.log('getCommunityPosts - 查询结果数量:', result.count);
+    if (result.rows.length > 0) {
+      const firstPost = result.rows[0] as any;
+      console.log('getCommunityPosts - 第一条帖子:', {
+        id: firstPost.id,
+        title: firstPost.title,
+        like_count: firstPost.like_count,
+        comment_count: firstPost.comment_count,
+        view_count: firstPost.view_count,
+        created_at: firstPost.created_at
+      });
+    }
 
     const data = result.rows.map((post) => {
       const raw = post.toJSON() as any;
@@ -293,12 +384,13 @@ export const createCommunityPost = async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, message: "未授权访问" });
     }
 
-    const { title, content, category, tags, isDraft } = req.body as {
+    const { title, content, category, tags, isDraft, forwardPostId } = req.body as {
       title?: string;
       content?: string;
       category?: string;
       tags?: string[] | string;
       isDraft?: string | boolean;
+      forwardPostId?: number;
     };
 
     if (!title || !content) {
@@ -344,10 +436,9 @@ export const createCommunityPost = async (req: Request, res: Response) => {
         .status(400)
         .json({ success: false, message: "最多只能上传4张图片" });
     }
-    const baseUrl = `${req.protocol}://${req.get("host")}`;
-    const imageUrls = files.map(
-      (file) => `${baseUrl}/uploads/posts/${file.filename}`,
-    );
+    
+    // 使用 OSS 上传（如果 OSS 可用）
+    const imageUrls = await uploadFilesToOss(req);
 
     const isDraftFlag =
       typeof isDraft === "string" ? isDraft === "true" : Boolean(isDraft);
@@ -368,6 +459,13 @@ export const createCommunityPost = async (req: Request, res: Response) => {
       ? `包含敏感词：${matches.slice(0, 10).join("、")}`
       : undefined;
 
+    let forwardPost: any = null;
+    if (forwardPostId) {
+      forwardPost = await Post.findOne({
+        where: { id: forwardPostId, status: 1, publish_status: 1 },
+      });
+    }
+
     const post = await Post.create({
       user_id: req.user.id,
       title,
@@ -381,6 +479,8 @@ export const createCommunityPost = async (req: Request, res: Response) => {
       comment_count: 0,
       is_top: 0,
       edit_count: 0,
+      forward_post_id: forwardPost ? forwardPost.id : null,
+      forward_user_id: forwardPost ? forwardPost.user_id : null,
       ...(auditReason
         ? { audit_reason: auditReason, audit_at: new Date() }
         : {}),
@@ -595,19 +695,50 @@ export const getCommunityPostComments = async (req: Request, res: Response) => {
     const decoded = token ? verifyToken(token) : null;
     const viewerId = decoded?.id;
 
-    const where: any = { post_id: postId };
+    // 获取主评论的条件
+    const mainCommentWhere: any = { 
+      post_id: postId, 
+      parent_id: null 
+    };
     if (viewerId) {
-      where[Op.or] = [{ status: 1 }, { status: 0, user_id: viewerId }];
+      mainCommentWhere[Op.or] = [{ status: 1 }, { status: 0, user_id: viewerId }];
     } else {
-      where.status = 1;
+      mainCommentWhere.status = 1;
     }
 
+    // 获取主评论的总数（用于分页）
+    const totalMainComments = await Comment.count({
+      where: mainCommentWhere,
+    });
+
+    // 获取主评论及其子评论
     const result = await Comment.findAndCountAll({
-      where,
+      where: mainCommentWhere,
       include: [
         {
           model: User,
-          attributes: ["id", "username", "nickname"],
+          attributes: ["id", "username", "nickname", "avatar"],
+        },
+        {
+          model: Comment,
+          as: "Replies",
+          include: [
+            {
+              model: User,
+              attributes: ["id", "username", "nickname", "avatar"],
+            },
+            {
+              model: Comment,
+              as: "ParentComment",
+              include: [
+                {
+                  model: User,
+                  attributes: ["id", "username", "nickname", "avatar"],
+                },
+              ],
+            },
+          ],
+          order: [["created_at", "ASC"]],
         },
       ],
       order: orderBy,
@@ -618,8 +749,19 @@ export const getCommunityPostComments = async (req: Request, res: Response) => {
     const rows = result.rows.map((item) => {
       const raw = item.toJSON() as any;
       if (raw.is_deleted) {
-        return { ...raw, content: "该评论已被删除" };
+        return { ...raw, content: "该评论已被删除", Replies: [] };
       }
+      
+      // 处理子评论
+      if (raw.Replies && raw.Replies.length > 0) {
+        raw.Replies = raw.Replies.map((reply: any) => {
+          if (reply.is_deleted) {
+            return { ...reply, content: "该评论已被删除" };
+          }
+          return reply;
+        });
+      }
+      
       return raw;
     });
 
@@ -630,7 +772,7 @@ export const getCommunityPostComments = async (req: Request, res: Response) => {
       pagination: {
         page: Number(page),
         pageSize: Number(pageSize),
-        total: result.count,
+        total: totalMainComments,
       },
     });
   } catch (error) {
@@ -817,35 +959,76 @@ export const getCommunityComments = async (req: Request, res: Response) => {
   }
 };
 
+const getStartOfWeek = () => {
+  const start = new Date();
+  const day = start.getDay();
+  const diff = start.getDate() - day + (day === 0 ? -6 : 1);
+  start.setDate(diff);
+  start.setHours(0, 0, 0, 0);
+  return start;
+};
+
 export const getCommunityLeaderboard = async (req: Request, res: Response) => {
   try {
     const type = String((req.query as any)?.type || "total");
+    const timeRange = String((req.query as any)?.timeRange || "all");
 
     if (type === "post_hot") {
       // 热门内容榜 - 返回帖子相关信息，按热度排序
+      const where: any = { status: 1, publish_status: 1 };
+
+      // 时间筛选
+      if (timeRange === "today") {
+        where[Op.and] = [
+          Sequelize.where(Sequelize.col("created_at"), {
+            [Op.gte]: getStartOfDay(),
+          }),
+        ];
+      } else if (timeRange === "week") {
+        where[Op.and] = [
+          Sequelize.where(Sequelize.col("created_at"), {
+            [Op.gte]: getStartOfWeek(),
+          }),
+        ];
+      }
+
       const posts = await Post.findAll({
-        where: { status: 1, publish_status: 1 },
+        where,
         include: [{
           model: User,
           attributes: ["id", "nickname", "username", "avatar"]
         }],
         order: [
-          [Sequelize.col("view_count"), "DESC"],
-          [Sequelize.col("like_count"), "DESC"],
-          [Sequelize.col("comment_count"), "DESC"],
+          [Sequelize.literal(`(view_count * 0.5 + like_count * 2 + comment_count)`), "DESC"],
           [Sequelize.col("created_at"), "DESC"]
         ],
         limit: 50,
       });
 
+      // 热度计算规则
+      const heatRules = {
+        viewWeight: 0.5,
+        likeWeight: 2,
+        commentWeight: 1,
+        formula: "热度值 = 浏览量 × 0.5 + 点赞数 × 2 + 评论数",
+        description: "热度值综合考虑浏览、点赞、评论三个维度，其中点赞权重最高，评论次之，浏览最低。"
+      };
+
       const data = posts.map((post: any) => {
         const postData = post.toJSON();
+        // 计算热度值
+        const heatScore = Math.round(
+          (postData.view_count || 0) * 0.5 +
+          (postData.like_count || 0) * 2 +
+          (postData.comment_count || 0)
+        );
         return {
           id: postData.id,
           title: postData.title,
           view_count: postData.view_count,
           like_count: postData.like_count,
           comment_count: postData.comment_count,
+          heat_score: heatScore,
           user_id: postData.User?.id,
           user_nickname: postData.User?.nickname,
           user_username: postData.User?.username,
@@ -858,6 +1041,8 @@ export const getCommunityLeaderboard = async (req: Request, res: Response) => {
         success: true,
         message: "获取排行榜成功",
         data,
+        heat_rules: heatRules,
+        time_range: timeRange,
       });
     }
 
@@ -1340,7 +1525,7 @@ export const getFavorites = async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, message: "未授权访问" });
     }
 
-    const { page = 1, pageSize = 10, folderId, keyword, category } = req.query;
+    const { page = 1, pageSize = 10, folderId, keyword, category, sortBy, sortOrder } = req.query;
     const where: any = { user_id: req.user.id };
     if (folderId) where.folder_id = Number(folderId);
 
@@ -1351,6 +1536,29 @@ export const getFavorites = async (req: Request, res: Response) => {
         { title: { [Op.like]: `%${keyword}%` } },
         { content: { [Op.like]: `%${keyword}%` } },
       ];
+    }
+
+    let orderBy: any;
+    const order = sortBy || "created_at";
+    const orderDir = (sortOrder as string)?.toUpperCase() === "ASC" ? "ASC" : "DESC";
+
+    if (order === "view_count") {
+      orderBy = [
+        [Sequelize.col("Post.view_count"), orderDir],
+        [Sequelize.col("created_at"), "DESC"],
+      ];
+    } else if (order === "like_count") {
+      orderBy = [
+        [Sequelize.col("Post.like_count"), orderDir],
+        [Sequelize.col("created_at"), "DESC"],
+      ];
+    } else if (order === "comment_count") {
+      orderBy = [
+        [Sequelize.col("Post.comment_count"), orderDir],
+        [Sequelize.col("created_at"), "DESC"],
+      ];
+    } else {
+      orderBy = [[Sequelize.col("created_at"), orderDir]];
     }
 
     const result = await Favorite.findAndCountAll({
@@ -1366,7 +1574,7 @@ export const getFavorites = async (req: Request, res: Response) => {
         },
         { model: FavoriteFolder, attributes: ["id", "name"] },
       ],
-      order: [[Sequelize.col("created_at"), "DESC"]],
+      order: orderBy,
       offset: (Number(page) - 1) * Number(pageSize),
       limit: Number(pageSize),
     });
