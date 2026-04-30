@@ -217,6 +217,7 @@ export const markAllAsRead = async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, message: "未授权访问" });
     }
 
+    // 1. 标记 notifications 表中的消息为已读
     const affectedCount = await Notification.update(
       { is_read: true },
       {
@@ -227,11 +228,26 @@ export const markAllAsRead = async (req: Request, res: Response) => {
       }
     );
 
+    // 2. 标记 unread_messages 表中的聊天消息为已读（将 unread_count 重置为 0）
+    const [chatUpdatedCount] = await UnreadMessage.update(
+      { unread_count: 0 },
+      {
+        where: {
+          user_id: req.user.id,
+          unread_count: { [Op.gt]: 0 }
+        }
+      }
+    );
+
+    const totalMarkedCount = affectedCount[0] + chatUpdatedCount;
+
     res.json({
       success: true,
-      message: `已标记 ${affectedCount[0]} 条通知为已读`,
+      message: `已标记 ${totalMarkedCount} 条通知为已读`,
       data: {
-        markedCount: affectedCount[0]
+        markedCount: totalMarkedCount,
+        notificationCount: affectedCount[0],
+        chatMessageCount: chatUpdatedCount
       }
     });
   } catch (error) {
