@@ -34,6 +34,7 @@ export const createCommunityPost = async (
         category: string;
         tags?: string[];
         isDraft?: boolean;
+        forwardPostId?: number;
       },
 ) => {
   const isFormData = payload instanceof FormData;
@@ -129,9 +130,20 @@ export const fetchCommunityLeaderboard = async () => {
   return response.data;
 };
 
-export const fetchCommunityLeaderboardByType = async (type: string) => {
+export const fetchCommunityLeaderboardByType = async (
+  type: string, 
+  timeRange?: string,
+  commentPeriod?: string // "7days" 或 "all"
+) => {
+  const params: Record<string, string> = { type };
+  if (timeRange) {
+    params.timeRange = timeRange;
+  }
+  if (commentPeriod) {
+    params.commentPeriod = commentPeriod;
+  }
   const response = await api.get("/community/leaderboard", {
-    params: { type },
+    params,
   });
   return response.data;
 };
