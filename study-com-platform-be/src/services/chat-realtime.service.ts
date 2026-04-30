@@ -3,6 +3,7 @@ import ChatMessage from '../models/chat-message.model';
 import ChatRoom from '../models/chat-room.model';
 import User from '../models/user.model';
 import UnreadMessage from '../models/unread-message.model';
+import Notification from '../models/notification.model';
 
 interface ClientInfo {
   userId: number;
@@ -18,10 +19,32 @@ interface ClientInfo {
 const connectedClients = new Map<string, ClientInfo>();
 // 存储每个房间的在线用户
 const roomOnlineUsers = new Map<number, Set<number>>();
+// 存储用户的全局Socket连接（用于跨页面消息推送）
+const userGlobalSockets = new Map<number, Set<string>>();
 
 export const initChatSockets = (io: Server) => {
   io.on('connection', (socket: Socket) => {
     console.log('用户连接:', socket.id);
+
+    // 用户加入全局通知房间（用于跨页面接收消息）
+    socket.on('join_global', async (data: { userId: number; username: string }) => {
+      try {
+        console.log('用户加入全局通知:', data.userId, data.username);
+        
+        // 加入用户个人房间
+        socket.join(`user_${data.userId}`);
+        
+        // 记录用户的全局Socket
+        if (!userGlobalSockets.has(data.userId)) {
+          userGlobalSockets.set(data.userId, new Set());
+        }
+        userGlobalSockets.get(data.userId)!.add(socket.id);
+        
+        console.log(`用户 ${data.userId} 已加入全局通知，当前全局连接数: ${userGlobalSockets.get(data.userId)?.size || 0}`);
+      } catch (error) {
+        console.error('加入全局通知失败:', error);
+      }
+    });
 
     // 用户加入房间
     socket.on('join_chat_room', async (data: { roomId: number; userId: number; username: string; nickname?: string }) => {
@@ -168,10 +191,40 @@ export const initChatSockets = (io: Server) => {
           file_url: messageData.file_url
         });
         
+        // 广播给房间内所有用户
         io.to(`chat_${data.roomId}`).emit('receive_chat_message', messageData);
+        
+        // 同时广播给房间内其他用户的个人房间（用于跨页面消息接收）
+        const roomUsers = roomOnlineUsers.get(data.roomId);
+        if (roomUsers) {
+          const room = await ChatRoom.findByPk(data.roomId);
+          const roomName = room?.toJSON()?.name || '未知房间';
+          
+          for (const userId of roomUsers) {
+            if (userId !== clientInfo.userId) {
+              // 向用户个人房间发送消息
+              io.to(`user_${userId}`).emit('receive_chat_message', {
+                ...messageData,
+                room_name: roomName
+              });
+              
+              // 同时也可以发送通知类型的消息
+              io.to(`user_${userId}`).emit('notification', {
+                type: 'chat_message',
+                data: {
+                  roomId: data.roomId,
+                  roomName: roomName,
+                  senderId: clientInfo.userId,
+                  senderName: clientInfo.nickname || clientInfo.username,
+                  content: data.content.substring(0, 50) + (data.content.length > 50 ? '...' : ''),
+                  messageId: messageData.id
+                }
+              });
+            }
+          }
+        }
 
         // 为房间内其他用户增加未读计数
-        const roomUsers = roomOnlineUsers.get(data.roomId);
         if (roomUsers) {
           // 准备消息摘要
           let messageContent = data.content;
@@ -264,6 +317,18 @@ export const initChatSockets = (io: Server) => {
         });
         connectedClients.delete(socket.id);
       }
+      
+      // 清理用户的全局Socket记录
+      for (const [userId, socketIds] of userGlobalSockets) {
+        if (socketIds.has(socket.id)) {
+          socketIds.delete(socket.id);
+          if (socketIds.size === 0) {
+            userGlobalSockets.delete(userId);
+          }
+          break;
+        }
+      }
+      
       console.log('用户断开:', socket.id);
     });
 

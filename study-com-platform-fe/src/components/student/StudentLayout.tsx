@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { 
   Layout, 
   Menu, 
@@ -42,6 +42,8 @@ import {
   type Notification,
   type NotificationType
 } from "../../services/notification";
+import { API_BASE } from "../../services/api";
+import io, { Socket } from 'socket.io-client';
 import "../../styles/student-layout.css";
 
 const { Header, Sider, Content } = Layout;
@@ -51,6 +53,19 @@ interface StudentLayoutProps {
   children: React.ReactNode;
 }
 
+interface ChatMessage {
+  id: number;
+  room_id: number;
+  user_id: number;
+  content: string;
+  message_type: 'text' | 'image' | 'system';
+  created_at?: string;
+  createdAt?: string;
+  sender_nickname?: string;
+  sender_username?: string;
+  room_name?: string;
+}
+
 const notificationTypeLabels: Record<NotificationType, { text: string; color: string }> = {
   reservation_start: { text: '预约提醒', color: 'blue' },
   reservation_renewal: { text: '续期提醒', color: 'orange' },
@@ -58,17 +73,83 @@ const notificationTypeLabels: Record<NotificationType, { text: string; color: st
   system: { text: '系统消息', color: 'default' }
 };
 
+const formatDate = (dateString: string | Date | undefined): string => {
+  if (!dateString) return '';
+  
+  try {
+    let date: Date;
+    
+    if (typeof dateString === 'string') {
+      if (dateString.includes('T') || dateString.includes('-')) {
+        date = new Date(dateString);
+      } else {
+        date = new Date(dateString);
+      }
+    } else {
+      date = dateString;
+    }
+    
+    if (isNaN(date.getTime())) {
+      return '';
+    }
+    
+    return date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (error) {
+    console.error('日期格式化失败:', error);
+    return '';
+  }
+};
+
+const playMessageSound = () => {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = 800;
+    oscillator.type = 'sine';
+    
+    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.15, audioContext.currentTime + 0.05);
+    gainNode.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.1);
+    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.2);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.25);
+    
+  } catch (error) {
+    console.log('播放消息提示音失败:', error);
+  }
+};
+
 export default function StudentLayout({ children }: StudentLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const authState = useAppSelector((state: RootState) => state.auth);
-  const { username } = authState;
+  const { username, token } = authState;
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationLoading, setNotificationLoading] = useState(false);
   const [notificationVisible, setNotificationVisible] = useState(false);
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
+  
+  const userInfoRef = useRef({ userId: authState.userId, username });
+
+  useEffect(() => {
+    userInfoRef.current = { userId: authState.userId, username };
+  }, [authState.userId, username]);
 
   const menuItems = [
     {
@@ -149,14 +230,101 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
   }, []);
 
   useEffect(() => {
+    if (!token || !authState.userId) {
+      return;
+    }
+
+    const apiBaseUrl = API_BASE.replace('/api', '');
+    
+    const newSocket = io(apiBaseUrl, {
+      transports: ['websocket'],
+      withCredentials: true,
+      auth: {
+        token: token
+      }
+    });
+
+    setSocket(newSocket);
+
+    newSocket.on('connect', () => {
+      console.log('通知Socket连接成功');
+      setIsSocketConnected(true);
+      
+      if (userInfoRef.current.userId && userInfoRef.current.username) {
+        newSocket.emit('join_global', {
+          userId: userInfoRef.current.userId,
+          username: userInfoRef.current.username
+        });
+      }
+    });
+
+    newSocket.on('receive_chat_message', (msg: ChatMessage) => {
+      console.log('收到全局聊天消息:', msg);
+      
+      if (msg.message_type === 'system') {
+        return;
+      }
+      
+      if (msg.user_id === userInfoRef.current.userId) {
+        return;
+      }
+      
+      playMessageSound();
+      
+      setUnreadCount(prev => prev + 1);
+      
+      const newNotification: Notification = {
+        id: Date.now(),
+        user_id: userInfoRef.current.userId,
+        title: `新消息: ${msg.sender_nickname || msg.sender_username || '有人'}`,
+        content: msg.content.substring(0, 100) + (msg.content.length > 100 ? '...' : ''),
+        notification_type: 'chat_message',
+        reservation_id: null,
+        chat_room_id: msg.room_id,
+        is_read: false,
+        metadata: {
+          message_type: msg.message_type,
+          sender_id: msg.user_id,
+          sender_nickname: msg.sender_nickname,
+          room_name: msg.room_name
+        },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      setNotifications(prev => [newNotification, ...prev]);
+      
+      message.info(`收到新消息: ${msg.sender_nickname || '有人'}`);
+    });
+
+    newSocket.on('notification', (data: { type: string; data: any }) => {
+      console.log('收到系统通知:', data);
+      fetchNotifications();
+    });
+
+    newSocket.on('disconnect', () => {
+      console.log('通知Socket断开连接');
+      setIsSocketConnected(false);
+    });
+
+    newSocket.on('error', (error: { message: string }) => {
+      console.error('通知Socket错误:', error.message);
+    });
+
+    return () => {
+      console.log('清理通知Socket连接');
+      newSocket.close();
+    };
+  }, [token, authState.userId, fetchNotifications]);
+
+  useEffect(() => {
     fetchNotifications();
-    // 每30秒刷新一次未读计数
+    
     const interval = setInterval(fetchUnreadCount, 30000);
     return () => clearInterval(interval);
   }, [fetchNotifications, fetchUnreadCount]);
 
   const handleNotificationClick = async (notification: Notification) => {
-    // 标记为已读
     try {
       await markAsRead(notification.id);
       setUnreadCount(prev => Math.max(0, prev - 1));
@@ -167,14 +335,11 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       console.error('标记已读失败:', error);
     }
 
-    // 根据类型跳转
     if (notification.notification_type === 'reservation_start' || 
         notification.notification_type === 'reservation_renewal') {
-      // 预约消息跳转到我的预约
       navigate('/student/my-reservations');
       setNotificationVisible(false);
     } else if (notification.notification_type === 'chat_message' && notification.chat_room_id) {
-      // 聊天消息跳转到聊天页面
       navigate('/student/chat', { state: { roomId: notification.chat_room_id } });
       setNotificationVisible(false);
     }
@@ -194,6 +359,32 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
 
   const handleRefreshNotifications = () => {
     fetchNotifications();
+  };
+
+  const getNotificationIcon = (type: NotificationType) => {
+    switch (type) {
+      case 'reservation_start':
+        return <CalendarOutlined />;
+      case 'reservation_renewal':
+        return <ClockCircleOutlined />;
+      case 'chat_message':
+        return <MessageOutlined />;
+      default:
+        return <BellOutlined />;
+    }
+  };
+
+  const getNotificationColor = (type: NotificationType) => {
+    switch (type) {
+      case 'reservation_start':
+        return '#1890ff';
+      case 'reservation_renewal':
+        return '#fa8c16';
+      case 'chat_message':
+        return '#52c41a';
+      default:
+        return '#bfbfbf';
+    }
   };
 
   const notificationDropdownContent = (
@@ -238,54 +429,53 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
           />
         ) : (
           <List
-            dataSource={notifications}
-            renderItem={(item) => (
-              <List.Item
-                className={`notification-item ${item.is_read ? 'read' : 'unread'}`}
-                onClick={() => handleNotificationClick(item)}
-              >
-                <List.Item.Meta
-                  avatar={
-                    <Badge dot={!item.is_read}>
-                      <Avatar 
-                        style={{ 
-                          backgroundColor: notificationTypeLabels[item.notification_type].color === 'blue' ? '#1890ff' : 
-                                          notificationTypeLabels[item.notification_type].color === 'orange' ? '#fa8c16' :
-                                          notificationTypeLabels[item.notification_type].color === 'green' ? '#52c41a' : '#bfbfbf'
-                        }}
-                        icon={
-                          item.notification_type === 'reservation_start' ? <CalendarOutlined /> :
-                          item.notification_type === 'reservation_renewal' ? <ClockCircleOutlined /> :
-                          item.notification_type === 'chat_message' ? <MessageOutlined /> :
-                          <BellOutlined />
-                        }
-                      />
-                    </Badge>
-                  }
-                  title={
-                    <Space>
-                      <Text strong>{item.title}</Text>
-                      <Tag color={notificationTypeLabels[item.notification_type].color} size="small">
-                        {notificationTypeLabels[item.notification_type].text}
-                      </Tag>
-                    </Space>
-                  }
-                  description={
-                    <div>
-                      <Paragraph 
-                        ellipsis={{ rows: 2 }} 
-                        style={{ marginBottom: 4, color: '#666' }}
-                      >
-                        {item.content}
-                      </Paragraph>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>
-                        {new Date(item.created_at).toLocaleString()}
-                      </Text>
-                    </div>
-                  }
-                />
-              </List.Item>
-            )}
+            dataSource={notifications.slice(0, 20)}
+            renderItem={(item) => {
+              const formattedDate = formatDate(item.created_at);
+              
+              return (
+                <List.Item
+                  className={`notification-item ${item.is_read ? 'read' : 'unread'}`}
+                  onClick={() => handleNotificationClick(item)}
+                >
+                  <List.Item.Meta
+                    avatar={
+                      <Badge dot={!item.is_read}>
+                        <Avatar 
+                          style={{ 
+                            backgroundColor: getNotificationColor(item.notification_type)
+                          }}
+                          icon={getNotificationIcon(item.notification_type)}
+                        />
+                      </Badge>
+                    }
+                    title={
+                      <Space>
+                        <Text strong>{item.title}</Text>
+                        <Tag color={notificationTypeLabels[item.notification_type].color} size="small">
+                          {notificationTypeLabels[item.notification_type].text}
+                        </Tag>
+                      </Space>
+                    }
+                    description={
+                      <div>
+                        <Paragraph 
+                          ellipsis={{ rows: 2 }} 
+                          style={{ marginBottom: 4, color: '#666' }}
+                        >
+                          {item.content}
+                        </Paragraph>
+                        {formattedDate && (
+                          <Text type="secondary" style={{ fontSize: '12px' }}>
+                            {formattedDate}
+                          </Text>
+                        )}
+                      </div>
+                    }
+                  />
+                </List.Item>
+              );
+            }}
           />
         )}
       </div>
@@ -295,7 +485,6 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
           type="link" 
           block 
           onClick={() => {
-            // 可以跳转到消息中心页面
             navigate('/student/my-reservations');
             setNotificationVisible(false);
           }}
@@ -343,7 +532,6 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
           </Text>
           
           <Space size="middle">
-            {/* 消息通知铃铛 */}
             <Dropdown
               dropdownRender={() => notificationDropdownContent}
               placement="bottomRight"
@@ -351,7 +539,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
               open={notificationVisible}
               onOpenChange={(visible) => setNotificationVisible(visible)}
             >
-              <Badge count={unreadCount} size="small">
+              <Badge count={unreadCount} size="small" overflowCount={99}>
                 <Button 
                   type="text" 
                   icon={<BellOutlined style={{ fontSize: '18px' }} />}
@@ -361,7 +549,6 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
               </Badge>
             </Dropdown>
             
-            {/* 用户下拉菜单 */}
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
               <Space className="student-layout-user-menu">
                 <Avatar 
