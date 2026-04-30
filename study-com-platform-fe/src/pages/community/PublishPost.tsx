@@ -27,7 +27,11 @@ import {
   HomeOutlined,
   FileTextOutlined,
   StarOutlined,
-  TrophyOutlined
+  TrophyOutlined,
+  CloseOutlined,
+  InfoCircleOutlined,
+  DownOutlined,
+  UpOutlined
 } from "@ant-design/icons";
 
 const { Title, Text } = Typography;
@@ -101,6 +105,7 @@ export default function PublishPost() {
   const [tagFetching, setTagFetching] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [isScrolled, setIsScrolled] = useState(false);
+  const [showGuidelines, setShowGuidelines] = useState(false);
   // 记录最后一次自动填充的模板内容，用于判断用户是否修改了内容
   const lastAutoFilledTemplateRef = useRef<string | null>(null);
   const tagTimerRef = useRef<number | null>(null);
@@ -161,6 +166,20 @@ export default function PublishPost() {
       return;
     }
 
+    // 明确的校验提示
+    if (!values.title || !values.title.trim()) {
+      messageApi.warning("请输入帖子标题");
+      return;
+    }
+    if (!values.category) {
+      messageApi.warning("请选择帖子分类");
+      return;
+    }
+    if (!values.content || !values.content.trim()) {
+      messageApi.warning("请输入帖子内容");
+      return;
+    }
+
     const formData = new FormData();
     formData.append("title", values.title.trim());
     formData.append("content", values.content.trim());
@@ -177,13 +196,23 @@ export default function PublishPost() {
 
     try {
       setSubmitting(true);
-      await createCommunityPost(formData);
+      const result = await createCommunityPost(formData);
       messageApi.success("发帖成功，等待审核");
       form.resetFields();
       setFileList([]);
+      lastAutoFilledTemplateRef.current = null;
+      
+      // 发布成功后跳转：优先跳转到详情页，否则跳转到社区首页
       window.setTimeout(() => {
-        navigate("/community");
-      }, 300);
+        // 检查返回结果中是否有帖子ID
+        const postId = result?.data?.id || result?.id;
+        if (postId) {
+          // 跳转到社区首页并打开详情弹窗
+          navigate(`/community?postId=${postId}`);
+        } else {
+          navigate("/community");
+        }
+      }, 500);
     } catch (err) {
       messageApi.error(err instanceof Error ? err.message : "发帖失败");
     } finally {
@@ -254,14 +283,14 @@ export default function PublishPost() {
         </div>
       </div>
       
-      {/* 主内容区域 - 增加顶部边距以容纳固定导航栏 */}
-      <div className="max-w-4xl mx-auto px-4 py-6 pt-16">
+      {/* 主内容区域 - 减少留白，提升填写效率 */}
+      <div className="max-w-4xl mx-auto px-4 py-4 pt-14">
 
         {/* 主编辑区域 - 白色卡片，与灰色背景形成对比 */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200">
           <Form form={form} layout="vertical" onFinish={handleSubmit}>
-            {/* 标题输入区域 - 顶部区域，有内边距 */}
-            <div className="px-6 pt-6 pb-4">
+            {/* 标题输入区域 - 压缩间距 */}
+            <div className="px-5 pt-4 pb-3">
               <div className="title-input-wrapper">
                 <Form.Item
                   name="title"
@@ -296,10 +325,10 @@ export default function PublishPost() {
             </div>
 
             {/* 分隔线 - 区分标题和正文区域 */}
-            <div className="h-px bg-gray-100 mx-6" />
+            <div className="h-px bg-gray-100 mx-5" />
 
-            {/* 分类选择区域 - 浅色背景区分 */}
-            <div className="px-6 py-5 bg-gray-50/50">
+            {/* 分类选择区域 - 压缩间距 */}
+            <div className="px-5 py-4 bg-gray-50/50">
               <div className="flex items-center gap-2 mb-3">
                 <TagsOutlined className="text-blue-500" />
                 <span className="text-sm font-medium text-gray-700">选择分类</span>
@@ -336,10 +365,10 @@ export default function PublishPost() {
             </div>
 
             {/* 分隔线 */}
-            <div className="h-px bg-gray-100 mx-6" />
+            <div className="h-px bg-gray-100 mx-5" />
 
-            {/* 正文编辑区域 - 主要内容区域，有更多内边距 */}
-            <div className="px-6 py-6">
+            {/* 正文编辑区域 - 压缩间距，优化高度 */}
+            <div className="px-5 py-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <EditOutlined className="text-blue-500" />
@@ -362,7 +391,7 @@ export default function PublishPost() {
                     : DEFAULT_PLACEHOLDER
                   }
                   maxLength={5000}
-                  autoSize={{ minRows: 16, maxRows: 40 }}
+                  autoSize={{ minRows: 10, maxRows: 30 }}
                   className="border-none shadow-none outline-none focus:ring-0 px-0 py-2 text-base text-gray-700 placeholder:text-gray-300 resize-none"
                   style={{
                     border: 'none',
@@ -372,9 +401,9 @@ export default function PublishPost() {
                     paddingRight: 0,
                     backgroundColor: 'transparent',
                     fontSize: '16px',
-                    lineHeight: '2',
+                    lineHeight: '1.8',
                     resize: 'none',
-                    minHeight: '320px',
+                    minHeight: '200px',
                   }}
                 />
               </Form.Item>
@@ -396,13 +425,13 @@ export default function PublishPost() {
             <div className="h-px bg-gray-100 mx-6" />
 
             {/* 底部辅助区域 - 标签和图片上传 */}
-            <div className="px-6 py-5 bg-gray-50/80">
+            <div className="px-6 py-4 bg-gray-50/80">
               {/* 标签选择 */}
-              <div className="mb-5">
+              <div className="mb-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <TagsOutlined className="text-yellow-500" />
+                  <TagsOutlined className="text-blue-500" />
                   <span className="text-sm font-medium text-gray-700">添加标签</span>
-                  <span className="text-xs text-gray-400">（最多5个）</span>
+                  <span className="text-xs text-gray-400">（建议3~5个，最多5个）</span>
                 </div>
                 <Form.Item 
                   name="tags"
@@ -411,7 +440,7 @@ export default function PublishPost() {
                   <Select
                     mode="tags"
                     maxTagCount={5}
-                    placeholder="输入标签后按 Enter 添加"
+                    placeholder="输入标签后按 Enter 添加（支持联想推荐）"
                     options={tagOptions.map((tag) => ({ label: tag, value: tag }))}
                     onSearch={handleTagSearch}
                     onChange={handleTagsChange}
@@ -420,32 +449,47 @@ export default function PublishPost() {
                     style={{
                       borderRadius: '8px',
                     }}
+                    allowClear={true}
                   />
                 </Form.Item>
+                {/* 已选标签展示 - 带删除按钮 */}
                 {watchedTags.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-3">
-                    <Text type="secondary" className="text-xs">已添加：</Text>
                     {watchedTags.map((tag: string) => (
                       <span 
                         key={tag}
-                        className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-medium"
+                        className="inline-flex items-center gap-1 bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-medium cursor-pointer hover:bg-blue-100 transition-colors group"
+                        onClick={() => {
+                          const newTags = watchedTags.filter((t: string) => t !== tag);
+                          form.setFieldsValue({ tags: newTags });
+                        }}
                       >
-                        #{tag}
+                        <span>#{tag}</span>
+                        <CloseOutlined 
+                          className="text-blue-400 group-hover:text-blue-600 transition-colors" 
+                          style={{ fontSize: '10px' }}
+                        />
                       </span>
                     ))}
+                    {watchedTags.length < 5 && (
+                      <span className="text-xs text-gray-400 flex items-center gap-1">
+                        <InfoCircleOutlined />
+                        还可添加 {5 - watchedTags.length} 个标签
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
 
               {/* 图片上传 */}
               <div>
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-2 mb-2">
                   <PictureOutlined className="text-green-500" />
                   <span className="text-sm font-medium text-gray-700">上传图片</span>
-                  <span className="text-xs text-gray-400">（最多4张）</span>
+                  <span className="text-xs text-gray-400">（可选，最多4张）</span>
                 </div>
                 <Form.Item className="mb-0">
-                  <div className="flex flex-wrap gap-3">
+                  <div className="flex flex-wrap gap-2">
                     <Upload
                       listType="picture-card"
                       fileList={fileList}
@@ -473,82 +517,97 @@ export default function PublishPost() {
               </div>
             </div>
 
-            {/* 底部提示栏 */}
-            <div className="px-6 py-5 border-t border-gray-200 bg-white rounded-b-xl">
-              <div className="flex items-center justify-center gap-2 text-gray-400 text-sm">
-                <span>💡</span>
-                <span>优质内容有机会登上社区排行榜</span>
+            {/* 底部提示栏 - 简化版 */}
+            <div className="px-6 py-3 border-t border-gray-200 bg-white rounded-b-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-gray-400 text-xs">
+                  <span>💡</span>
+                  <span>优质内容有机会登上社区排行榜</span>
+                </div>
+                {/* 折叠的发布指南 */}
+                <Button 
+                  type="text" 
+                  size="small" 
+                  className="text-gray-400 text-xs"
+                  onClick={() => setShowGuidelines(!showGuidelines)}
+                  icon={showGuidelines ? <UpOutlined /> : <DownOutlined />}
+                >
+                  {showGuidelines ? '收起指南' : '发布指南'}
+                </Button>
               </div>
+              
+              {/* 折叠的发布指南内容 */}
+              {showGuidelines && (
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <StarOutlined className="text-yellow-500" style={{ fontSize: '14px' }} />
+                        <span className="text-sm font-medium text-gray-700">发布指南</span>
+                      </div>
+                      <ul className="text-xs text-gray-500 space-y-1.5">
+                        <li className="flex items-start gap-1">
+                          <span className="text-blue-500 mt-0.5">📌</span>
+                          <span>标题要明确具体</span>
+                        </li>
+                        <li className="flex items-start gap-1">
+                          <span className="text-green-500 mt-0.5">📝</span>
+                          <span>内容需详细完整</span>
+                        </li>
+                        <li className="flex items-start gap-1">
+                          <span className="text-yellow-500 mt-0.5">🏷️</span>
+                          <span>选择合适分类和标签</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <EditOutlined className="text-blue-500" style={{ fontSize: '14px' }} />
+                        <span className="text-sm font-medium text-gray-700">格式示例</span>
+                      </div>
+                      <div className="text-xs text-gray-500 space-y-2">
+                        <div className="bg-white rounded p-2">
+                          <span className="font-medium text-blue-600">【问题求助】</span>
+                          <p className="text-gray-400 mt-1 leading-relaxed">1. 问题描述<br/>2. 已尝试的方案<br/>3. 期望结果</p>
+                        </div>
+                        <div className="bg-white rounded p-2">
+                          <span className="font-medium text-green-600">【经验分享】</span>
+                          <p className="text-gray-400 mt-1 leading-relaxed">1. 资源介绍<br/>2. 适用人群<br/>3. 使用建议</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <TrophyOutlined className="text-yellow-500" style={{ fontSize: '14px' }} />
+                        <span className="text-sm font-medium text-gray-700">社区规则</span>
+                      </div>
+                      <ul className="text-xs text-gray-500 space-y-1.5">
+                        <li className="flex items-start gap-1">
+                          <span className="text-red-500 mt-0.5">🚫</span>
+                          <span>禁止发布广告内容</span>
+                        </li>
+                        <li className="flex items-start gap-1">
+                          <span className="text-red-500 mt-0.5">😡</span>
+                          <span>禁止人身攻击和辱骂</span>
+                        </li>
+                        <li className="flex items-start gap-1">
+                          <span className="text-blue-500 mt-0.5">⚖️</span>
+                          <span>尊重他人知识产权</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </Form>
         </div>
 
-        {/* 右侧辅助卡片 - 简化版，只在大屏幕显示 */}
-        <div className="hidden lg:block mt-8">
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-              <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
-                <StarOutlined className="text-yellow-500" />
-                <span className="font-medium text-gray-800">发布指南</span>
-              </div>
-              <ul className="text-sm text-gray-600 space-y-3">
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-500 mt-0.5">📌</span>
-                  <span>标题要明确具体</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-500 mt-0.5">📝</span>
-                  <span>内容需详细完整</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-yellow-500 mt-0.5">🏷️</span>
-                  <span>选择合适分类和标签</span>
-                </li>
-              </ul>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-              <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
-                <EditOutlined className="text-blue-500" />
-                <span className="font-medium text-gray-800">格式示例</span>
-              </div>
-              <div className="text-sm text-gray-600 space-y-4">
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <span className="font-medium text-blue-600">【问题求助】</span>
-                  <p className="text-xs text-gray-500 mt-2 leading-relaxed">1. 问题描述<br/>2. 已尝试的方案<br/>3. 期望结果</p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <span className="font-medium text-green-600">【经验分享】</span>
-                  <p className="text-xs text-gray-500 mt-2 leading-relaxed">1. 资源介绍<br/>2. 适用人群<br/>3. 使用建议</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-              <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
-                <TrophyOutlined className="text-yellow-500" />
-                <span className="font-medium text-gray-800">社区规则</span>
-              </div>
-              <ul className="text-sm text-gray-600 space-y-3">
-                <li className="flex items-start gap-2">
-                  <span className="text-red-500 mt-0.5">🚫</span>
-                  <span>禁止发布广告内容</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-red-500 mt-0.5">😡</span>
-                  <span>禁止人身攻击和辱骂</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-500 mt-0.5">⚖️</span>
-                  <span>尊重他人知识产权</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
+        {/* 简化的底部 */}
         <CommunityFooter
-          className="mt-12 text-center text-gray-400 text-sm"
+          className="mt-6 text-center text-gray-400 text-sm"
         />
       </div>
 
