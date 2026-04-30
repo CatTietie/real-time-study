@@ -1086,17 +1086,105 @@ export const getCommunityLeaderboard = async (req: Request, res: Response) => {
       limit: 100,
     });
 
+    // 收集用户ID，用于批量查询统计数据
+    const userIds = users.map((user) => user.id);
+    
+    // 查询每个用户的发帖数
+    const postCounts = await Post.findAll({
+      attributes: [
+        "user_id",
+        [Sequelize.fn("COUNT", Sequelize.col("id")), "post_count"],
+      ],
+      where: { 
+        user_id: { [Op.in]: userIds },
+        status: 1,
+        publish_status: 1 
+      },
+      group: ["user_id"],
+      raw: true,
+    });
+    
+    // 查询每个用户的帖子获赞数（其他用户给该用户的帖子点赞）
+    const postLikeCounts = await Post.findAll({
+      attributes: [
+        "Post.user_id",
+        [Sequelize.fn("COUNT", Sequelize.col("PostLikes.id")), "like_count"],
+      ],
+      where: { 
+        user_id: { [Op.in]: userIds },
+        status: 1,
+        publish_status: 1 
+      },
+      include: [{
+        model: PostLike,
+        attributes: [],
+        as: "PostLikes",
+        required: false,
+      }],
+      group: ["Post.user_id"],
+      raw: true,
+    });
+
+    // 查询每个用户的评论获赞数（其他用户给该用户的评论点赞）
+    const commentLikeCounts = await Comment.findAll({
+      attributes: [
+        "Comment.user_id",
+        [Sequelize.fn("COUNT", Sequelize.col("CommentLikes.id")), "like_count"],
+      ],
+      where: { 
+        user_id: { [Op.in]: userIds },
+        is_deleted: 0,
+        status: 1 
+      },
+      include: [{
+        model: CommentLike,
+        attributes: [],
+        as: "CommentLikes",
+        required: false,
+      }],
+      group: ["Comment.user_id"],
+      raw: true,
+    });
+
+    // 构建统计数据的Map
+    const postCountMap = new Map<number, number>();
+    const postLikeCountMap = new Map<number, number>();
+    const commentLikeCountMap = new Map<number, number>();
+
+    postCounts.forEach((item: any) => {
+      postCountMap.set(Number(item.user_id), Number(item.post_count || 0));
+    });
+
+    postLikeCounts.forEach((item: any) => {
+      postLikeCountMap.set(Number(item["Post.user_id"]), Number(item.like_count || 0));
+    });
+
+    commentLikeCounts.forEach((item: any) => {
+      commentLikeCountMap.set(Number(item["Comment.user_id"]), Number(item.like_count || 0));
+    });
+
     res.json({
       success: true,
       message: "获取排行榜成功",
-      data: users.map((user) => ({
-        id: user.id,
-        nickname: user.nickname,
-        username: user.username,
-        avatar: user.avatar,
-        points: user.points,
-        level: calculateLevel(user.points),
-      })),
+      data: users.map((user) => {
+        const postCount = postCountMap.get(user.id) || 0;
+        const postLikes = postLikeCountMap.get(user.id) || 0;
+        const commentLikes = commentLikeCountMap.get(user.id) || 0;
+        const totalLikes = postLikes + commentLikes;
+        
+        return {
+          id: user.id,
+          nickname: user.nickname,
+          username: user.username,
+          avatar: user.avatar,
+          points: user.points,
+          level: calculateLevel(user.points),
+          post_count: postCount,
+          like_count: totalLikes,
+          post_like_count: postLikes,
+          comment_like_count: commentLikes,
+        };
+      }),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "获取排行榜失败";

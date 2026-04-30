@@ -44,6 +44,11 @@ type LeaderboardRow = {
     author_username?: string;
     // 新增后端计算的热度值
     heat_score?: number;
+    // 社区达人榜新增字段
+    avatar?: string;
+    post_count?: number; // 发帖数
+    post_like_count?: number; // 帖子获赞数
+    comment_like_count?: number; // 评论获赞数
 };
 
 type HeatRules = {
@@ -446,85 +451,288 @@ export default function Leaderboard() {
                 }
             ];
         } else if (activeTab === "users") {
+            // 等级颜色配置 - 渐变效果
+            const getLevelStyle = (level: number) => {
+                const levelStyles: Record<number, { bg: string; textColor: string; border: string; label: string }> = {
+                    1: { 
+                        bg: "linear-gradient(135deg, #9CA3AF 0%, #D1D5DB 100%)", 
+                        textColor: "#374151", 
+                        border: "#9CA3AF",
+                        label: "新手" 
+                    },
+                    2: { 
+                        bg: "linear-gradient(135deg, #10B981 0%, #34D399 100%)", 
+                        textColor: "#064E3B", 
+                        border: "#10B981",
+                        label: "初级" 
+                    },
+                    3: { 
+                        bg: "linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%)", 
+                        textColor: "#1E3A8A", 
+                        border: "#3B82F6",
+                        label: "中级" 
+                    },
+                    4: { 
+                        bg: "linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)", 
+                        textColor: "#4C1D95", 
+                        border: "#8B5CF6",
+                        label: "高级" 
+                    },
+                    5: { 
+                        bg: "linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)", 
+                        textColor: "#78350F", 
+                        border: "#F59E0B",
+                        label: "专家" 
+                    },
+                };
+                // 等级 >= 5 都显示专家级别的样式
+                return level >= 5 ? levelStyles[5] : levelStyles[level] || levelStyles[1];
+            };
+
             return [
                 ...baseColumns,
                 {
                     title: "用户信息",
-                    render: (_value: unknown, record: LeaderboardRow) => (
-                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                            <div style={{
-                                width: 44,
-                                height: 44,
-                                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                borderRadius: "50%",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                color: "white",
-                                fontWeight: "bold",
-                                fontSize: 18
-                            }}>
-                                {(record.nickname || record.user?.nickname || "U").charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                                <div style={{
-                                    fontWeight: 600,
-                                    color: "#1F2937",
-                                    marginBottom: 2,
-                                    fontSize: 15
-                                }}>
-                                    {record.nickname || record.user?.nickname || record.user_nickname || "匿名用户"}
+                    render: (_value: unknown, record: LeaderboardRow) => {
+                        const level = record.level ?? 1;
+                        const levelStyle = getLevelStyle(level);
+                        const avatar = record.avatar;
+                        const nickname = record.nickname || record.user?.nickname || record.user_nickname || "匿名用户";
+                        const username = record.username || record.user?.username || record.user_username || "-";
+                        const postCount = record.post_count ?? 0;
+                        const postLikeCount = record.post_like_count ?? 0;
+                        const commentLikeCount = record.comment_like_count ?? 0;
+                        const totalLikes = postLikeCount + commentLikeCount;
+
+                        return (
+                            <div 
+                                style={{ 
+                                    display: "flex", 
+                                    alignItems: "center", 
+                                    gap: 16,
+                                    cursor: "pointer",
+                                    transition: "all 0.2s ease",
+                                    padding: "4px 8px",
+                                    borderRadius: "8px",
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = "rgba(102, 126, 234, 0.05)";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = "transparent";
+                                }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    // 目前没有个人主页，显示提示
+                                    message.info("个人主页功能开发中，敬请期待");
+                                }}
+                            >
+                                {/* 头像 - 放大显示 */}
+                                {avatar ? (
+                                    <img
+                                        src={avatar}
+                                        alt={nickname}
+                                        style={{
+                                            width: 64,
+                                            height: 64,
+                                            borderRadius: "50%",
+                                            objectFit: "cover",
+                                            border: `3px solid ${levelStyle.border}`,
+                                            boxShadow: `0 4px 12px rgba(0,0,0,0.1)`,
+                                        }}
+                                    />
+                                ) : (
+                                    <div style={{
+                                        width: 64,
+                                        height: 64,
+                                        background: levelStyle.bg,
+                                        borderRadius: "50%",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        color: "white",
+                                        fontWeight: "bold",
+                                        fontSize: 24,
+                                        boxShadow: `0 4px 12px rgba(0,0,0,0.1)`,
+                                    }}>
+                                        {nickname.charAt(0).toUpperCase()}
+                                    </div>
+                                )}
+                                
+                                {/* 用户信息 */}
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    {/* 昵称 + 等级标签 - 更突出显示 */}
+                                    <div style={{ 
+                                        display: "flex", 
+                                        alignItems: "center", 
+                                        gap: 10, 
+                                        marginBottom: 8,
+                                        flexWrap: "wrap",
+                                    }}>
+                                        <Text style={{
+                                            fontWeight: 700,
+                                            fontSize: 17,
+                                            color: "#1F2937",
+                                        }}>
+                                            {nickname}
+                                        </Text>
+                                        {/* 等级标签 - 颜色渐变 */}
+                                        <Tag
+                                            style={{
+                                                background: levelStyle.bg,
+                                                color: levelStyle.textColor,
+                                                border: `1px solid ${levelStyle.border}`,
+                                                fontWeight: 600,
+                                                fontSize: 12,
+                                                padding: "2px 10px",
+                                                borderRadius: "20px",
+                                                margin: 0,
+                                            }}
+                                        >
+                                            Lv.{level} {levelStyle.label}
+                                        </Tag>
+                                    </div>
+                                    
+                                    {/* @用户名 */}
+                                    <div style={{ marginBottom: 8 }}>
+                                        <Text style={{
+                                            color: "#6B7280",
+                                            fontSize: 13,
+                                            background: "#F3F4F6",
+                                            padding: "2px 8px",
+                                            borderRadius: 4,
+                                        }}>
+                                            @{username}
+                                        </Text>
+                                    </div>
+                                    
+                                    {/* 活跃度数据：发帖数 + 获赞数 */}
+                                    <Space size={16} wrap>
+                                        {/* 发帖数 */}
+                                        <div style={{ 
+                                            display: "flex", 
+                                            alignItems: "center", 
+                                            gap: 6,
+                                            fontSize: 13,
+                                        }}>
+                                            <div style={{
+                                                background: "linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%)",
+                                                color: "white",
+                                                padding: "2px 8px",
+                                                borderRadius: "4px",
+                                                fontWeight: 600,
+                                                fontSize: 12,
+                                            }}>
+                                                📝 帖子
+                                            </div>
+                                            <Text style={{ fontWeight: 600, color: "#1F2937", fontSize: 14 }}>
+                                                {postCount}
+                                            </Text>
+                                        </div>
+                                        
+                                        {/* 获赞数 */}
+                                        <div style={{ 
+                                            display: "flex", 
+                                            alignItems: "center", 
+                                            gap: 6,
+                                            fontSize: 13,
+                                        }}>
+                                            <div style={{
+                                                background: "linear-gradient(135deg, #EF4444 0%, #F87171 100%)",
+                                                color: "white",
+                                                padding: "2px 8px",
+                                                borderRadius: "4px",
+                                                fontWeight: 600,
+                                                fontSize: 12,
+                                            }}>
+                                                ❤️ 获赞
+                                            </div>
+                                            <Text style={{ fontWeight: 600, color: "#1F2937", fontSize: 14 }}>
+                                                {totalLikes}
+                                            </Text>
+                                            {/* 显示明细 */}
+                                            {(postLikeCount > 0 || commentLikeCount > 0) && (
+                                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                                    (帖子{postLikeCount} + 评论{commentLikeCount})
+                                                </Text>
+                                            )}
+                                        </div>
+                                    </Space>
                                 </div>
-                                <div style={{
-                                    color: "#6B7280",
-                                    fontSize: 13,
-                                    background: "#F3F4F6",
-                                    padding: "2px 8px",
-                                    borderRadius: 4,
-                                    display: "inline-block"
-                                }}>
-                                    @{record.username || record.user?.username || record.user_username || "-"}
-                                </div>
                             </div>
-                        </div>
-                    ),
+                        );
+                    },
                 },
                 {
                     title: "等级",
-                    render: (_value: unknown, record: LeaderboardRow) => (
-                        <div style={{
-                            background: "linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)",
-                            color: "white",
-                            width: 52,
-                            height: 52,
-                            borderRadius: "50%",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontWeight: "bold",
-                            fontSize: 20,
-                            margin: "0 auto",
-                            boxShadow: "0 2px 8px rgba(245, 158, 11, 0.3)"
-                        }}>
-                            Lv.{record.level ?? 1}
-                        </div>
-                    ),
-                    width: 100,
+                    render: (_value: unknown, record: LeaderboardRow) => {
+                        const level = record.level ?? 1;
+                        const levelStyle = getLevelStyle(level);
+                        
+                        return (
+                            <Tooltip title={`等级 ${level} (${levelStyle.label})`}>
+                                <div style={{
+                                    background: levelStyle.bg,
+                                    color: "white",
+                                    width: 64,
+                                    height: 64,
+                                    borderRadius: "50%",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontWeight: "bold",
+                                    margin: "0 auto",
+                                    boxShadow: `0 4px 16px rgba(0,0,0,0.15)`,
+                                    border: `3px solid white`,
+                                }}>
+                                    <Text style={{
+                                        color: "white",
+                                        fontWeight: 800,
+                                        fontSize: 20,
+                                        lineHeight: 1,
+                                    }}>
+                                        {level}
+                                    </Text>
+                                    <Text style={{
+                                        color: "rgba(255,255,255,0.9)",
+                                        fontWeight: 600,
+                                        fontSize: 10,
+                                        marginTop: 2,
+                                    }}>
+                                        {levelStyle.label}
+                                    </Text>
+                                </div>
+                            </Tooltip>
+                        );
+                    },
+                    width: 120,
                     align: "center",
                 },
                 {
                     title: "积分",
-                    render: (_value: unknown, record: LeaderboardRow) => (
-                        <div style={{
-                            fontSize: 24,
-                            fontWeight: 700,
-                            color: "#10B981",
-                            textShadow: "0 2px 4px rgba(16, 185, 129, 0.1)"
-                        }}>
-                            {record.points ?? record.user?.points ?? 0}
-                        </div>
-                    ),
-                    width: 100,
+                    render: (_value: unknown, record: LeaderboardRow) => {
+                        const points = record.points ?? record.user?.points ?? 0;
+                        
+                        return (
+                            <div style={{ textAlign: "center" }}>
+                                <Text style={{
+                                    fontSize: 28,
+                                    fontWeight: 800,
+                                    background: "linear-gradient(135deg, #10B981 0%, #34D399 100%)",
+                                    WebkitBackgroundClip: "text",
+                                    WebkitTextFillColor: "transparent",
+                                    display: "block",
+                                }}>
+                                    {points.toLocaleString()}
+                                </Text>
+                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                    总积分
+                                </Text>
+                            </div>
+                        );
+                    },
+                    width: 120,
                     align: "center",
                 }
             ];
