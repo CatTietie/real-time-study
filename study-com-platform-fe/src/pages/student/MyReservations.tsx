@@ -10,21 +10,20 @@ import {
 } from "antd";
 import { 
   CalendarOutlined,
-  CheckCircleOutlined,
   CloseCircleOutlined,
   ClockCircleOutlined,
-  TeamOutlined
+  TeamOutlined,
+  LogoutOutlined
 } from "@ant-design/icons";
-import { getMyReservations, confirmReservation, cancelReservation, endReservation, leaveStudyRoom, forceUpdateExpired } from "../../services/studyRoom";
+import { getMyReservations, cancelReservation, leaveAndEndReservation, forceUpdateExpired, earlyExitReservation } from "../../services/studyRoom";
 import type { RoomReservation } from "../../types/study-room";
 
 const { TabPane } = Tabs;
 
-const statusMap = {
-  pending: { text: '待确认', color: 'orange' },
-  confirmed: { text: '已确认', color: 'green' },
+const statusMap: Record<string, { text: string; color: string }> = {
+  confirmed: { text: '已确认', color: 'blue' },
+  in_progress: { text: '已进入', color: 'green' },
   cancelled: { text: '已取消', color: 'red' },
-  completed: { text: '已加入', color: 'blue' },
   ended: { text: '已结束', color: 'gray' }
 };
 
@@ -104,29 +103,8 @@ export default function MyReservations() {
       key: 'action',
       render: (_: unknown, record: RoomReservation) => (
         <Space>
-          {record.status === 'pending' && (
+          {record.status === 'confirmed' && (
             <>
-              <Button 
-                type="link" 
-                icon={<CheckCircleOutlined />}
-                onClick={async () => {
-                  try {
-                    const response = await confirmReservation(record.id);
-                    if (response.success) {
-                      message.success('确认成功，预约状态已更新为已确认');
-                      // 刷新数据
-                      fetchReservations(pagination.current, pagination.pageSize, activeTab === 'all' ? undefined : activeTab);
-                    } else {
-                      message.error(response.message || '确认失败');
-                    }
-                  } catch (error) {
-                    console.error('确认失败:', error);
-                    message.error('确认失败');
-                  }
-                }}
-              >
-                确认
-              </Button>
               <Button 
                 type="link" 
                 danger
@@ -136,72 +114,42 @@ export default function MyReservations() {
                     const response = await cancelReservation(record.id);
                     if (response.success) {
                       message.success('取消预约成功');
-                      // 刷新数据
                       fetchReservations(pagination.current, pagination.pageSize, activeTab === 'all' ? undefined : activeTab);
                     } else {
                       message.error(response.message || '取消预约失败');
                     }
-                  } catch (error) {
-                    console.error('取消预约失败:', error);
+                  } catch (_error) {
                     message.error('取消预约失败');
                   }
                 }}
               >
-                取消
+                取消预约
               </Button>
             </>
           )}
-          {record.status === 'completed' && (
-            <Button 
-              type="link" 
-              icon={<TeamOutlined />}
-              onClick={async () => {
-                // 已加入状态下退出自习室并立即结束预约
-                try {
-                  // 先退出自习室
-                  const leaveResponse = await leaveStudyRoom();
-                  if (leaveResponse.success) {
-                    // 然后立即更新预约状态为已结束
-                    const endResponse = await endReservation(record.id);
-                    if (endResponse.success) {
-                      message.success('退出自习室并结束预约成功');
+          {record.status === 'in_progress' && (
+            <>
+              <Button 
+                type="link" 
+                icon={<LogoutOutlined />}
+                onClick={async () => {
+                  try {
+                    const response = await earlyExitReservation(record.id);
+                    if (response.success) {
+                      message.success('提前退出成功');
                       fetchReservations(pagination.current, pagination.pageSize, activeTab === 'all' ? undefined : activeTab);
                     } else {
-                      message.error(`结束预约失败: ${endResponse.message}`);
+                      message.error(response.message || '退出失败');
                     }
-                  } else {
-                    message.error(`退出自习室失败: ${leaveResponse.message}`);
+                  } catch (error) {
+                    console.error('提前退出操作异常:', error);
+                    message.error(`退出操作失败: ${error instanceof Error ? error.message : '未知错误'}`);
                   }
-                } catch (error) {
-                  console.error('退出操作异常:', error);
-                  message.error(`退出操作失败: ${error instanceof Error ? error.message : '未知错误'}`);
-                }
-              }}
-            >
-              退出自习室
-            </Button>
-          )}
-          {(record.status === 'confirmed' || record.status === 'completed') && (
-            <Button 
-              type="link" 
-              danger
-              icon={<CloseCircleOutlined />}
-              onClick={async () => {
-                try {
-                  const response = await cancelReservation(record.id);
-                  if (response.success) {
-                    message.success('取消预约成功');
-                    fetchReservations(pagination.current, pagination.pageSize, activeTab === 'all' ? undefined : activeTab);
-                  } else {
-                    message.error(response.message || '取消预约失败');
-                  }
-                } catch (_error) {
-                  message.error('取消预约失败');
-                }
-              }}
-            >
-              提前取消
-            </Button>
+                }}
+              >
+                提前退出
+              </Button>
+            </>
           )}
         </Space>
       )
@@ -243,9 +191,8 @@ export default function MyReservations() {
           }
         >
           <TabPane tab="全部" key="all" />
-          <TabPane tab="待确认" key="pending" />
           <TabPane tab="已确认" key="confirmed" />
-          <TabPane tab="已加入" key="completed" />
+          <TabPane tab="已进入" key="in_progress" />
           <TabPane tab="已结束" key="ended" />
           <TabPane tab="已取消" key="cancelled" />
         </Tabs>
