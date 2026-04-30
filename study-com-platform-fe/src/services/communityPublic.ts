@@ -231,4 +231,23 @@ export const fetchUserTodayStats = async () => {
   return response.data;
 };
 
+// ========================================
+// 草稿相关 API
+// ========================================
+
+export const fetchCommunityDrafts = async (params?: { page?: number; pageSize?: number }) => {
+  const response = await api.get("/community/drafts", { params });
+  return response.data;
+};
+
+export const fetchCommunityDraftDetail = async (id: number) => {
+  const response = await api.get(`/community/drafts/${id}`);
+  return response.data;
+};
+
+export const deleteCommunityDraft = async (id: number) => {
+  const response = await api.delete(`/community/drafts/${id}`);
+  return response.data;
+};
+
 

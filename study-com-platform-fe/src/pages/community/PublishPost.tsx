@@ -2,6 +2,7 @@ import {
   Button,
   Form,
   Input,
+  Modal,
   Radio,
   Select,
   Space,
@@ -14,9 +15,10 @@ import React, { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppSelector } from "../../app/hooks";
 import type { RootState } from "../../app/store";
-import { 
+import {
   createCommunityPost,
   fetchCommunityTagSuggestions,
+  fetchCommunityDrafts,
 } from "../../services/communityPublic";
 import CommunityFooter from "../../components/community/CommunityFooter";
 import RichTextEditor from "../../components/community/RichTextEditor";
@@ -32,7 +34,11 @@ import {
   CloseOutlined,
   InfoCircleOutlined,
   DownOutlined,
-  UpOutlined
+  UpOutlined,
+  SaveOutlined,
+  ReloadOutlined,
+  DeleteOutlined,
+  ClockCircleOutlined,
 } from "@ant-design/icons";
 
 const { Title, Text } = Typography;
@@ -69,6 +75,12 @@ const CATEGORY_OPTIONS = [
 // 默认占位文案
 const DEFAULT_PLACEHOLDER = "分享你的经验/问题背景...";
 
+// 草稿相关常量
+const LOCAL_STORAGE_DRAFT_KEY = "community_post_draft";
+const AUTO_SAVE_INTERVAL = 8000; // 自动保存间隔：8秒（5-10秒范围）
+const MIN_AUTO_SAVE_INTERVAL = 5000; // 最小间隔：5秒
+const MAX_AUTO_SAVE_INTERVAL = 10000; // 最大间隔：10秒
+
 // 根据分类获取占位文案
 const getPlaceholderByCategory = (category: string): string => {
   const option = CATEGORY_OPTIONS.find(opt => opt.value === category);
@@ -94,6 +106,21 @@ type PublishForm = {
   tags?: string[];
 };
 
+// 草稿数据类型
+interface DraftData {
+  title: string;
+  content: string;
+  category: string;
+  tags: string[];
+  savedAt: number; // 保存时间戳
+}
+
+// 草稿恢复弹窗数据
+interface DraftModalData {
+  visible: boolean;
+  draft: DraftData | null;
+}
+
 export default function PublishPost() {
   const navigate = useNavigate();
   const { token } = useAppSelector((state: RootState) => state.auth);
@@ -107,17 +134,203 @@ export default function PublishPost() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [showGuidelines, setShowGuidelines] = useState(false);
   const [editorContent, setEditorContent] = useState<string>("");
+  
+  // 草稿相关状态
+  const [draftModal, setDraftModal] = useState<DraftModalData>({ visible: false, draft: null });
+  const [saveDraftLoading, setSaveDraftLoading] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  
   // 记录最后一次自动填充的模板内容，用于判断用户是否修改了内容
   const lastAutoFilledTemplateRef = useRef<string | null>(null);
   const tagTimerRef = useRef<number | null>(null);
+  const autoSaveTimerRef = useRef<number | null>(null);
   const watchedTags = Form.useWatch("tags", form) || [];
   const watchedCategory = Form.useWatch("category", form) || "";
+  const watchedTitle = Form.useWatch("title", form) || "";
 
   // 监听滚动事件，改变顶部栏样式
   const handleScroll = () => {
     const scrollTop = window.scrollY;
     setIsScrolled(scrollTop > 20);
   };
+
+  // ========================================
+  // 草稿相关函数
+  // ========================================
+
+  // 检查是否有实际内容（用于判断是否需要自动保存）
+  const hasContent = useCallback(() => {
+    const hasTitle = watchedTitle && watchedTitle.trim().length > 0;
+    const hasCategory = watchedCategory && watchedCategory.length > 0;
+    const hasEditorContent = editorContent && 
+      editorContent.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim().length > 0;
+    return hasTitle || hasCategory || hasEditorContent;
+  }, [watchedTitle, watchedCategory, editorContent]);
+
+  // 从 localStorage 读取草稿
+  const loadLocalDraft = useCallback((): DraftData | null => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_DRAFT_KEY);
+      if (saved) {
+        return JSON.parse(saved) as DraftData;
+      }
+    } catch (error) {
+      console.error('读取本地草稿失败:', error);
+    }
+    return null;
+  }, []);
+
+  // 保存草稿到 localStorage
+  const saveLocalDraft = useCallback(() => {
+    try {
+      const draftData: DraftData = {
+        title: watchedTitle || '',
+        content: editorContent || '',
+        category: watchedCategory || '',
+        tags: watchedTags || [],
+        savedAt: Date.now(),
+      };
+      localStorage.setItem(LOCAL_STORAGE_DRAFT_KEY, JSON.stringify(draftData));
+      setLastSavedTime(Date.now());
+      return draftData;
+    } catch (error) {
+      console.error('保存本地草稿失败:', error);
+      return null;
+    }
+  }, [watchedTitle, editorContent, watchedCategory, watchedTags]);
+
+  // 清空本地草稿
+  const clearLocalDraft = useCallback(() => {
+    try {
+      localStorage.removeItem(LOCAL_STORAGE_DRAFT_KEY);
+      setLastSavedTime(null);
+    } catch (error) {
+      console.error('清空本地草稿失败:', error);
+    }
+  }, []);
+
+  // 恢复草稿
+  const restoreDraft = useCallback((draft: DraftData) => {
+    // 设置表单值
+    form.setFieldsValue({
+      title: draft.title,
+      category: draft.category || undefined,
+      tags: draft.tags?.length > 0 ? draft.tags : undefined,
+    });
+    // 设置编辑器内容
+    setEditorContent(draft.content || '');
+    // 更新选中的分类
+    if (draft.category) {
+      setSelectedCategory(draft.category);
+    }
+    // 记录自动填充的模板（如果是模板内容）
+    lastAutoFilledTemplateRef.current = null;
+    // 关闭弹窗
+    setDraftModal({ visible: false, draft: null });
+    // 提示用户
+    messageApi.success('已恢复草稿内容');
+  }, [form, messageApi]);
+
+  // 保存草稿到后端（同步到服务端）
+  const saveDraftToServer = useCallback(async () => {
+    if (!token) {
+      messageApi.warning('请先登录');
+      return;
+    }
+
+    // 校验必填字段（至少要有标题或内容）
+    if (!watchedTitle?.trim() && !editorContent?.replace(/<[^>]+>/g, '').trim()) {
+      messageApi.warning('请至少输入标题或内容');
+      return;
+    }
+
+    setSaveDraftLoading(true);
+    try {
+      const formData = new FormData();
+      if (watchedTitle) {
+        formData.append("title", watchedTitle.trim());
+      }
+      if (editorContent) {
+        formData.append("content", editorContent);
+      }
+      if (watchedCategory) {
+        formData.append("category", watchedCategory);
+      }
+      if (watchedTags && watchedTags.length > 0) {
+        formData.append("tags", watchedTags.join(","));
+      }
+      formData.append("isDraft", "true");
+
+      fileList.forEach((file) => {
+        if (file.originFileObj) {
+          formData.append("images", file.originFileObj);
+        }
+      });
+
+      const result = await createCommunityPost(formData);
+      
+      if (result?.success) {
+        messageApi.success('草稿已保存到服务端');
+        // 保存成功后清空本地草稿（因为已同步到服务端）
+        clearLocalDraft();
+      } else {
+        messageApi.error(result?.message || '保存草稿失败');
+      }
+    } catch (error) {
+      messageApi.error(error instanceof Error ? error.message : '保存草稿失败');
+    } finally {
+      setSaveDraftLoading(false);
+    }
+  }, [token, watchedTitle, editorContent, watchedCategory, watchedTags, fileList, messageApi, clearLocalDraft]);
+
+  // ========================================
+  // 自动保存逻辑
+  // ========================================
+
+  // 启动自动保存定时器
+  const startAutoSave = useCallback(() => {
+    // 先清除已有的定时器
+    if (autoSaveTimerRef.current !== null) {
+      window.clearInterval(autoSaveTimerRef.current);
+    }
+
+    // 创建新的定时器
+    autoSaveTimerRef.current = window.setInterval(() => {
+      // 只有当有实际内容时才保存
+      if (hasContent()) {
+        saveLocalDraft();
+        // 显示轻微的提示（可选，避免频繁打扰）
+        // messageApi.info('已自动保存');
+      }
+    }, AUTO_SAVE_INTERVAL);
+  }, [hasContent, saveLocalDraft]);
+
+  // 停止自动保存定时器
+  const stopAutoSave = useCallback(() => {
+    if (autoSaveTimerRef.current !== null) {
+      window.clearInterval(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+  }, []);
+
+  // ========================================
+  // 页面离开时的处理
+  // ========================================
+
+  // 处理页面离开（刷新或关闭）
+  const handleBeforeUnload = useCallback((event: BeforeUnloadEvent) => {
+    // 如果有未保存的内容，提示用户
+    if (hasContent()) {
+      // 立即保存一次
+      saveLocalDraft();
+      // 提示用户（现代浏览器可能不会显示自定义消息）
+      event.preventDefault();
+      event.returnValue = '您有未保存的内容，确定要离开吗？';
+      return '您有未保存的内容，确定要离开吗？';
+    }
+    return undefined;
+  }, [hasContent, saveLocalDraft]);
 
   // 添加和移除滚动监听
   React.useEffect(() => {
@@ -126,6 +339,49 @@ export default function PublishPost() {
       window.removeEventListener('scroll', handleScroll);
     };
   }, []);
+
+  // ========================================
+  // 草稿相关的 useEffect
+  // ========================================
+
+  // 页面初始化时检查是否有本地草稿
+  React.useEffect(() => {
+    const localDraft = loadLocalDraft();
+    if (localDraft) {
+      // 检查草稿是否有实际内容
+      const hasDraftContent = 
+        localDraft.title?.trim() || 
+        localDraft.category || 
+        (localDraft.content && localDraft.content.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim());
+      
+      if (hasDraftContent) {
+        // 显示草稿恢复弹窗
+        setDraftModal({ visible: true, draft: localDraft });
+      }
+    }
+  }, [loadLocalDraft]);
+
+  // 启动自动保存
+  React.useEffect(() => {
+    // 启动自动保存定时器
+    startAutoSave();
+    
+    // 组件卸载时停止自动保存
+    return () => {
+      stopAutoSave();
+    };
+  }, [startAutoSave, stopAutoSave]);
+
+  // 监听页面离开事件
+  React.useEffect(() => {
+    // 添加 beforeunload 事件监听
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // 组件卸载时移除事件监听
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [handleBeforeUnload]);
 
   // 监听分类变化，更新内容模板
   React.useEffect(() => {
@@ -211,6 +467,11 @@ export default function PublishPost() {
       setSubmitting(true);
       const result = await createCommunityPost(formData);
       messageApi.success("发帖成功，等待审核");
+      
+      // 发布成功后清空草稿
+      stopAutoSave();
+      clearLocalDraft();
+      
       form.resetFields();
       setEditorContent(""); // 清空编辑器内容
       setFileList([]);
@@ -283,6 +544,113 @@ export default function PublishPost() {
     <div className="min-h-screen bg-gray-50">
       {contextHolder}
       
+      {/* 草稿恢复弹窗 */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2">
+            <FileTextOutlined className="text-blue-500" />
+            <span>发现未发布的草稿</span>
+          </div>
+        }
+        open={draftModal.visible && draftModal.draft !== null}
+        onCancel={() => setDraftModal({ visible: false, draft: null })}
+        footer={null}
+        centered
+        destroyOnHidden
+        width={520}
+      >
+        {draftModal.draft && (
+          <div className="py-2">
+            {/* 草稿信息 */}
+            <div className="bg-gray-50 rounded-lg p-4 mb-4">
+              {/* 保存时间 */}
+              <div className="flex items-center gap-1 text-xs text-gray-400 mb-3">
+                <ClockCircleOutlined />
+                <span>
+                  保存于 {new Date(draftModal.draft.savedAt).toLocaleString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </span>
+              </div>
+              
+              {/* 草稿标题 */}
+              {draftModal.draft.title?.trim() && (
+                <div className="mb-2">
+                  <Text type="secondary" className="text-xs">标题</Text>
+                  <div className="text-base font-medium text-gray-800 mt-1">
+                    {draftModal.draft.title}
+                  </div>
+                </div>
+              )}
+              
+              {/* 草稿分类 */}
+              {draftModal.draft.category && (
+                <div className="mb-2">
+                  <Text type="secondary" className="text-xs">分类</Text>
+                  <div className="mt-1">
+                    <span className="inline-block bg-blue-50 text-blue-600 text-xs px-2 py-1 rounded">
+                      {draftModal.draft.category}
+                    </span>
+                  </div>
+                </div>
+              )}
+              
+              {/* 草稿内容预览 */}
+              {draftModal.draft.content && (
+                <div>
+                  <Text type="secondary" className="text-xs">内容预览</Text>
+                  <div 
+                    className="text-sm text-gray-600 mt-1 line-clamp-3"
+                    style={{
+                      lineHeight: '1.6',
+                      display: '-webkit-box',
+                      WebkitLineClamp: '3',
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden'
+                    }}
+                    dangerouslySetInnerHTML={{ 
+                      __html: draftModal.draft.content
+                        .replace(/<[^>]+>/g, ' ')
+                        .replace(/&nbsp;/g, ' ')
+                        .trim()
+                        .slice(0, 150) + 
+                        (draftModal.draft.content.length > 150 ? '...' : '')
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+            
+            {/* 操作按钮 */}
+            <div className="flex items-center justify-end gap-3">
+              <Button
+                onClick={() => {
+                  // 清空草稿
+                  clearLocalDraft();
+                  setDraftModal({ visible: false, draft: null });
+                  messageApi.info('已放弃草稿');
+                }}
+                icon={<DeleteOutlined />}
+              >
+                放弃草稿
+              </Button>
+              <Button
+                type="primary"
+                onClick={() => restoreDraft(draftModal.draft!)}
+                icon={<ReloadOutlined />}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                恢复草稿
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+      
       {/* 固定顶部导航栏 - 滚动时保持可见 */}
       <div 
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
@@ -292,25 +660,53 @@ export default function PublishPost() {
         }`}
       >
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Button
-            type="text"
-            icon={<HomeOutlined />}
-            onClick={() => navigate('/community')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            返回社区
-          </Button>
+          <div className="flex items-center gap-4">
+            <Button
+              type="text"
+              icon={<HomeOutlined />}
+              onClick={() => navigate('/community')}
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              返回社区
+            </Button>
+            
+            {/* 自动保存提示 */}
+            {lastSavedTime && (
+              <span className="flex items-center gap-1 text-xs text-gray-400">
+                <ClockCircleOutlined style={{ fontSize: '12px' }} />
+                <span>
+                  已保存于 {new Date(lastSavedTime).toLocaleTimeString('zh-CN', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  })}
+                </span>
+              </span>
+            )}
+          </div>
           
-          <Button
-            type="primary"
-            htmlType="submit"
-            loading={submitting}
-            onClick={() => form.submit()}
-            className="bg-blue-600 hover:bg-blue-700 border-none px-6 shadow-md"
-            icon={<SendOutlined />}
-          >
-            发布
-          </Button>
+          <div className="flex items-center gap-3">
+            {/* 保存草稿按钮 */}
+            <Button
+              type="default"
+              loading={saveDraftLoading}
+              onClick={saveDraftToServer}
+              className="border border-blue-200 text-blue-600 hover:bg-blue-50"
+              icon={<SaveOutlined />}
+            >
+              保存草稿
+            </Button>
+            
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={submitting}
+              onClick={() => form.submit()}
+              className="bg-blue-600 hover:bg-blue-700 border-none px-6 shadow-md"
+              icon={<SendOutlined />}
+            >
+              发布
+            </Button>
+          </div>
         </div>
       </div>
       

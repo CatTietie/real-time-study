@@ -2339,3 +2339,136 @@ export const getUserTodayStats = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message });
   }
 };
+
+// ========================================
+// 草稿相关接口
+// ========================================
+
+/**
+ * 获取用户的草稿列表
+ */
+export const getCommunityDrafts = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const { page = 1, pageSize = 20 } = req.query;
+    const userId = req.user.id;
+
+    const where: any = {
+      user_id: userId,
+      publish_status: 0, // 草稿状态
+    };
+
+    const total = await Post.count({ where });
+
+    const drafts = await Post.findAll({
+      where,
+      attributes: ['id', 'title', 'content', 'category', 'tags', 'images', 'created_at', 'updated_at'],
+      order: [['updated_at', 'DESC']],
+      offset: (Number(page) - 1) * Number(pageSize),
+      limit: Number(pageSize),
+      raw: true,
+    });
+
+    // 处理 tags 和 images
+    const processedDrafts = drafts.map((draft: any) => ({
+      ...draft,
+      tags: parseTags(draft.tags),
+      images: parseImages(draft.images),
+    }));
+
+    res.json({
+      success: true,
+      message: "获取草稿列表成功",
+      data: processedDrafts,
+      pagination: {
+        page: Number(page),
+        pageSize: Number(pageSize),
+        total,
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "获取草稿列表失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+/**
+ * 获取单个草稿详情
+ */
+export const getCommunityDraftDetail = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const id = Number(req.params.id);
+
+    const draft = await Post.findOne({
+      where: {
+        id,
+        user_id: req.user.id,
+        publish_status: 0, // 必须是草稿状态
+      },
+      attributes: ['id', 'title', 'content', 'category', 'tags', 'images', 'created_at', 'updated_at'],
+      raw: true,
+    });
+
+    if (!draft) {
+      return res.status(404).json({ success: false, message: "草稿不存在" });
+    }
+
+    const processedDraft = {
+      ...draft,
+      tags: parseTags(draft.tags),
+      images: parseImages(draft.images),
+    };
+
+    res.json({
+      success: true,
+      message: "获取草稿详情成功",
+      data: processedDraft,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "获取草稿详情失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+/**
+ * 删除草稿
+ */
+export const deleteCommunityDraft = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const id = Number(req.params.id);
+
+    const draft = await Post.findOne({
+      where: {
+        id,
+        user_id: req.user.id,
+        publish_status: 0, // 只能删除草稿
+      },
+    });
+
+    if (!draft) {
+      return res.status(404).json({ success: false, message: "草稿不存在" });
+    }
+
+    // 软删除
+    await draft.update({
+      publish_status: 2,
+      deleted_at: new Date(),
+    });
+
+    res.json({ success: true, message: "草稿已删除" });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "删除草稿失败";
+    res.status(500).json({ success: false, message });
+  }
+};
