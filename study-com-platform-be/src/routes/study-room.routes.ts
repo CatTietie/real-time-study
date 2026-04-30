@@ -11,6 +11,7 @@ import {
   leaveAndEndReservation,
   getHourlyAvailability,
 } from "../controllers/study-room.controller";
+import { getStudyStats, getOverallStudyStats } from "../controllers/study-stats.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { Op } from "sequelize";
 
@@ -27,6 +28,8 @@ router.use(authMiddleware);
 router.post("/reserve", reserveStudyRoom);
 router.post("/leave", leaveStudyRoom);
 router.get("/my/reservations", getMyReservations);
+router.get("/my/stats", getStudyStats);
+router.get("/my/stats/overall", getOverallStudyStats);
 
 // 预约操作接口
 router.post("/reservations/end", endReservation);

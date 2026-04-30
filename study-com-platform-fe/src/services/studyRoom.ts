@@ -74,3 +74,41 @@ export const getHourlyAvailability = async (date?: string) => {
   const response = await api.get("/study-rooms/hourly/availability", { params });
   return response.data;
 };
+
+interface DailyDuration {
+  date: string;
+  duration: number;
+}
+
+interface RoomUsage {
+  roomId: number;
+  roomName: string;
+  duration: number;
+  count: number;
+}
+
+export interface StudyStats {
+  totalDuration: number;
+  totalSessions: number;
+  dailyDurations: DailyDuration[];
+  roomUsages: RoomUsage[];
+}
+
+export interface OverallStudyStats {
+  totalDuration: number;
+  totalSessions: number;
+  roomUsages: RoomUsage[];
+}
+
+export const getStudyStats = async (month?: number, year?: number) => {
+  const params: Record<string, unknown> = {};
+  if (month !== undefined) params.month = month;
+  if (year !== undefined) params.year = year;
+  const response = await api.get("/study-rooms/my/stats", { params });
+  return response.data;
+};
+
+export const getOverallStudyStats = async () => {
+  const response = await api.get("/study-rooms/my/stats/overall");
+  return response.data;
+};
