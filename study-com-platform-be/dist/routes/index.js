@@ -15,6 +15,7 @@ const study_room_routes_1 = __importDefault(require("./study-room.routes"));
 const chat_routes_1 = __importDefault(require("./chat.routes")); // 新增
 const whiteboard_routes_1 = __importDefault(require("./whiteboard.routes")); // 新增
 const user_management_routes_1 = __importDefault(require("./user-management.routes")); // 用户管理
+const notification_routes_1 = __importDefault(require("./notification.routes")); // 通知路由
 const router = (0, express_1.Router)();
 router.use("/admin", admin_routes_1.default);
 router.use("/user", user_routes_1.default);
@@ -26,5 +27,6 @@ router.use("/study-rooms", study_room_routes_1.default);
 router.use("/chat", chat_routes_1.default); // 新增
 router.use("/whiteboard", whiteboard_routes_1.default); // 新增
 router.use("/user-management", user_management_routes_1.default); // 用户管理
+router.use("/notifications", notification_routes_1.default); // 通知路由
 exports.default = router;
 //# sourceMappingURL=index.js.map

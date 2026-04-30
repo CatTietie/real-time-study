@@ -16,6 +16,7 @@ const chat_realtime_service_1 = require("./services/chat-realtime.service");
 const whiteboard_realtime_service_1 = require("./services/whiteboard-realtime.service");
 const chat_seed_1 = require("./seed/chat.seed");
 const socketManager_1 = require("./utils/socketManager");
+const notification_cron_service_1 = require("./services/notification-cron.service");
 // 创建HTTP服务器
 const httpServer = (0, http_1.createServer)(app_1.default);
 // 初始化Socket.IO
@@ -48,6 +49,8 @@ const startServer = async () => {
             setInterval(study_room_controller_1.checkExpiredReservations, 5 * 60 * 1000);
             // 立即执行一次检查
             (0, study_room_controller_1.checkExpiredReservations)();
+            // 启动预约提醒定时任务
+            (0, notification_cron_service_1.initNotificationCron)();
         });
     }
     catch (error) {

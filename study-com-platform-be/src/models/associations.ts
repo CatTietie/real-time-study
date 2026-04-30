@@ -24,6 +24,7 @@ import ChatMessage from "./chat-message.model";
 import Whiteboard from "./whiteboard.model";
 import WhiteboardAction from "./whiteboard-action.model";
 import WhiteboardSnapshot from "./whiteboard-snapshot.model";
+import Notification from "./notification.model";
 
 export const initAssociations = () => {
   // 用户与帖子/评论/点赞
@@ -154,4 +155,14 @@ export const initAssociations = () => {
   WhiteboardSnapshot.belongsTo(Whiteboard, { foreignKey: "whiteboard_id" });
   User.hasMany(WhiteboardSnapshot, { foreignKey: "user_id" });
   WhiteboardSnapshot.belongsTo(User, { foreignKey: "user_id" });
+  
+  // 通知关联
+  User.hasMany(Notification, { foreignKey: "user_id" });
+  Notification.belongsTo(User, { foreignKey: "user_id" });
+  
+  RoomReservation.hasMany(Notification, { foreignKey: "reservation_id", constraints: false });
+  Notification.belongsTo(RoomReservation, { foreignKey: "reservation_id", as: "Reservation", constraints: false });
+  
+  ChatRoom.hasMany(Notification, { foreignKey: "chat_room_id", constraints: false });
+  Notification.belongsTo(ChatRoom, { foreignKey: "chat_room_id", as: "ChatRoom", constraints: false });
 };

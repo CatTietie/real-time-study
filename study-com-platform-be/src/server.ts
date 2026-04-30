@@ -13,6 +13,7 @@ import { initChatSockets } from './services/chat-realtime.service';
 import { initWhiteboardSockets } from './services/whiteboard-realtime.service';
 import { seedChatRooms } from './seed/chat.seed';
 import { setSocketIo } from './utils/socketManager';
+import { initNotificationCron } from './services/notification-cron.service';
 
 // 创建HTTP服务器
 const httpServer = createServer(app);
@@ -54,6 +55,9 @@ const startServer = async () => {
       setInterval(checkExpiredReservations, 5 * 60 * 1000);
       // 立即执行一次检查
       checkExpiredReservations();
+      
+      // 启动预约提醒定时任务
+      initNotificationCron();
     });
   } catch (error) {
     console.error("❌ Failed to start server:", error);

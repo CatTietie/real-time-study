@@ -150,3 +150,100 @@
 .student-layout-sider {
   animation: fadeInLeft 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
+
+/* ========== 通知下拉菜单样式 ========== */
+.notification-dropdown {
+  width: 400px;
+  max-height: 500px;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(148, 163, 184, 0.15);
+  overflow: hidden;
+}
+
+.notification-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.notification-list-container {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 380px;
+}
+
+.notification-list-container .ant-list {
+  padding: 0;
+}
+
+.notification-item {
+  padding: 12px 16px !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.5);
+}
+
+.notification-item:hover {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+}
+
+.notification-item.unread {
+  background: linear-gradient(135deg, #f8fafc 0%, #f0f9ff 100%);
+  border-left: 3px solid #1890ff;
+}
+
+.notification-item.read {
+  opacity: 0.8;
+}
+
+.notification-item.read .ant-list-item-meta-title {
+  font-weight: 400 !important;
+}
+
+.notification-item .ant-list-item-meta-title {
+  margin-bottom: 4px !important;
+}
+
+.notification-item .ant-list-item-meta-description {
+  color: #64748b;
+}
+
+.notification-footer {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-top: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.notification-footer .ant-btn-link {
+  color: #0ea5e9;
+  font-weight: 500;
+}
+
+.notification-footer .ant-btn-link:hover {
+  color: #0284c7;
+}
+
+/* 通知铃铛按钮 */
+.notification-bell-btn {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.notification-bell-btn:hover {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%) !important;
+  border-radius: 8px;
+}
+
+.notification-bell-btn .anticon-bell {
+  color: #64748b;
+  transition: color 0.3s ease;
+}
+
+.notification-bell-btn:hover .anticon-bell {
+  color: #0ea5e9;
+}
