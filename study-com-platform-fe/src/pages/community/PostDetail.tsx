@@ -855,14 +855,19 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
                 {post?.title || "求一个不把应届生当cs的城市"}
               </Title>
 
-              <Paragraph style={{
-                margin: '0 0 16px 0',
-                textAlign: 'left',
-                fontSize: 14,
-                whiteSpace: 'pre-wrap'
-              }}>
-                {post?.content || "我真有点想骂人了"}
-              </Paragraph>
+              <div 
+                className="post-content-render"
+                style={{
+                  margin: '0 0 16px 0',
+                  textAlign: 'left',
+                  fontSize: 15,
+                  lineHeight: 1.8,
+                  color: '#333',
+                }}
+                dangerouslySetInnerHTML={{ 
+                  __html: post?.content || "<p style='color: #999;'>暂无内容</p>" 
+                }}
+              />
 
               {post?.images && post.images.length > 0 && (
                 <div style={{ textAlign: 'left', marginBottom: 16 }}>
@@ -1303,6 +1308,187 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
           onChange={(e) => setReportReason(e.target.value)}
         />
       </Modal>
+
+      {/* 富文本内容渲染样式 */}
+      <style>{`
+        .post-content-render {
+          word-break: break-word;
+        }
+        
+        .post-content-render h1 {
+          font-size: 28px;
+          font-weight: 700;
+          margin: 24px 0 16px 0;
+          color: #111;
+          line-height: 1.4;
+        }
+        
+        .post-content-render h2 {
+          font-size: 24px;
+          font-weight: 600;
+          margin: 20px 0 12px 0;
+          color: #222;
+          line-height: 1.4;
+        }
+        
+        .post-content-render h3 {
+          font-size: 20px;
+          font-weight: 600;
+          margin: 16px 0 10px 0;
+          color: #333;
+          line-height: 1.4;
+        }
+        
+        .post-content-render p {
+          margin: 10px 0;
+          line-height: 1.8;
+        }
+        
+        .post-content-render strong,
+        .post-content-render b {
+          font-weight: 600;
+          color: #111;
+        }
+        
+        .post-content-render em,
+        .post-content-render i {
+          font-style: italic;
+        }
+        
+        .post-content-render u {
+          text-decoration: underline;
+        }
+        
+        .post-content-render del,
+        .post-content-render s {
+          text-decoration: line-through;
+          color: #999;
+        }
+        
+        .post-content-render ul,
+        .post-content-render ol {
+          margin: 12px 0;
+          padding-left: 24px;
+        }
+        
+        .post-content-render ul {
+          list-style-type: disc;
+        }
+        
+        .post-content-render ol {
+          list-style-type: decimal;
+        }
+        
+        .post-content-render li {
+          margin: 6px 0;
+          line-height: 1.8;
+        }
+        
+        .post-content-render blockquote {
+          border-left: 4px solid #1890ff;
+          padding: 12px 16px;
+          margin: 16px 0;
+          background-color: #f8f9fa;
+          border-radius: 0 8px 8px 0;
+          color: #666;
+          font-style: italic;
+        }
+        
+        .post-content-render blockquote p {
+          margin: 0;
+        }
+        
+        .post-content-render pre {
+          background-color: #1e1e1e;
+          color: #d4d4d4;
+          padding: 16px;
+          border-radius: 8px;
+          overflow-x: auto;
+          margin: 16px 0;
+          font-family: 'Consolas', 'Monaco', monospace;
+          font-size: 14px;
+          line-height: 1.6;
+        }
+        
+        .post-content-render pre code {
+          background: none;
+          padding: 0;
+          font-size: inherit;
+          color: inherit;
+        }
+        
+        .post-content-render code {
+          background-color: #f0f0f0;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-family: 'Consolas', 'Monaco', monospace;
+          font-size: 14px;
+          color: #e96900;
+        }
+        
+        .post-content-render a {
+          color: #1890ff;
+          text-decoration: underline;
+          cursor: pointer;
+          transition: color 0.2s;
+        }
+        
+        .post-content-render a:hover {
+          color: #40a9ff;
+        }
+        
+        .post-content-render img {
+          max-width: 100%;
+          height: auto;
+          border-radius: 8px;
+          margin: 12px 0;
+          display: block;
+        }
+        
+        .post-content-render hr {
+          border: none;
+          border-top: 1px solid #e8e8e8;
+          margin: 24px 0;
+        }
+        
+        .post-content-render table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 16px 0;
+        }
+        
+        .post-content-render table th,
+        .post-content-render table td {
+          border: 1px solid #d9d9d9;
+          padding: 8px 12px;
+          text-align: left;
+        }
+        
+        .post-content-render table th {
+          background-color: #fafafa;
+          font-weight: 600;
+        }
+        
+        /* 响应式调整 */
+        @media (max-width: 768px) {
+          .post-content-render h1 {
+            font-size: 24px;
+          }
+          
+          .post-content-render h2 {
+            font-size: 20px;
+          }
+          
+          .post-content-render h3 {
+            font-size: 18px;
+          }
+          
+          .post-content-render pre {
+            padding: 12px;
+            font-size: 13px;
+          }
+        }
+      `}</style>
     </div>
   );
 }

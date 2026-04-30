@@ -1,7 +1,6 @@
 import {
   Button,
   Form,
-  Input,
   Radio,
   Select,
   Space,
@@ -19,6 +18,7 @@ import {
   fetchCommunityTagSuggestions,
 } from "../../services/communityPublic";
 import CommunityFooter from "../../components/community/CommunityFooter";
+import RichTextEditor from "../../components/community/RichTextEditor";
 import {
   EditOutlined,
   TagsOutlined,
@@ -35,7 +35,6 @@ import {
 } from "@ant-design/icons";
 
 const { Title, Text } = Typography;
-const { TextArea } = Input;
 
 const CATEGORY_OPTIONS = [
   { 
@@ -47,14 +46,14 @@ const CATEGORY_OPTIONS = [
   { 
     value: "问题求助", 
     label: "问题求助", 
-    template: "请描述你的问题：\n\n1. 问题背景：\n2. 遇到的困难：\n3. 已尝试的方法：\n4. 期望的结果：",
+    template: '<h2>请描述你的问题：</h2><h3>1. 问题背景：</h3><p>请详细描述你遇到问题的背景和场景...</p><h3>2. 遇到的困难：</h3><p>具体描述你遇到了什么困难...</p><h3>3. 已尝试的方法：</h3><p>你已经尝试了哪些解决方案？</p><h3>4. 期望的结果：</h3><p>你期望达到什么效果？</p>',
     placeholder: "请按模板描述您的问题...",
     isStructured: true
   },
   { 
     value: "经验分享", 
     label: "经验分享", 
-    template: "分享你的经验和技巧：\n\n1. 资源/方法介绍：\n2. 适用人群：\n3. 使用建议：\n4. 注意事项：",
+    template: '<h2>分享你的经验和技巧：</h2><h3>1. 资源/方法介绍：</h3><p>详细介绍你要分享的资源或方法...</p><h3>2. 适用人群：</h3><p>这个资源/方法适合哪些人群？</p><h3>3. 使用建议：</h3><p>有什么使用建议或技巧？</p><h3>4. 注意事项：</h3><p>使用过程中需要注意什么？</p>',
     placeholder: "请按模板分享您的经验...",
     isStructured: true
   },
@@ -106,6 +105,7 @@ export default function PublishPost() {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [isScrolled, setIsScrolled] = useState(false);
   const [showGuidelines, setShowGuidelines] = useState(false);
+  const [editorContent, setEditorContent] = useState<string>("");
   // 记录最后一次自动填充的模板内容，用于判断用户是否修改了内容
   const lastAutoFilledTemplateRef = useRef<string | null>(null);
   const tagTimerRef = useRef<number | null>(null);
@@ -132,13 +132,18 @@ export default function PublishPost() {
       setSelectedCategory(watchedCategory);
       
       // 获取当前内容
-      const currentContent = form.getFieldValue('content') || '';
+      const currentContent = editorContent || '';
       const lastTemplate = lastAutoFilledTemplateRef.current;
       
       // 判断是否应该自动填充模板：
-      // 1. 当前内容为空
+      // 1. 当前内容为空或只有默认空标签
       // 2. 或者当前内容等于上一次自动填充的模板（说明用户没有修改）
-      const shouldAutoFill = !currentContent.trim() || 
+      const isEmptyContent = !currentContent || 
+        currentContent.trim() === '' || 
+        currentContent === '<p></p>' || 
+        currentContent === '<p><br></p>';
+      
+      const shouldAutoFill = isEmptyContent || 
         (lastTemplate !== null && currentContent === lastTemplate);
       
       if (shouldAutoFill) {
@@ -147,17 +152,17 @@ export default function PublishPost() {
         
         if (newTemplate) {
           // 对于结构化模板（问题求助、经验分享），自动填充内容
-          form.setFieldsValue({ content: newTemplate });
+          setEditorContent(newTemplate);
           // 记录这次自动填充的模板
           lastAutoFilledTemplateRef.current = newTemplate;
         } else {
           // 对于非结构化模板（学习心得、聊天交友），清空内容（使用placeholder）
-          form.setFieldsValue({ content: '' });
+          setEditorContent('');
           lastAutoFilledTemplateRef.current = null;
         }
       }
     }
-  }, [watchedCategory, selectedCategory, form]);
+  }, [watchedCategory, selectedCategory, editorContent]);
 
   const handleSubmit = async (values: PublishForm) => {
     if (!token) {
@@ -175,14 +180,21 @@ export default function PublishPost() {
       messageApi.warning("请选择帖子分类");
       return;
     }
-    if (!values.content || !values.content.trim()) {
+    
+    // 校验富文本内容：去除HTML标签后检查是否有实际内容
+    const plainContent = editorContent
+      .replace(/<[^>]+>/g, '') // 去除HTML标签
+      .replace(/&nbsp;/g, ' ') // 替换HTML空格
+      .trim();
+    
+    if (!plainContent) {
       messageApi.warning("请输入帖子内容");
       return;
     }
 
     const formData = new FormData();
     formData.append("title", values.title.trim());
-    formData.append("content", values.content.trim());
+    formData.append("content", editorContent); // 直接使用HTML格式的内容
     formData.append("category", values.category);
     if (values.tags && values.tags.length) {
       formData.append("tags", values.tags.join(","));
@@ -199,6 +211,7 @@ export default function PublishPost() {
       const result = await createCommunityPost(formData);
       messageApi.success("发帖成功，等待审核");
       form.resetFields();
+      setEditorContent(""); // 清空编辑器内容
       setFileList([]);
       lastAutoFilledTemplateRef.current = null;
       
@@ -397,33 +410,15 @@ export default function PublishPost() {
                   )}
                 </div>
               </div>
-              <Form.Item
-                name="content"
-                rules={[{ required: true, message: "请输入内容" }]}
-                className="mb-0"
-              >
-                <TextArea
-                  placeholder={watchedCategory 
-                    ? getPlaceholderByCategory(watchedCategory)
-                    : DEFAULT_PLACEHOLDER
-                  }
-                  maxLength={5000}
-                  autoSize={{ minRows: 10, maxRows: 30 }}
-                  className="border-none shadow-none outline-none focus:ring-0 px-0 py-2 text-base text-gray-700 placeholder:text-gray-300 resize-none"
-                  style={{
-                    border: 'none',
-                    boxShadow: 'none',
-                    outline: 'none',
-                    paddingLeft: 0,
-                    paddingRight: 0,
-                    backgroundColor: 'transparent',
-                    fontSize: '16px',
-                    lineHeight: '1.8',
-                    resize: 'none',
-                    minHeight: '200px',
-                  }}
-                />
-              </Form.Item>
+              <RichTextEditor
+                value={editorContent}
+                onChange={setEditorContent}
+                placeholder={watchedCategory 
+                  ? getPlaceholderByCategory(watchedCategory)
+                  : DEFAULT_PLACEHOLDER
+                }
+                maxLength={50000}
+              />
               {/* 分类模板提示 */}
               {watchedCategory && (
                 <div className="mt-3 text-xs text-gray-400 flex items-center gap-1">
