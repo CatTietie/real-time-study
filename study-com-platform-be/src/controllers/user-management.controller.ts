@@ -3,6 +3,7 @@ import User from '../models/user.model';
 import UserRole from '../models/user-role.model';
 import Role from '../models/role.model';
 import { hashPassword, comparePassword } from '../utils/password';
+import { validatePasswordStrength } from '../utils/validator';
 import { Op } from 'sequelize';
 
 class UserController {
@@ -191,6 +192,15 @@ class UserController {
       const isValid = await comparePassword(oldPassword, user.password);
       if (!isValid) {
         return res.status(400).json({ success: false, message: '原密码错误' });
+      }
+
+      // 密码强度校验（与注册时的校验逻辑一致）
+      const passwordStrength = validatePasswordStrength(newPassword);
+      if (!passwordStrength.isValid) {
+        return res.status(400).json({ 
+          success: false, 
+          message: passwordStrength.message 
+        });
       }
 
       // 加密新密码

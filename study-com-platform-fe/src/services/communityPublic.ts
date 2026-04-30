@@ -34,6 +34,7 @@ export const createCommunityPost = async (
         category: string;
         tags?: string[];
         isDraft?: boolean;
+        forwardPostId?: number;
       },
 ) => {
   const isFormData = payload instanceof FormData;
