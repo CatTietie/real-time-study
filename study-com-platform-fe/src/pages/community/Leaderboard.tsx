@@ -34,21 +34,22 @@ type LeaderboardRow = {
     like_count?: number;
     comment_count?: number;
     user?: { nickname?: string; username?: string; points?: number };
-    // 添加浏览量字段
     view_count?: number;
-    // 评论数量字段
     commentCount?: number;
-    // 作者信息字段
     author?: { nickname?: string; username?: string };
     author_nickname?: string;
     author_username?: string;
-    // 新增后端计算的热度值
     heat_score?: number;
-    // 社区达人榜新增字段
     avatar?: string;
-    post_count?: number; // 发帖数
-    post_like_count?: number; // 帖子获赞数
-    comment_like_count?: number; // 评论获赞数
+    post_count?: number;
+    post_like_count?: number;
+    comment_like_count?: number;
+    // 评论之星新增字段
+    period_comment_count?: number;
+    total_comment_count?: number;
+    last_comment_time?: string;
+    period_type?: string;
+    period_label?: string;
 };
 
 type HeatRules = {
@@ -59,34 +60,103 @@ type HeatRules = {
     description: string;
 };
 
+// 数据缓存类型
+type CachedData = {
+    posts: {
+        [timeRange: string]: {
+            data: LeaderboardRow[];
+            heatRules: HeatRules | null;
+            timestamp: number;
+        };
+    };
+    users: {
+        data: LeaderboardRow[];
+        timestamp: number;
+    };
+    comments: {
+        data: LeaderboardRow[];
+        timestamp: number;
+    };
+};
+
+// 缓存过期时间（5分钟）
+const CACHE_EXPIRE_TIME = 5 * 60 * 1000;
+
+// 初始化缓存
+const initialCache: CachedData = {
+    posts: {},
+    users: { data: [], timestamp: 0 },
+    comments: { data: [], timestamp: 0 },
+};
+
 export default function Leaderboard() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const [data, setData] = useState<LeaderboardRow[]>([]);
     const [loading, setLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState("posts"); // 改为标签页形式
-    const [timeRange, setTimeRange] = useState<string>("all"); // 时间筛选
-    const [heatRules, setHeatRules] = useState<HeatRules | null>(null); // 热度计算规则
+    const [activeTab, setActiveTab] = useState("posts");
+    const [timeRange, setTimeRange] = useState<string>("all");
+    const [heatRules, setHeatRules] = useState<HeatRules | null>(null);
+    const [cache, setCache] = useState<CachedData>(initialCache);
+    const [tabTransitioning, setTabTransitioning] = useState(false);
+
+    // 检查缓存是否有效
+    const isValidCache = (timestamp: number) => {
+        return Date.now() - timestamp < CACHE_EXPIRE_TIME;
+    };
+
+    // 切换标签页（带动画）
+    const handleTabChange = (newTab: string) => {
+        if (newTab === activeTab) return;
+        
+        setTabTransitioning(true);
+        
+        setTimeout(() => {
+            setActiveTab(newTab);
+            // 如果是热门内容榜，重置时间筛选为all
+            if (newTab !== "posts") {
+                setTimeRange("all");
+            }
+            setTabTransitioning(false);
+        }, 200);
+    };
 
     const loadData = useCallback(
         async () => {
+            // 检查缓存
+            if (activeTab === "posts") {
+                const cached = cache.posts[timeRange];
+                if (cached && isValidCache(cached.timestamp)) {
+                    setData(cached.data.slice(0, 10));
+                    setHeatRules(cached.heatRules);
+                    return;
+                }
+            } else if (activeTab === "users") {
+                if (cache.users.data.length > 0 && isValidCache(cache.users.timestamp)) {
+                    setData(cache.users.data.slice(0, 10));
+                    return;
+                }
+            } else if (activeTab === "comments") {
+                if (cache.comments.data.length > 0 && isValidCache(cache.comments.timestamp)) {
+                    setData(cache.comments.data.slice(0, 10));
+                    return;
+                }
+            }
+
             setLoading(true);
             try {
-                // 根据活动标签映射对应的类型
                 const typeMap = {
-                    posts: "post_hot", // 修改为热门内容（包含浏览量）
+                    posts: "post_hot",
                     users: "total",
-                    comments: "comment_count" // 修改为评论数量排行
+                    comments: "comment_count"
                 };
 
-                // 只有热门内容榜支持时间筛选
                 const actualTimeRange = activeTab === "posts" ? timeRange : undefined;
                 const res = await fetchCommunityLeaderboardByType(
                     typeMap[activeTab as keyof typeof typeMap], 
                     actualTimeRange
                 );
 
-                // 如果是热门内容榜，保存热度计算规则
                 if (activeTab === "posts" && res?.heat_rules) {
                     setHeatRules(res.heat_rules);
                 }
@@ -95,23 +165,52 @@ export default function Leaderboard() {
                     (item, index) => ({
                         ...item,
                         key: item.key ?? item.id ?? index,
-                        // 确保作者信息有值 - 适配后端返回的字段名
                         author_nickname: item.user_nickname || item.author?.nickname || item.Post?.User?.nickname || item.nickname,
                         author_username: item.user_username || item.author?.username || item.Post?.User?.username || item.username,
                     }),
                 );
-                // 只取前10条数据
+                
                 const list = fullList.slice(0, 10);
                 setData(list);
-                
-                // 添加加载完成提示（可选，根据用户体验调整）
+
+                // 更新缓存
+                const now = Date.now();
+                if (activeTab === "posts") {
+                    setCache(prev => ({
+                        ...prev,
+                        posts: {
+                            ...prev.posts,
+                            [timeRange]: {
+                                data: fullList,
+                                heatRules: res?.heat_rules || null,
+                                timestamp: now,
+                            },
+                        },
+                    }));
+                } else if (activeTab === "users") {
+                    setCache(prev => ({
+                        ...prev,
+                        users: {
+                            data: fullList,
+                            timestamp: now,
+                        },
+                    }));
+                } else if (activeTab === "comments") {
+                    setCache(prev => ({
+                        ...prev,
+                        comments: {
+                            data: fullList,
+                            timestamp: now,
+                        },
+                    }));
+                }
             } catch (err) {
                 message.error(err instanceof Error ? err.message : "加载失败");
             } finally {
                 setLoading(false);
             }
         },
-        [activeTab, timeRange],
+        [activeTab, timeRange, cache],
     );
 
     useEffect(() => {
@@ -739,117 +838,278 @@ export default function Leaderboard() {
                 }
             ];
         } else { // comments - 评论之星
+            // 格式化最新评论时间
+            const formatLastCommentTime = (timeStr: string | undefined) => {
+                if (!timeStr) return null;
+                const now = new Date();
+                const commentTime = new Date(timeStr);
+                const diffHours = (now.getTime() - commentTime.getTime()) / (1000 * 60 * 60);
+                
+                if (diffHours < 1) {
+                    return "活跃中";
+                } else if (diffHours < 24) {
+                    return `${Math.floor(diffHours)}小时前";
+                } else {
+                    return `${Math.floor(diffHours / 24)}天前";
+                }
+            };
+            
+            // 检查是否活跃（24小时内有评论）
+            const isActive = (timeStr: string | undefined) => {
+                if (!timeStr) return false;
+                const now = new Date();
+                const commentTime = new Date(timeStr);
+                const diffHours = (now.getTime() - commentTime.getTime()) / (1000 * 60 * 60);
+                return diffHours < 24;
+            };
+
             return [
                 ...baseColumns,
                 {
                     title: "评论达人",
-                    render: (_value: unknown, record: LeaderboardRow) => (
-                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                            <div style={{
-                                width: 44,
-                                height: 44,
-                                background: "linear-gradient(135deg, #10B981 0%, #34D399 100%)",
-                                borderRadius: "50%",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                color: "white",
-                                fontWeight: "bold",
-                                fontSize: 18
-                            }}>
-                                {(record.user?.nickname || record.nickname || record.user_nickname || "U").charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                                <div style={{
-                                    fontWeight: 600,
-                                    color: "#1F2937",
-                                    marginBottom: 2,
-                                    fontSize: 15
-                                }}>
-                                    {record.user?.nickname || record.nickname || record.user_nickname || "匿名用户"}
-                                </div>
-                                <div style={{
-                                    color: "#6B7280",
-                                    fontSize: 13
-                                }}>
-                                    @{record.user?.username || record.username || record.user_username || "-"}
-                                </div>
-                            </div>
-                        </div>
-                    ),
-                },
-                {
-                    title: "评论数",
-                    render: (_value: unknown, record: LeaderboardRow) => (
-                        <div style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: 8,
-                            background: "#E0F2FE",
-                            padding: "12px 16px",
-                            borderRadius: 12,
-                            border: "1px solid #7DD3FC",
-                            minWidth: 120
-                        }}>
-                            <MessageOutlined style={{ color: "#0EA5E9", fontSize: 16 }} />
-                            <Text style={{
-                                color: "#0369A1",
-                                fontWeight: 700,
-                                fontSize: 24
-                            }}>
-                                {record.commentCount || record.comment_count || 0}
-                            </Text>
-                            <Text style={{
-                                color: "#0EA5E9",
-                                fontWeight: 600,
-                                fontSize: 12
-                            }}>
-                                条
-                            </Text>
-                        </div>
-                    ),
-                    width: 140,
-                    align: "center",
-                },
-                {
-                    title: "达人等级",
                     render: (_value: unknown, record: LeaderboardRow) => {
-                        const commentCount = record.commentCount || record.comment_count || 0;
-                        let badge = "💬 新秀";
-                        let color = "#10B981";
-                        let bgColor = "#D1FAE5";
-
-                        if (commentCount > 100) {
-                            badge = "🏆 评论家";
-                            color = "#8B5CF6";
-                            bgColor = "#EDE9FE";
-                        } else if (commentCount > 50) {
-                            badge = "⭐ 活跃";
-                            color = "#F59E0B";
-                            bgColor = "#FEF3C7";
-                        } else if (commentCount > 20) {
-                            badge = "💬 积极";
-                            color = "#0EA5E9";
-                            bgColor = "#E0F2FE";
-                        }
-
+                        const nickname = record.nickname || record.user?.nickname || record.user_nickname || "匿名用户";
+                        const username = record.username || record.user?.username || record.user_username || "-";
+                        const avatar = record.avatar;
+                        const lastCommentTime = record.last_comment_time;
+                        const userId = record.id;
+                        const isUserActive = isActive(lastCommentTime);
+                        const lastTimeLabel = formatLastCommentTime(lastCommentTime);
+                        
                         return (
-                            <div style={{
-                                background: bgColor,
-                                padding: "8px 16px",
-                                borderRadius: 20,
-                                border: `2px solid ${color}`,
-                                color: color,
-                                fontWeight: 700,
-                                fontSize: 13,
-                                display: "inline-block"
-                            }}>
-                                {badge}
+                            <div 
+                                style={{ 
+                                    display: "flex", 
+                                    alignItems: "center", 
+                                    gap: 14,
+                                    cursor: "pointer",
+                                    padding: "6px 10px",
+                                    borderRadius: "10px",
+                                    transition: "all 0.2s ease",
+                                }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (userId) {
+                                        navigate(`/community/user/${userId}`);
+                                    }
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = "rgba(102, 126, 234, 0.05)";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = "transparent";
+                                }}
+                            >
+                                {/* 头像 */}
+                                <div style={{ position: "relative" }}>
+                                    {avatar ? (
+                                        <img
+                                            src={avatar}
+                                            alt={nickname}
+                                            style={{
+                                                width: 52,
+                                                height: 52,
+                                                borderRadius: "50%",
+                                                objectFit: "cover",
+                                                border: "2px solid #E5E7EB",
+                                            }}
+                                        />
+                                    ) : (
+                                        <div style={{
+                                            width: 52,
+                                            height: 52,
+                                            background: "linear-gradient(135deg, #0EA5E9 0%, #38BDF8 100%)",
+                                            borderRadius: "50%",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            color: "white",
+                                            fontWeight: "bold",
+                                            fontSize: 20,
+                                        }}>
+                                            {nickname.charAt(0).toUpperCase()}
+                                        </div>
+                                    )}
+                                    {/* 活跃状态指示器 */}
+                                    {isUserActive && (
+                                        <div style={{
+                                            position: "absolute",
+                                            bottom: 0,
+                                            right: 0,
+                                            width: 14,
+                                            height: 14,
+                                            background: "#10B981",
+                                            borderRadius: "50%",
+                                            border: "2px solid white",
+                                            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                                        }} />
+                                    )}
+                                </div>
+                                
+                                {/* 用户信息 */}
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ 
+                                        display: "flex", 
+                                        alignItems: "center", 
+                                        gap: 8, 
+                                        marginBottom: 4,
+                                    }}>
+                                        <Text style={{
+                                            fontWeight: 700,
+                                            color: "#1F2937",
+                                            fontSize: 15,
+                                        }}>
+                                            {nickname}
+                                        </Text>
+                                        {/* 活跃状态标签 */}
+                                        {isUserActive && lastTimeLabel === "活跃中" && (
+                                            <Tag color="success" style={{
+                                                margin: 0,
+                                                fontSize: 11,
+                                                padding: "1px 6px",
+                                            }}>
+                                                🔥 活跃中
+                                            </Tag>
+                                        )}
+                                    </div>
+                                    <div style={{ 
+                                        display: "flex", 
+                                        alignItems: "center", 
+                                        gap: 10,
+                                    }}>
+                                        <Text style={{
+                                            color: "#9CA3AF",
+                                            fontSize: 12,
+                                        }}>
+                                            @{username}
+                                        </Text>
+                                        {/* 最后评论时间 */}
+                                        {lastTimeLabel && lastTimeLabel !== "活跃中" && (
+                                            <Text style={{
+                                                color: "#D1D5DB",
+                                                fontSize: 11,
+                                            }}>
+                                                最后评论：{lastTimeLabel}
+                                            </Text>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         );
                     },
-                    width: 120,
+                },
+                {
+                    title: "近7天评论",
+                    render: (_value: unknown, record: LeaderboardRow) => {
+                        const periodCount = record.period_comment_count ?? record.comment_count ?? record.commentCount ?? 0;
+                        const totalCount = record.total_comment_count ?? 0;
+                        
+                        // 根据评论数量确定样式等级
+                        let badgeColor = "";
+                        let bgGradient = "";
+                        let textColor = "";
+                        
+                        if (periodCount >= 30) {
+                            badgeColor = "🏆";
+                            bgGradient = "linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)";
+                            textColor = "white";
+                        } else if (periodCount >= 15) {
+                            badgeColor = "⭐";
+                            bgGradient = "linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)";
+                            textColor = "white";
+                        } else if (periodCount >= 5) {
+                            badgeColor = "💬";
+                            bgGradient = "linear-gradient(135deg, #0EA5E9 0%, #38BDF8 100%)";
+                            textColor = "white";
+                        } else {
+                            badgeColor = "📝";
+                            bgGradient = "#F3F4F6";
+                            textColor = "#4B5563";
+                        }
+
+                        const tooltipContent = totalCount > 0 ? (
+                            <div style={{ fontSize: 12 }}>
+                                <div style={{ fontWeight: "bold", marginBottom: 6 }}>评论统计</div>
+                                <div>📅 近7天：<span style={{ fontWeight: "bold", color: "#10B981" }}>{periodCount} 条</span></div>
+                                <div>📊 历史总计：<span style={{ fontWeight: "bold", color: "#3B82F6" }}>{totalCount} 条</span></div>
+                                <div style={{ marginTop: 6, color: "#D1D5DB", fontSize: 11, borderTop: "1px solid rgba(255,255,255,0.2)", paddingTop: 6 }}>
+                                    排名依据：近7天评论数量
+                                </div>
+                            </div>
+                        ) : undefined;
+
+                        const commentDisplay = (
+                            <div style={{
+                                background: bgGradient,
+                                padding: "14px 20px",
+                                borderRadius: 16,
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                minWidth: 110,
+                                boxShadow: periodCount >= 15 ? "0 4px 12px rgba(0,0,0,0.1)" : "none",
+                            }}>
+                                <div style={{ 
+                                    display: "flex", 
+                                    alignItems: "center", 
+                                    gap: 6,
+                                    marginBottom: 2,
+                                }}>
+                                    <span style={{ fontSize: 14 }}>{badgeColor}</span>
+                                </div>
+                                <Text style={{
+                                    color: textColor,
+                                    fontWeight: 800,
+                                    fontSize: 28,
+                                    lineHeight: 1,
+                                }}>
+                                    {periodCount}
+                                </Text>
+                                <Text style={{
+                                    color: textColor === "white" ? "rgba(255,255,255,0.9)" : "#9CA3AF",
+                                    fontWeight: 600,
+                                    fontSize: 11,
+                                    marginTop: 2,
+                                }}>
+                                    条
+                                </Text>
+                            </div>
+                        );
+
+                        if (tooltipContent) {
+                            return (
+                                <Tooltip title={tooltipContent} placement="topRight">
+                                    {commentDisplay}
+                                </Tooltip>
+                            );
+                        }
+
+                        return commentDisplay;
+                    },
+                    width: 150,
+                    align: "center",
+                },
+                {
+                    title: "等级",
+                    render: (_value: unknown, record: LeaderboardRow) => {
+                        const level = record.level ?? 1;
+                        
+                        // 弱化显示等级
+                        return (
+                            <div style={{
+                                textAlign: "center" }}>
+                                <Text style={{
+                                    fontSize: 16,
+                                    fontWeight: 600,
+                                    color: "#6B7280",
+                                }}>
+                                    Lv.{level}
+                                </Text>
+                            </div>
+                        );
+                    },
+                    width: 100,
                     align: "center",
                 }
             ];
@@ -984,7 +1244,7 @@ export default function Leaderboard() {
                     {tabs.map(tab => (
                         <div
                             key={tab.key}
-                            onClick={() => setActiveTab(tab.key)}
+                            onClick={() => handleTabChange(tab.key)}
                             style={{
                                 background: activeTab === tab.key
                                     ? "white"
@@ -1008,7 +1268,8 @@ export default function Leaderboard() {
                                 flexDirection: "column",
                                 textAlign: "center",
                                 position: "relative",
-                                overflow: "hidden"
+                                overflow: "hidden",
+                                opacity: tabTransitioning ? 0.6 : 1,
                             }}
                             onMouseEnter={(e) => {
                                 if (activeTab !== tab.key) {
@@ -1061,38 +1322,6 @@ export default function Leaderboard() {
                     ))}
                 </div>
 
-                {/* 时间筛选 - 仅热门内容榜显示 */}
-                {activeTab === "posts" && (
-                    <div style={{
-                        display: "flex",
-                        justifyContent: "center",
-                        marginBottom: 24,
-                    }}>
-                        <Radio.Group 
-                            value={timeRange} 
-                            onChange={(e) => setTimeRange(e.target.value)}
-                            buttonStyle="solid"
-                        >
-                            <Radio.Button value="today" style={{
-                                borderRadius: "8px 0 0 8px",
-                            }}>
-                                今日
-                            </Radio.Button>
-                            <Radio.Button value="week" style={{
-                                borderLeft: "none",
-                                borderRight: "none",
-                            }}>
-                                本周
-                            </Radio.Button>
-                            <Radio.Button value="all" style={{
-                                borderRadius: "0 8px 8px 0",
-                            }}>
-                                全部
-                            </Radio.Button>
-                        </Radio.Group>
-                    </div>
-                )}
-
                 {/* 排行榜卡片 */}
                 <Card
                     loading={loading}
@@ -1123,7 +1352,7 @@ export default function Leaderboard() {
                                 background: "white",
                                 borderRadius: 4
                             }} />
-                            <div>
+                            <div style={{ flex: 1 }}>
                                 <Title level={4} style={{
                                     margin: 0,
                                     color: "white",
@@ -1139,6 +1368,56 @@ export default function Leaderboard() {
                                     {tabs.find(t => t.key === activeTab)?.description}
                                 </div>
                             </div>
+                            
+                            {/* 时间筛选 - 仅热门内容榜显示，移至头部栏中间 */}
+                            {activeTab === "posts" && (
+                                <div style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                }}>
+                                    <Radio.Group 
+                                        value={timeRange} 
+                                        onChange={(e) => setTimeRange(e.target.value)}
+                                        buttonStyle="solid"
+                                        style={{
+                                            background: "rgba(255, 255, 255, 0.15)",
+                                            borderRadius: "8px",
+                                            padding: "2px",
+                                        }}
+                                    >
+                                        <Radio.Button value="today" style={{
+                                            background: "transparent",
+                                            border: "none",
+                                            color: timeRange === "today" ? "#1F2937" : "rgba(255, 255, 255, 0.85)",
+                                            fontWeight: 500,
+                                            borderRadius: "6px",
+                                        }}>
+                                            今日
+                                        </Radio.Button>
+                                        <Radio.Button value="week" style={{
+                                            background: "transparent",
+                                            border: "none",
+                                            borderLeft: "1px solid rgba(255, 255, 255, 0.2)",
+                                            color: timeRange === "week" ? "#1F2937" : "rgba(255, 255, 255, 0.85)",
+                                            fontWeight: 500,
+                                            borderRadius: "6px",
+                                        }}>
+                                            本周
+                                        </Radio.Button>
+                                        <Radio.Button value="all" style={{
+                                            background: "transparent",
+                                            border: "none",
+                                            borderLeft: "1px solid rgba(255, 255, 255, 0.2)",
+                                            color: timeRange === "all" ? "#1F2937" : "rgba(255, 255, 255, 0.85)",
+                                            fontWeight: 500,
+                                            borderRadius: "6px",
+                                        }}>
+                                            全部
+                                        </Radio.Button>
+                                    </Radio.Group>
+                                </div>
+                            )}
+                            
                             <div style={{
                                 marginLeft: "auto",
                                 background: "rgba(255, 255, 255, 0.2)",

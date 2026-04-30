@@ -968,6 +968,13 @@ const getStartOfWeek = () => {
   return start;
 };
 
+const getStartOfNDaysAgo = (days: number) => {
+  const start = new Date();
+  start.setDate(start.getDate() - days);
+  start.setHours(0, 0, 0, 0);
+  return start;
+};
+
 export const getCommunityLeaderboard = async (req: Request, res: Response) => {
   try {
     const type = String((req.query as any)?.type || "total");
@@ -1047,11 +1054,15 @@ export const getCommunityLeaderboard = async (req: Request, res: Response) => {
     }
 
     if (type === "comment_count") {
-      // 评论之星榜 - 按评论数量统计
-      const rows = await Comment.findAll({
+      // 评论之星榜 - 区分总评论数和周期（近7天）评论数
+      const sevenDaysAgo = getStartOfNDaysAgo(7);
+      
+      // 1. 先查询所有有评论的用户的基础数据（总评论数）
+      const totalRows = await Comment.findAll({
         attributes: [
           "user_id",
-          [Sequelize.fn("COUNT", Sequelize.col("Comment.id")), "comment_count"],
+          [Sequelize.fn("COUNT", Sequelize.col("Comment.id")), "total_comment_count"],
+          [Sequelize.fn("MAX", Sequelize.col("Comment.created_at")), "last_comment_time"],
         ],
         where: { status: 1 },
         group: ["user_id"],
@@ -1059,23 +1070,71 @@ export const getCommunityLeaderboard = async (req: Request, res: Response) => {
           model: User,
           attributes: ["id", "nickname", "username", "avatar", "points"]
         }],
-        order: [[Sequelize.literal("comment_count"), "DESC"]],
-        limit: 50,
+        limit: 200,
       });
-
-      const data = rows.map((row: any) => {
+      
+      // 2. 查询近7天的评论数
+      const periodRows = await Comment.findAll({
+        attributes: [
+          "user_id",
+          [Sequelize.fn("COUNT", Sequelize.col("Comment.id")), "period_comment_count"],
+        ],
+        where: { 
+          status: 1,
+          created_at: { [Op.gte]: sevenDaysAgo }
+        },
+        group: ["user_id"],
+        raw: true,
+      });
+      
+      // 3. 构建周期评论数的Map
+      const periodMap = new Map<number, number>();
+      periodRows.forEach((item: any) => {
+        periodMap.set(Number(item.user_id), Number(item.period_comment_count || 0));
+      });
+      
+      // 4. 组合数据并按周期评论数排序
+      const combinedData = totalRows.map((row: any) => {
         const rawData = row.toJSON();
+        const userId = Number(rawData.user_id);
+        const totalCount = Number(rawData.total_comment_count || 0);
+        const periodCount = periodMap.get(userId) || 0;
+        
         return {
-          id: rawData.user_id,
+          id: userId,
           nickname: rawData.User?.nickname,
           username: rawData.User?.username,
           avatar: rawData.User?.avatar,
+          points: Number(rawData.User?.points || 0),
           level: calculateLevel(Number(rawData.User?.points || 0)),
-          comment_count: Number(rawData.comment_count || 0),
+          // 周期评论数（近7天）- 默认用这个排序
+          comment_count: periodCount,
+          period_comment_count: periodCount,
+          total_comment_count: totalCount,
+          // 最新评论时间
+          last_comment_time: rawData.last_comment_time,
+          // 周期类型
+          period_type: "7days",
+          period_label: "近7天",
         };
       });
+      
+      // 按周期评论数降序排序
+      combinedData.sort((a, b) => b.period_comment_count - a.period_comment_count);
+      
+      // 只取前50条
+      const data = combinedData.slice(0, 50);
 
-      return res.json({ success: true, message: "获取排行榜成功", data });
+      return res.json({ 
+        success: true, 
+        message: "获取排行榜成功", 
+        data,
+        meta: {
+          period_type: "7days",
+          period_label: "近7天",
+          description: "评论之星榜默认按近7天评论数排序，更公平地反映近期活跃度"
+        }
+      });
     }
 
     // 默认是 total - 社区达人榜（按总积分排行）
