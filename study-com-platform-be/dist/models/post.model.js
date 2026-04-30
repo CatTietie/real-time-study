@@ -103,6 +103,24 @@ Post.init({
         type: sequelize_1.DataTypes.DATE,
         comment: "删除时间（回收站）",
     },
+    forward_post_id: {
+        type: sequelize_1.DataTypes.INTEGER,
+        allowNull: true,
+        comment: "转发的原帖ID",
+        references: {
+            model: "posts",
+            key: "id",
+        },
+    },
+    forward_user_id: {
+        type: sequelize_1.DataTypes.INTEGER,
+        allowNull: true,
+        comment: "被转发的原作者ID",
+        references: {
+            model: "users",
+            key: "id",
+        },
+    },
 }, {
     sequelize: sequelize_2.sequelize,
     modelName: "Post",
@@ -117,6 +135,8 @@ Post.init({
         { fields: ["category"] },
         { fields: ["created_at"] },
         { fields: ["audit_admin_id"] },
+        { fields: ["forward_post_id"] },
+        { fields: ["forward_user_id"] },
     ],
 });
 exports.default = Post;
