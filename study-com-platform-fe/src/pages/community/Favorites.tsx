@@ -2,22 +2,31 @@ import {
   Avatar,
   Button,
   Card,
-  Divider,
-  List,
+  Input,
+  Select,
   Space,
   Tag,
   Typography,
   message,
+  Spin,
+  Empty,
 } from "antd";
-import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+} from "react";
+import { useNavigate } from "react-router-dom";
 import { deleteFavorite, fetchFavorites } from "../../services/communityPublic";
 import CommunityFooter from "../../components/community/CommunityFooter";
-import { HomeOutlined } from "@ant-design/icons";
+import { HomeOutlined, SearchOutlined, FilterOutlined } from "@ant-design/icons";
 
-const { Title, Paragraph, Text } = Typography;
+const { Title, Text } = Typography;
+const { Search } = Input;
+
 const API_BASE = (
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8081/api"
 ).replace(/\/$/, "");
 const IMAGE_BASE = API_BASE.replace(/\/api$/, "");
 const resolveImageUrl = (src?: string) => {
@@ -38,6 +47,25 @@ const parseImages = (images?: string | string[]) => {
     return [];
   }
 };
+
+const parseTags = (tags?: string) => {
+  if (!tags) return [];
+  try {
+    const parsed = JSON.parse(tags);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+type SortOption = "created_at" | "view_count" | "like_count" | "comment_count";
+
+const SORT_OPTIONS = [
+  { value: "created_at", label: "最新收藏" },
+  { value: "view_count", label: "最多浏览" },
+  { value: "like_count", label: "最多点赞" },
+  { value: "comment_count", label: "最多评论" },
+];
 
 type FavoriteRow = {
   id: number;
@@ -69,7 +97,7 @@ type FavoritePost = {
   title: string;
   content: string;
   category?: string;
-  tags?: string;
+  tags: string[];
   images?: string[];
   createdAt?: string;
   view_count?: number;
@@ -78,57 +106,234 @@ type FavoritePost = {
   User?: { nickname?: string; username?: string };
 };
 
+const stripText = (value?: string) =>
+  (value || "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const formatTime = (dateStr?: string) => {
+  if (!dateStr) return "-";
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+
+  if (diff < 60 * 1000) return "刚刚";
+  if (diff < 60 * 60 * 1000) return `${Math.floor(diff / (60 * 1000))}分钟前`;
+  if (diff < 24 * 60 * 60 * 1000) return `${Math.floor(diff / (60 * 60 * 1000))}小时前`;
+  if (diff < 7 * 24 * 60 * 60 * 1000) return `${Math.floor(diff / (24 * 60 * 60 * 1000))}天前`;
+  return date.toLocaleDateString("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+};
+
 export default function Favorites() {
   const navigate = useNavigate();
   const [favorites, setFavorites] = useState<FavoriteRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
+  const [pageSize] = useState(12);
   const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [keyword, setKeyword] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("created_at");
+  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
+  const [hoverFavoriteId, setHoverFavoriteId] = useState<number | null>(null);
+  const [removingId, setRemovingId] = useState<number | null>(null);
 
-  const loadFavorites = async (pageNo = page) => {
-    setLoading(true);
+  const searchInputRef = useRef("");
+  const searchTimerRef = useRef<number | null>(null);
+  const fetchingMoreRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const hasLoadedRef = useRef(false);
+  const lastKeywordRef = useRef<string | null>(null);
+  const lastSortByRef = useRef<SortOption | null>(null);
+
+  const allTags = new Set<string>();
+  favorites.forEach((fav) => {
+    if (fav.Post?.tags) {
+      const tags = parseTags(fav.Post.tags);
+      tags.forEach((tag) => allTags.add(tag));
+    }
+  });
+
+  const loadFavorites = useCallback(
+    async (pageNo: number, append = false, isSearch = false) => {
+      if (fetchingMoreRef.current && append) return;
+      fetchingMoreRef.current = true;
+
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+
+      const trimmedKeyword = keyword.trim();
+      
+      if (!append && hasLoadedRef.current) {
+        if (lastKeywordRef.current === trimmedKeyword && lastSortByRef.current === sortBy) {
+          fetchingMoreRef.current = false;
+          return;
+        }
+      }
+
+      if (append) {
+        setLoadingMore(true);
+      } else if (isSearch) {
+        setSearching(true);
+      } else {
+        setLoading(true);
+      }
+
+      try {
+        const res = await fetchFavorites({
+          page: pageNo,
+          pageSize,
+          keyword: trimmedKeyword || undefined,
+          sortBy,
+          sortOrder: sortBy === "created_at" ? "DESC" : "DESC",
+        });
+
+        const newData = res?.data || [];
+        const newTotal = res?.pagination?.total || 0;
+
+        if (append) {
+          setFavorites((prev) => [...prev, ...newData]);
+        } else {
+          setFavorites(newData);
+          hasLoadedRef.current = true;
+          lastKeywordRef.current = trimmedKeyword;
+          lastSortByRef.current = sortBy;
+        }
+        setTotal(newTotal);
+        setPage(pageNo);
+        setHasMore((pageNo - 1) * pageSize + newData.length < newTotal);
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+        } else {
+          message.error(err instanceof Error ? err.message : "加载收藏失败");
+        }
+      } finally {
+        setLoading(false);
+        setSearching(false);
+        setLoadingMore(false);
+        fetchingMoreRef.current = false;
+        if (abortControllerRef.current) {
+          abortControllerRef.current = null;
+        }
+      }
+    },
+    [keyword, sortBy, pageSize]
+  );
+
+  useEffect(() => {
+    loadFavorites(1, false, keyword !== lastKeywordRef.current && hasLoadedRef.current);
+  }, [keyword, sortBy]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!hasMore || loading || loadingMore || searching || fetchingMoreRef.current) return;
+
+      const scrollTop = window.scrollY;
+      const windowHeight = window.innerHeight;
+      const docHeight = document.documentElement.scrollHeight;
+
+      if (scrollTop + windowHeight >= docHeight - 200) {
+        loadFavorites(page + 1, true);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [hasMore, loading, loadingMore, searching, page, loadFavorites]);
+
+  const handleSearch = (value: string) => {
+    if (searchTimerRef.current) {
+      window.clearTimeout(searchTimerRef.current);
+    }
+    setKeyword(value);
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    searchInputRef.current = value;
+
+    if (searchTimerRef.current) {
+      window.clearTimeout(searchTimerRef.current);
+    }
+
+    searchTimerRef.current = window.setTimeout(() => {
+      if (hasLoadedRef.current && searchInputRef.current.trim() === lastKeywordRef.current) {
+        return;
+      }
+      setKeyword(searchInputRef.current);
+    }, 400);
+  };
+
+  const handleTagClick = (tag: string) => {
+    setSelectedTags((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(tag)) {
+        newSet.delete(tag);
+      } else {
+        newSet.add(tag);
+      }
+      return newSet;
+    });
+  };
+
+  const handleClearTags = () => {
+    setSelectedTags(new Set());
+  };
+
+  const handleRemoveFavorite = async (favoriteId: number) => {
     try {
-      const res = await fetchFavorites({
-        page: pageNo,
-        pageSize,
-      });
-      setFavorites(res?.data || []);
-      setTotal(res?.pagination?.total || 0);
-      setPage(pageNo);
+      setRemovingId(favoriteId);
+      await deleteFavorite(favoriteId);
+      message.success("已取消收藏");
+      setFavorites((prev) => prev.filter((f) => f.id !== favoriteId));
+      setTotal((prev) => prev - 1);
     } catch (err) {
-      message.error(err instanceof Error ? err.message : "加载收藏失败");
+      message.error("取消收藏失败");
     } finally {
-      setLoading(false);
+      setRemovingId(null);
     }
   };
 
-  useEffect(() => {
-    loadFavorites(1);
-  }, []);
+  const handlePostClick = (postId: number) => {
+    navigate(`/community?postId=${postId}`);
+  };
 
-  const items = useMemo(() => {
-    return favorites
-      .map((fav) => {
-        if (!fav.Post) return null;
-        const favoriteAt = fav.createdAt || fav.created_at;
-        const postCreatedAt = fav.Post.createdAt || fav.Post.created_at;
-        return {
-          favoriteId: fav.id,
-          favoriteAt,
-          ...fav.Post,
-          createdAt: postCreatedAt,
-          images: parseImages(fav.Post.images),
-        } as FavoritePost;
-      })
-      .filter(Boolean) as FavoritePost[];
-  }, [favorites]);
+  const filteredItems: FavoritePost[] = favorites
+    .map((fav) => {
+      if (!fav.Post) return null;
+      const favoriteAt = fav.createdAt || fav.created_at;
+      const postCreatedAt = fav.Post.createdAt || fav.Post.created_at;
+      const postTags = parseTags(fav.Post.tags);
 
-  const stripText = (value?: string) =>
-    (value || "")
-      .replace(/<[^>]+>/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
+      if (selectedTags.size > 0) {
+        const hasMatch = Array.from(selectedTags).some((tag) =>
+          postTags.includes(tag)
+        );
+        if (!hasMatch) return null;
+      }
+
+      return {
+        favoriteId: fav.id,
+        favoriteAt,
+        ...fav.Post,
+        tags: postTags,
+        createdAt: postCreatedAt,
+        images: parseImages(fav.Post.images),
+      } as FavoritePost;
+    })
+    .filter(Boolean) as FavoritePost[];
+
+  const hasFavorites = total > 0;
+  const hasFilteredItems = filteredItems.length > 0;
 
   return (
     <div
@@ -136,19 +341,18 @@ export default function Favorites() {
       style={{
         minHeight: "100vh",
         background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-        padding: "24px 16px",
-        position: "relative"
+        padding: "20px 16px 40px",
+        position: "relative",
       }}
     >
-      {/* 返回按钮 */}
       <Button
         type="text"
         icon={<HomeOutlined />}
-        onClick={() => navigate('/community')}
+        onClick={() => navigate("/community")}
         style={{
           position: "absolute",
-          top: 24,
-          left: 24,
+          top: 20,
+          left: 20,
           zIndex: 10,
           background: "rgba(255, 255, 255, 0.95)",
           backdropFilter: "blur(10px)",
@@ -173,261 +377,577 @@ export default function Favorites() {
       >
         返回社区
       </Button>
-      
-      {/* 装饰背景 */}
-      <div style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        height: 200,
-        background: "linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 100%)"
-      }} />
-      
-      <div style={{
-        maxWidth: 1200,
-        margin: "0 auto",
-        position: "relative",
-        zIndex: 1
-      }}>
-        {/* 标题区域 */}
-        <div style={{
-          textAlign: "center",
-          marginBottom: 32,
-          paddingTop: 16
-        }}>
-          <div style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 12,
-            background: "rgba(255, 255, 255, 0.95)",
-            padding: "16px 32px",
-            borderRadius: 20,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
-            marginBottom: 16,
-            backdropFilter: "blur(10px)",
-            border: "1px solid rgba(255, 255, 255, 0.3)"
-          }}>
-            <Title
-              level={2}
-              style={{
-                margin: 0,
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                fontWeight: 800,
-                fontSize: 32
-              }}
-            >
-              我的收藏
-            </Title>
-          </div>
-        </div>
-        
+
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 200,
+          background:
+            "linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 100%)",
+          pointerEvents: "none",
+        }}
+      />
+
+      <div
+        style={{
+          maxWidth: 1200,
+          margin: "0 auto",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
         <Card
           style={{
-            borderRadius: 24,
-            boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+            borderRadius: 20,
+            boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
             border: "none",
-            background: "white",
-            overflow: "hidden",
-            position: "relative"
+            background: "rgba(255, 255, 255, 0.95)",
+            backdropFilter: "blur(20px)",
+            marginBottom: 20,
           }}
-          styles={{ body: { padding: 0 } }}
+          styles={{ body: { padding: "20px 24px" } }}
         >
-          <div style={{
-            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-            padding: "24px 32px",
-            color: "white"
-          }}>
-            <div style={{
+          <div
+            style={{
               display: "flex",
+              flexWrap: "wrap",
               alignItems: "center",
-              gap: 12
-            }}>
-              <div style={{
-                width: 8,
-                height: 32,
-                background: "white",
-                borderRadius: 4
-              }} />
-              <div>
-                <Title level={4} style={{
-                  margin: 0,
-                  color: "white",
-                  fontWeight: 600
-                }}>
-                  收藏的帖子
-                </Title>
-                <div style={{
-                  fontSize: 13,
-                  opacity: 0.9,
-                  marginTop: 4
-                }}>
-                  管理和查看您收藏的所有帖子
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <List
-            loading={loading}
-            dataSource={items}
-            pagination={{
-              current: page,
-              pageSize,
-              total,
-              onChange: (p) => loadFavorites(p),
-              showSizeChanger: false,
-              showQuickJumper: true,
+              justifyContent: "space-between",
+              gap: 16,
+              marginBottom: 16,
             }}
-            renderItem={(item) => {
-              const summary = stripText(item.content).slice(0, 120);
-              const cover = resolveImageUrl(item.images?.[0]);
-              return (
-                <List.Item>
-                  <div
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
+              <Title
+                level={2}
+                style={{
+                  margin: 0,
+                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  fontWeight: 800,
+                  fontSize: 28,
+                }}
+              >
+                我的收藏
+              </Title>
+              <Tag
+                color="purple"
+                style={{
+                  fontSize: 14,
+                  padding: "4px 12px",
+                  borderRadius: 12,
+                  fontWeight: 600,
+                }}
+              >
+                共 {total} 个
+              </Tag>
+            </div>
+
+            <Space
+              wrap
+              style={{
+                flex: 1,
+                maxWidth: 600,
+                minWidth: 200,
+                justifyContent: "flex-end",
+              }}
+            >
+              <Search
+                placeholder="搜索收藏的帖子..."
+                allowClear
+                prefix={<SearchOutlined style={{ color: "#999" }} />}
+                value={keyword}
+                onChange={handleSearchChange}
+                onSearch={handleSearch}
+                style={{ width: 280 }}
+                size="large"
+              />
+              <Select
+                value={sortBy}
+                onChange={(value) => setSortBy(value as SortOption)}
+                style={{ width: 140 }}
+                size="large"
+                options={SORT_OPTIONS}
+                suffixIcon={<FilterOutlined />}
+              />
+            </Space>
+          </div>
+
+          {allTags.size > 0 && (
+            <div
+              style={{
+                paddingTop: 16,
+                borderTop: "1px solid #f0f0f0",
+              }}
+            >
+              <Space wrap align="center">
+                <Text type="secondary" style={{ fontSize: 13 }}>
+                  标签筛选：
+                </Text>
+                {Array.from(allTags).map((tag) => (
+                  <Tag
+                    key={tag}
+                    color={selectedTags.has(tag) ? "purple" : "default"}
                     style={{
-                      display: "grid",
-                      gridTemplateColumns: cover ? "1fr 120px" : "1fr",
-                      gap: 16,
-                      alignItems: "center",
-                      padding: "20px 24px",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      padding: "4px 12px",
+                      borderRadius: 8,
+                      transition: "all 0.2s ease",
+                      border: selectedTags.has(tag)
+                        ? "1px solid #722ed1"
+                        : "1px solid #d9d9d9",
+                      background: selectedTags.has(tag) ? "#f9f0ff" : "#fff",
+                      fontWeight: selectedTags.has(tag) ? 600 : 400,
+                    }}
+                    onClick={() => handleTagClick(tag)}
+                  >
+                    #{tag}
+                  </Tag>
+                ))}
+                {selectedTags.size > 0 && (
+                  <Button
+                    type="link"
+                    size="small"
+                    onClick={handleClearTags}
+                    style={{ fontSize: 12 }}
+                  >
+                    清除筛选
+                  </Button>
+                )}
+              </Space>
+            </div>
+          )}
+        </Card>
+
+        {loading && favorites.length === 0 ? (
+          <div
+            style={{
+              textAlign: "center",
+              padding: 80,
+              background: "rgba(255, 255, 255, 0.9)",
+              borderRadius: 20,
+            }}
+          >
+            <Spin size="large" />
+          </div>
+        ) : !hasFavorites ? (
+          <Card
+            style={{
+              borderRadius: 20,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
+              border: "none",
+              background: "rgba(255, 255, 255, 0.95)",
+              backdropFilter: "blur(20px)",
+            }}
+          >
+            <div
+              style={{
+                textAlign: "center",
+                padding: "60px 20px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 80,
+                  marginBottom: 24,
+                }}
+              >
+                📚
+              </div>
+              <Title
+                level={3}
+                style={{
+                  margin: "0 0 12px 0",
+                  color: "#333",
+                  fontWeight: 600,
+                }}
+              >
+                还没有收藏的内容
+              </Title>
+              <Text
+                type="secondary"
+                style={{
+                  fontSize: 15,
+                  display: "block",
+                  marginBottom: 32,
+                }}
+              >
+                去社区发现有趣的内容，收藏喜欢的帖子吧～
+              </Text>
+              <Button
+                type="primary"
+                size="large"
+                onClick={() => navigate("/community")}
+                style={{
+                  borderRadius: 24,
+                  height: 48,
+                  padding: "0 32px",
+                  fontSize: 16,
+                  background:
+                    "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                  border: "none",
+                  boxShadow: "0 4px 16px rgba(102, 126, 234, 0.4)",
+                }}
+              >
+                去逛逛 👉
+              </Button>
+            </div>
+          </Card>
+        ) : (
+          <>
+            {searching && (
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: 16,
+                  marginBottom: 16,
+                  background: "rgba(255, 255, 255, 0.9)",
+                  borderRadius: 16,
+                  backdropFilter: "blur(10px)",
+                }}
+              >
+                <Spin size="small" />
+                <Text type="secondary" style={{ marginLeft: 8, fontSize: 13 }}>
+                  搜索中...
+                </Text>
+              </div>
+            )}
+
+            {!hasFilteredItems && !searching ? (
+              <Card
+                style={{
+                  borderRadius: 20,
+                  boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
+                  border: "none",
+                  background: "rgba(255, 255, 255, 0.95)",
+                }}
+              >
+                <Empty
+                  description={
+                    <Text type="secondary" style={{ fontSize: 15 }}>
+                      没有找到匹配的收藏内容
+                    </Text>
+                  }
+                  style={{ padding: "60px 20px" }}
+                />
+              </Card>
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fill, minmax(320px, 1fr))",
+                  gap: 20,
+                  marginBottom: 20,
+                  opacity: searching ? 0.6 : 1,
+                  transition: "opacity 0.2s ease",
+                }}
+              >
+                {filteredItems.map((item) => (
+                  <Card
+                    key={item.favoriteId}
+                    loading={removingId === item.favoriteId}
+                    hoverable
+                    style={{
+                      borderRadius: 16,
+                      boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+                      border: "1px solid rgba(0,0,0,0.04)",
+                      background: "rgba(255, 255, 255, 0.95)",
                       transition: "all 0.3s ease",
-                      borderBottom: "1px solid #F3F4F6"
+                    }}
+                    styles={{
+                      body: { padding: 20 },
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "#F9FAFB";
+                      e.currentTarget.style.transform = "translateY(-4px)";
+                      e.currentTarget.style.boxShadow =
+                        "0 12px 24px rgba(102, 126, 234, 0.15)";
+                      e.currentTarget.style.background = "#fff";
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "transparent";
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow =
+                        "0 2px 12px rgba(0,0,0,0.06)";
+                      e.currentTarget.style.background =
+                        "rgba(255, 255, 255, 0.95)";
                     }}
                   >
-                    <Space direction="vertical" style={{ width: "100%" }}>
-                      <Space wrap>
-                        {item.category && (
-                          <Tag color="blue">{item.category}</Tag>
-                        )}
-                        <Link to={`/community/posts/${item.id}`}>
-                          <Typography.Text strong style={{ fontSize: 16, color: "#1F2937" }}>
-                            {item.title}
-                          </Typography.Text>
-                        </Link>
-                        <Tag color="gold">⭐ 已收藏</Tag>
-                      </Space>
-                      
-                      <Typography.Paragraph 
-                        ellipsis={{ rows: 2 }} 
-                        style={{ color: "#6B7280", margin: "8px 0" }}
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        height: "100%",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          justifyContent: "space-between",
+                          marginBottom: 12,
+                          gap: 12,
+                        }}
                       >
-                        {summary}
-                        {summary.length >= 120 ? "...【阅读更多】" : ""}
-                      </Typography.Paragraph>
-                      
-                      <Space wrap size="small">
-                        <Avatar size={20} style={{
-                          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-                        }}>
-                          {
-                            (item.User?.nickname ||
-                              item.User?.username ||
-                              "U")[0]
-                          }
-                        </Avatar>
-                        <Typography.Text type="secondary">
-                          {item.User?.nickname || item.User?.username || "未知"}
-                        </Typography.Text>
-                        <Typography.Text type="secondary">·</Typography.Text>
-                        <Typography.Text type="secondary">
-                          {item.createdAt
-                            ? new Date(item.createdAt).toLocaleString()
-                            : "-"}
-                        </Typography.Text>
-                        <Typography.Text type="secondary">
-                          · 👁️ {item.view_count || 0}
-                        </Typography.Text>
-                        {item.favoriteAt && (
-                          <Typography.Text type="secondary">
-                            · 📌 收藏于：
-                            {new Date(item.favoriteAt).toLocaleString()}
-                          </Typography.Text>
-                        )}
-                      </Space>
-                      
-                      {item.tags && (
-                        <Space wrap>
-                          {(() => {
-                            try {
-                              return JSON.parse(item.tags);
-                            } catch {
-                              return [];
-                            }
-                          })().map((tag: string) => (
-                            <Tag key={tag} color="purple">#{tag}</Tag>
-                          ))}
-                        </Space>
-                      )}
-                      
-                      <Divider style={{ margin: "12px 0" }} />
-                      
-                      <Space wrap>
-                        <Typography.Text>👍 {item.like_count || 0}</Typography.Text>
-                        <Typography.Text>💬 {item.comment_count || 0}</Typography.Text>
-                        <Button
-                          size="small"
-                          danger
-                          onClick={async () => {
-                            await deleteFavorite(item.favoriteId);
-                            loadFavorites(page);
-                          }}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          {item.category && (
+                            <Tag
+                              color="blue"
+                              style={{
+                                marginBottom: 8,
+                                borderRadius: 6,
+                              }}
+                            >
+                              {item.category}
+                            </Tag>
+                          )}
+                          <Text
+                            strong
+                            style={{
+                              fontSize: 16,
+                              color: "#1F2937",
+                              cursor: "pointer",
+                              display: "block",
+                              lineHeight: 1.5,
+                              transition: "color 0.2s",
+                            }}
+                            onClick={() => handlePostClick(item.id)}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.color = "#667eea";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.color = "#1F2937";
+                            }}
+                          >
+                            {item.title}
+                          </Text>
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          marginBottom: 16,
+                          minHeight: 88,
+                          overflow: "hidden",
+                        }}
+                      >
+                        <Text
+                          type="secondary"
                           style={{
-                            marginLeft: "auto"
+                            fontSize: 14,
+                            lineHeight: 1.55,
+                            color: "#6B7280",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 4,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                            margin: 0,
+                            whiteSpace: "normal",
                           }}
                         >
-                          取消收藏
-                        </Button>
-                      </Space>
-                    </Space>
-                    
-                    {cover && (
-                      <Image
-                        src={cover}
-                        alt={item.title}
-                        style={{
-                          width: 120,
-                          height: 90,
-                          objectFit: "cover",
-                          borderRadius: 8,
-                        }}
-                        preview={false}
-                      />
-                    )}
-                  </div>
-                </List.Item>
-              );
-            }}
-          />
-        </Card>
-        
-        {/* 底部信息 */}
-        <div style={{
-          textAlign: "center",
-          marginTop: 24,
-          color: "rgba(255, 255, 255, 0.9)",
-          fontSize: 14,
-          background: "rgba(255, 255, 255, 0.1)",
-          padding: "16px",
-          borderRadius: 12,
-          backdropFilter: "blur(10px)",
-          border: "1px solid rgba(255, 255, 255, 0.2)"
-        }}>
-          <p style={{ margin: 0 }}>⭐ <strong>您可以在这里管理和查看所有收藏的帖子</strong></p>
-          <p style={{ margin: "8px 0 0 0", fontSize: 13, opacity: 0.8 }}>
-            点击帖子标题查看详情，或点击"取消收藏"按钮移除不需要的收藏
-          </p>
-        </div>
+                          {stripText(item.content) || "暂无内容"}
+                        </Text>
+                      </div>
+
+                      {item.tags.length > 0 && (
+                        <Space wrap size={6} style={{ marginBottom: 16 }}>
+                          {item.tags.slice(0, 4).map((tag) => (
+                            <Tag
+                              key={tag}
+                              color={selectedTags.has(tag) ? "purple" : "default"}
+                              style={{
+                                cursor: "pointer",
+                                fontSize: 12,
+                                padding: "2px 8px",
+                                borderRadius: 6,
+                                transition: "all 0.2s ease",
+                                border: selectedTags.has(tag)
+                                  ? "1px solid #722ed1"
+                                  : "1px solid #e8e8e8",
+                                background: selectedTags.has(tag)
+                                  ? "#f9f0ff"
+                                  : "#fafafa",
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleTagClick(tag);
+                              }}
+                            >
+                              #{tag}
+                            </Tag>
+                          ))}
+                          {item.tags.length > 4 && (
+                            <Tag
+                              style={{
+                                fontSize: 12,
+                                padding: "2px 8px",
+                                borderRadius: 6,
+                                background: "#f5f5f5",
+                                border: "1px solid #e8e8e8",
+                              }}
+                            >
+                              +{item.tags.length - 4}
+                            </Tag>
+                          )}
+                        </Space>
+                      )}
+
+                      <div style={{ marginTop: "auto" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            paddingTop: 12,
+                            borderTop: "1px solid #f0f0f0",
+                          }}
+                        >
+                          <Space size="small" wrap>
+                            <Avatar
+                              size={22}
+                              style={{
+                                background:
+                                  "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                fontSize: 12,
+                              }}
+                            >
+                              {(
+                                item.User?.nickname ||
+                                item.User?.username ||
+                                "U"
+                              )[0]}
+                            </Avatar>
+                            <Text
+                              type="secondary"
+                              style={{ fontSize: 12 }}
+                            >
+                              {item.User?.nickname ||
+                                item.User?.username ||
+                                "未知"}
+                            </Text>
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              ·
+                            </Text>
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              {formatTime(item.createdAt)}
+                            </Text>
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              · 👁️ {item.view_count || 0}
+                            </Text>
+                          </Space>
+                        </div>
+
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            marginTop: 12,
+                          }}
+                        >
+                          <Space size={16}>
+                            <Text
+                              type="secondary"
+                              style={{ fontSize: 13, color: "#6B7280" }}
+                            >
+                              👍 {item.like_count || 0}
+                            </Text>
+                            <Text
+                              type="secondary"
+                              style={{ fontSize: 13, color: "#6B7280" }}
+                            >
+                              💬 {item.comment_count || 0}
+                            </Text>
+                          </Space>
+
+                          <Button
+                            size="small"
+                            style={{
+                              borderRadius: 16,
+                              padding: "4px 12px",
+                              height: 28,
+                              fontSize: 12,
+                              background:
+                                hoverFavoriteId === item.favoriteId
+                                  ? "#fff1f0"
+                                  : "#fffbe6",
+                              borderColor:
+                                hoverFavoriteId === item.favoriteId
+                                  ? "#ffccc7"
+                                  : "#ffe58f",
+                              color:
+                                hoverFavoriteId === item.favoriteId
+                                  ? "#cf1322"
+                                  : "#d48806",
+                              transition: "all 0.2s ease",
+                              fontWeight: 500,
+                            }}
+                            onMouseEnter={() =>
+                              setHoverFavoriteId(item.favoriteId)
+                            }
+                            onMouseLeave={() => setHoverFavoriteId(null)}
+                            onClick={() => handleRemoveFavorite(item.favoriteId)}
+                          >
+                            {hoverFavoriteId === item.favoriteId
+                              ? "取消收藏"
+                              : "⭐ 已收藏"}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {loadingMore && (
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: 20,
+                  background: "rgba(255, 255, 255, 0.9)",
+                  borderRadius: 16,
+                }}
+              >
+                <Spin />
+                <Text
+                  type="secondary"
+                  style={{ marginLeft: 8, fontSize: 13 }}
+                >
+                  加载更多...
+                </Text>
+              </div>
+            )}
+
+            {!hasMore && hasFilteredItems && !searching && (
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: "20px 0",
+                }}
+              >
+                <Text
+                  type="secondary"
+                  style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}
+                >
+                  —— 没有更多了 ——
+                </Text>
+              </div>
+            )}
+          </>
+        )}
       </div>
-      
+
       <CommunityFooter
         style={{
           marginTop: 48,
@@ -435,7 +955,7 @@ export default function Favorites() {
           backdropFilter: "blur(10px)",
           borderRadius: 16,
           padding: 24,
-          border: "1px solid rgba(255, 255, 255, 0.2)"
+          border: "1px solid rgba(255, 255, 255, 0.2)",
         }}
       />
     </div>
