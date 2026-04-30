@@ -6,9 +6,12 @@ import {
   createCommunityReport,
   deleteCommunityComment,
   deleteCommunityPost,
+  deleteCommunityDraft,
   deleteFavorite,
   deleteFavoriteFolder,
   getCommunityComments,
+  getCommunityDrafts,
+  getCommunityDraftDetail,
   getCommunityLeaderboard,
   getCommunityPostComments,
   getCommunityPostDetail,
@@ -89,5 +92,10 @@ router.get("/profile/summary", authMiddleware, getCommunityProfileSummary);
 
 // 用户今日统计
 router.get("/user/today-stats", authMiddleware, getUserTodayStats);
+
+// 草稿相关路由
+router.get("/drafts", authMiddleware, getCommunityDrafts);
+router.get("/drafts/:id", authMiddleware, getCommunityDraftDetail);
+router.delete("/drafts/:id", authMiddleware, deleteCommunityDraft);
 
 export default router;
