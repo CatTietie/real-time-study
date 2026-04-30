@@ -1482,7 +1482,7 @@ export const getFavorites = async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, message: "未授权访问" });
     }
 
-    const { page = 1, pageSize = 10, folderId, keyword, category } = req.query;
+    const { page = 1, pageSize = 10, folderId, keyword, category, sortBy, sortOrder } = req.query;
     const where: any = { user_id: req.user.id };
     if (folderId) where.folder_id = Number(folderId);
 
@@ -1493,6 +1493,29 @@ export const getFavorites = async (req: Request, res: Response) => {
         { title: { [Op.like]: `%${keyword}%` } },
         { content: { [Op.like]: `%${keyword}%` } },
       ];
+    }
+
+    let orderBy: any;
+    const order = sortBy || "created_at";
+    const orderDir = (sortOrder as string)?.toUpperCase() === "ASC" ? "ASC" : "DESC";
+
+    if (order === "view_count") {
+      orderBy = [
+        [Sequelize.col("Post.view_count"), orderDir],
+        [Sequelize.col("created_at"), "DESC"],
+      ];
+    } else if (order === "like_count") {
+      orderBy = [
+        [Sequelize.col("Post.like_count"), orderDir],
+        [Sequelize.col("created_at"), "DESC"],
+      ];
+    } else if (order === "comment_count") {
+      orderBy = [
+        [Sequelize.col("Post.comment_count"), orderDir],
+        [Sequelize.col("created_at"), "DESC"],
+      ];
+    } else {
+      orderBy = [[Sequelize.col("created_at"), orderDir]];
     }
 
     const result = await Favorite.findAndCountAll({
@@ -1508,7 +1531,7 @@ export const getFavorites = async (req: Request, res: Response) => {
         },
         { model: FavoriteFolder, attributes: ["id", "name"] },
       ],
-      order: [[Sequelize.col("created_at"), "DESC"]],
+      order: orderBy,
       offset: (Number(page) - 1) * Number(pageSize),
       limit: Number(pageSize),
     });
