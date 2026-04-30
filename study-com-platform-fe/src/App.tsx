@@ -24,6 +24,7 @@ import Leaderboard from "./pages/community/Leaderboard";
 import Favorites from "./pages/community/Favorites";
 import PointsCenter from "./pages/community/PointsCenter";
 import MyLikes from "./pages/community/MyLikes";
+import UserProfile from "./pages/community/UserProfile";
 import StudentDashboard from "./pages/student/Dashboard";
 import LearningAnalytics from "./pages/student/LearningAnalytics";
 import ProfileEdit from "./pages/student/ProfileEdit";
@@ -66,6 +67,7 @@ function App() {
         <Route path="/community/publish" element={<PublishPost />} />
         <Route path="/community/posts/:id" element={<PostDetailRedirect />} />
         <Route path="/community/leaderboard" element={<Leaderboard />} />
+        <Route path="/community/user/:userId" element={<UserProfile />} />
         <Route path="/community/favorites" element={<Favorites />} />
         <Route path="/community/likes" element={<MyLikes />} />
         <Route path="/community/points" element={<PointsCenter />} />

@@ -523,8 +523,10 @@ export default function Leaderboard() {
                                 }}
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    // 目前没有个人主页，显示提示
-                                    message.info("个人主页功能开发中，敬请期待");
+                                    // 跳转到用户个人主页
+                                    if (record.id) {
+                                        navigate(`/community/user/${record.id}`);
+                                    }
                                 }}
                             >
                                 {/* 头像 - 放大显示 */}
