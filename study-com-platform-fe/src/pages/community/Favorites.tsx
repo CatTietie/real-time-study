@@ -149,8 +149,9 @@ export default function Favorites() {
   const searchTimerRef = useRef<number | null>(null);
   const fetchingMoreRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const lastKeywordRef = useRef<string>("");
-  const lastSortByRef = useRef<SortOption>("created_at");
+  const hasLoadedRef = useRef(false);
+  const lastKeywordRef = useRef<string | null>(null);
+  const lastSortByRef = useRef<SortOption | null>(null);
 
   const allTags = new Set<string>();
   favorites.forEach((fav) => {
@@ -171,7 +172,8 @@ export default function Favorites() {
       abortControllerRef.current = new AbortController();
 
       const trimmedKeyword = keyword.trim();
-      if (!append) {
+      
+      if (!append && hasLoadedRef.current) {
         if (lastKeywordRef.current === trimmedKeyword && lastSortByRef.current === sortBy) {
           fetchingMoreRef.current = false;
           return;
@@ -202,6 +204,7 @@ export default function Favorites() {
           setFavorites((prev) => [...prev, ...newData]);
         } else {
           setFavorites(newData);
+          hasLoadedRef.current = true;
           lastKeywordRef.current = trimmedKeyword;
           lastSortByRef.current = sortBy;
         }
@@ -227,7 +230,7 @@ export default function Favorites() {
   );
 
   useEffect(() => {
-    loadFavorites(1, false, keyword !== lastKeywordRef.current);
+    loadFavorites(1, false, keyword !== lastKeywordRef.current && hasLoadedRef.current);
   }, [keyword, sortBy]);
 
   useEffect(() => {
@@ -263,7 +266,7 @@ export default function Favorites() {
     }
 
     searchTimerRef.current = window.setTimeout(() => {
-      if (searchInputRef.current.trim() === lastKeywordRef.current) {
+      if (hasLoadedRef.current && searchInputRef.current.trim() === lastKeywordRef.current) {
         return;
       }
       setKeyword(searchInputRef.current);
@@ -734,7 +737,7 @@ export default function Favorites() {
                       <div
                         style={{
                           marginBottom: 16,
-                          minHeight: 45,
+                          minHeight: 88,
                           overflow: "hidden",
                         }}
                       >
@@ -742,13 +745,14 @@ export default function Favorites() {
                           type="secondary"
                           style={{
                             fontSize: 14,
-                            lineHeight: 1.6,
+                            lineHeight: 1.55,
                             color: "#6B7280",
                             display: "-webkit-box",
-                            WebkitLineClamp: 2,
+                            WebkitLineClamp: 4,
                             WebkitBoxOrient: "vertical",
                             overflow: "hidden",
                             margin: 0,
+                            whiteSpace: "normal",
                           }}
                         >
                           {stripText(item.content) || "暂无内容"}
