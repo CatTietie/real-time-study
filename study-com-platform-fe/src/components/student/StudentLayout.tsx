@@ -292,21 +292,24 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
   }, [fetchNotifications, fetchUnreadCount]);
 
   const handleNotificationClick = async (notification: Notification) => {
-    try {
-      await markAsRead(notification.id);
+    if (notification.notification_type === 'reservation_start' || 
+        notification.notification_type === 'reservation_renewal') {
+      try {
+        await markAsRead(notification.id);
+        setUnreadCount(prev => Math.max(0, prev - 1));
+        setNotifications(prev => 
+          prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n)
+        );
+      } catch (error) {
+        console.error('标记已读失败:', error);
+      }
+      navigate('/student/my-reservations');
+      setNotificationVisible(false);
+    } else if (notification.notification_type === 'chat_message' && notification.chat_room_id) {
       setUnreadCount(prev => Math.max(0, prev - 1));
       setNotifications(prev => 
         prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n)
       );
-    } catch (error) {
-      console.error('标记已读失败:', error);
-    }
-
-    if (notification.notification_type === 'reservation_start' || 
-        notification.notification_type === 'reservation_renewal') {
-      navigate('/student/my-reservations');
-      setNotificationVisible(false);
-    } else if (notification.notification_type === 'chat_message' && notification.chat_room_id) {
       navigate('/student/chat', { state: { roomId: notification.chat_room_id } });
       setNotificationVisible(false);
     }

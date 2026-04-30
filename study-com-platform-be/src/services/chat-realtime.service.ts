@@ -246,7 +246,7 @@ export const initChatSockets = (io: Server) => {
 
         // 为所有目标用户处理消息
         for (const userId of allTargetUsers) {
-          // 1. 增加未读计数
+          // 1. 增加未读计数（使用 unread_messages 表）
           await UnreadMessage.incrementUnreadCountForUser(
             userId,
             data.roomId,
@@ -258,28 +258,10 @@ export const initChatSockets = (io: Server) => {
             clientInfo.avatar || ''
           );
           
-          // 2. 创建通知记录（这样刷新按钮可以获取到）
-          await Notification.create({
-            user_id: userId,
-            title: `新消息: ${clientInfo.nickname || clientInfo.username}`,
-            content: messageContent,
-            notification_type: 'chat_message',
-            reservation_id: null,
-            chat_room_id: data.roomId,
-            is_read: false,
-            metadata: {
-              message_type: messageType,
-              sender_id: clientInfo.userId,
-              sender_nickname: clientInfo.nickname,
-              sender_username: clientInfo.username,
-              room_name: roomName,
-              message_id: messageData.id
-            }
-          });
-          
-          // 3. 广播到用户个人房间（实时推送通知）
+          // 2. 广播到用户个人房间（实时推送通知）
           // 只发送 notification 事件，由前端调用 fetchNotifications() 获取最新通知列表
-          // 避免重复提醒
+          // 注意：聊天消息不再存储到 notifications 表，只存储到 unread_messages 表
+          // 通知控制器会合并两个表的数据，避免重复
           io.to(`user_${userId}`).emit('notification', {
             type: 'chat_message',
             data: {
