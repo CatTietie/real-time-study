@@ -269,10 +269,65 @@ export const getCommunityTagSuggestions = async (
 ) => {
   try {
     const keyword = String(req.query.keyword || "").trim();
+
+    // 如果没有关键词，返回热门标签（从已发布的帖子中提取）
     if (keyword.length < 1) {
-      return res.json({ success: true, message: "获取成功", data: [] });
+      // 获取最近200条已发布的帖子，提取所有标签并统计频率
+      const posts = await Post.findAll({
+        attributes: ["tags"],
+        where: {
+          status: 1, // 审核通过
+          publish_status: 1, // 已发布
+          tags: { [Op.ne]: null },
+        },
+        limit: 200,
+        order: [["created_at", "DESC"]],
+      });
+
+      // 统计标签出现频率
+      const tagCount = new Map<string, number>();
+      posts.forEach((post) => {
+        const raw = (post as any).tags as string | undefined;
+        if (!raw) return;
+        
+        let tags: string[] = [];
+        try {
+          // 尝试解析为 JSON 数组
+          const parsed = JSON.parse(raw) as string[];
+          if (Array.isArray(parsed)) {
+            tags = parsed;
+          }
+        } catch {
+          // 如果不是 JSON，尝试按逗号分割
+          tags = raw
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean);
+        }
+
+        tags.forEach((tag) => {
+          const key = tag.trim();
+          if (key && key.length > 0) {
+            tagCount.set(key, (tagCount.get(key) || 0) + 1);
+          }
+        });
+      });
+
+      // 按频率排序，返回前15个热门标签
+      const hotTags = Array.from(tagCount.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 15)
+        .map(([tag]) => tag);
+
+      return res.json({
+        success: true,
+        message: "获取成功",
+        data: hotTags,
+        isHotTags: true,
+      });
     }
 
+    // 如果有关键词，执行联想搜索
     const posts = await Post.findAll({
       attributes: ["tags"],
       where: {
@@ -302,6 +357,7 @@ export const getCommunityTagSuggestions = async (
       success: true,
       message: "获取成功",
       data: Array.from(tags).slice(0, 10),
+      isHotTags: false,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "获取失败";

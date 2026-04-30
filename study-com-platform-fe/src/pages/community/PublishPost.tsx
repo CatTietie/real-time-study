@@ -220,25 +220,42 @@ export default function PublishPost() {
     }
   };
 
-  const handleTagSearch = (value: string) => {
-    if (!value || value.trim().length < 1) {
+  // 搜索标签（支持空关键词获取热门标签）
+  const fetchTagSuggestions = async (keyword: string) => {
+    try {
+      setTagFetching(true);
+      const res = await fetchCommunityTagSuggestions(keyword.trim());
+      setTagOptions((res?.data as string[]) || []);
+    } catch {
       setTagOptions([]);
-      return;
+    } finally {
+      setTagFetching(false);
     }
+  };
+
+  // 处理标签搜索输入
+  const handleTagSearch = (value: string) => {
     if (tagTimerRef.current) {
       window.clearTimeout(tagTimerRef.current);
     }
-    tagTimerRef.current = window.setTimeout(async () => {
-      try {
-        setTagFetching(true);
-        const res = await fetchCommunityTagSuggestions(value.trim());
-        setTagOptions((res?.data as string[]) || []);
-      } catch {
-        setTagOptions([]);
-      } finally {
-        setTagFetching(false);
-      }
-    }, 300);
+    
+    // 如果有输入内容，延迟搜索（防抖）
+    if (value && value.trim().length > 0) {
+      tagTimerRef.current = window.setTimeout(() => {
+        fetchTagSuggestions(value);
+      }, 300);
+    } else {
+      // 没有输入内容时，直接获取热门标签
+      fetchTagSuggestions('');
+    }
+  };
+
+  // 处理标签输入框获得焦点
+  const handleTagFocus = () => {
+    // 如果还没有标签选项，获取热门标签
+    if (tagOptions.length === 0) {
+      fetchTagSuggestions('');
+    }
   };
 
   const handleTagsChange = (values: string[]) => {
@@ -444,12 +461,15 @@ export default function PublishPost() {
                     options={tagOptions.map((tag) => ({ label: tag, value: tag }))}
                     onSearch={handleTagSearch}
                     onChange={handleTagsChange}
+                    onFocus={handleTagFocus}
                     loading={tagFetching}
                     className="w-full"
                     style={{
                       borderRadius: '8px',
                     }}
                     allowClear={true}
+                    showSearch={true}
+                    filterOption={false}
                   />
                 </Form.Item>
                 {/* 已选标签展示 - 带删除按钮 */}
