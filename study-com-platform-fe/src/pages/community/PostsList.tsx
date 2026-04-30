@@ -679,12 +679,10 @@ export default function PostsList() {
               <CalendarOutlined />
               <span>{formatTime(item.created_at)}</span>
             </div>
-            {item.like_count > 0 && (
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <HeartOutlined style={{ color: "#F43F5E" }} />
-                <span>{item.like_count}</span>
-              </div>
-            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <HeartOutlined style={{ color: item.like_count > 0 ? "#F43F5E" : "#9CA3AF" }} />
+              <span>{item.like_count || 0}</span>
+            </div>
             {item.parent_id && (
               <Tag color="default" style={{ fontSize: 11, margin: 0 }}>
                 回复
