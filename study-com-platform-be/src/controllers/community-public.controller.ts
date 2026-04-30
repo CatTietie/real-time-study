@@ -93,14 +93,16 @@ export const getCommunityPosts = async (req: Request, res: Response) => {
       userId
     });
 
-    const where: any = {
-      status: 1,
-      publish_status: 1,
-    };
+    const where: any = {};
 
-    // 如果提供了userId参数，则只返回该用户的帖子
+    // 如果提供了userId参数（用户查看自己的帖子），则显示所有状态的帖子（除了已删除）
     if (userId) {
       where.user_id = Number(userId);
+      where.publish_status = { [Op.ne]: 2 }; // 排除已删除的帖子
+    } else {
+      // 没有userId参数（公开列表），只显示已发布且审核通过的帖子
+      where.status = 1;
+      where.publish_status = 1;
     }
 
     // 处理视图模式
