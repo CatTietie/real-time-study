@@ -34,6 +34,7 @@ export const createCommunityPost = async (
         category: string;
         tags?: string[];
         isDraft?: boolean;
+        forwardPostId?: number;
       },
 ) => {
   const isFormData = payload instanceof FormData;
@@ -129,9 +130,20 @@ export const fetchCommunityLeaderboard = async () => {
   return response.data;
 };
 
-export const fetchCommunityLeaderboardByType = async (type: string) => {
+export const fetchCommunityLeaderboardByType = async (
+  type: string, 
+  timeRange?: string,
+  commentPeriod?: string // "7days" 或 "all"
+) => {
+  const params: Record<string, string> = { type };
+  if (timeRange) {
+    params.timeRange = timeRange;
+  }
+  if (commentPeriod) {
+    params.commentPeriod = commentPeriod;
+  }
   const response = await api.get("/community/leaderboard", {
-    params: { type },
+    params,
   });
   return response.data;
 };
@@ -216,6 +228,25 @@ export const fetchFavoriteStatus = async (postId: number) => {
 
 export const fetchUserTodayStats = async () => {
   const response = await api.get("/community/user/today-stats");
+  return response.data;
+};
+
+// ========================================
+// 草稿相关 API
+// ========================================
+
+export const fetchCommunityDrafts = async (params?: { page?: number; pageSize?: number }) => {
+  const response = await api.get("/community/drafts", { params });
+  return response.data;
+};
+
+export const fetchCommunityDraftDetail = async (id: number) => {
+  const response = await api.get(`/community/drafts/${id}`);
+  return response.data;
+};
+
+export const deleteCommunityDraft = async (id: number) => {
+  const response = await api.delete(`/community/drafts/${id}`);
   return response.data;
 };
 
