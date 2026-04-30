@@ -1,6 +1,6 @@
-import { Card, Table, Typography, message, Badge, Button } from "antd";
+import { Card, Table, Typography, message, Badge, Button, Tooltip, Tag, Space, Radio } from "antd";
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { fetchCommunityLeaderboardByType } from "../../services/communityPublic";
 import CommunityFooter from "../../components/community/CommunityFooter";
 import {
@@ -11,7 +11,8 @@ import {
     UserOutlined,
     EyeOutlined,
     MessageOutlined,
-    HomeOutlined
+    HomeOutlined,
+    QuestionCircleOutlined
 } from "@ant-design/icons";
 
 const { Title, Text } = Typography;
@@ -41,13 +42,26 @@ type LeaderboardRow = {
     author?: { nickname?: string; username?: string };
     author_nickname?: string;
     author_username?: string;
+    // 新增后端计算的热度值
+    heat_score?: number;
+};
+
+type HeatRules = {
+    viewWeight: number;
+    likeWeight: number;
+    commentWeight: number;
+    formula: string;
+    description: string;
 };
 
 export default function Leaderboard() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [data, setData] = useState<LeaderboardRow[]>([]);
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState("posts"); // 改为标签页形式
+    const [timeRange, setTimeRange] = useState<string>("all"); // 时间筛选
+    const [heatRules, setHeatRules] = useState<HeatRules | null>(null); // 热度计算规则
 
     const loadData = useCallback(
         async () => {
@@ -60,7 +74,18 @@ export default function Leaderboard() {
                     comments: "comment_count" // 修改为评论数量排行
                 };
 
-                const res = await fetchCommunityLeaderboardByType(typeMap[activeTab as keyof typeof typeMap]);
+                // 只有热门内容榜支持时间筛选
+                const actualTimeRange = activeTab === "posts" ? timeRange : undefined;
+                const res = await fetchCommunityLeaderboardByType(
+                    typeMap[activeTab as keyof typeof typeMap], 
+                    actualTimeRange
+                );
+
+                // 如果是热门内容榜，保存热度计算规则
+                if (activeTab === "posts" && res?.heat_rules) {
+                    setHeatRules(res.heat_rules);
+                }
+
                 const fullList = ((res?.data as LeaderboardRow[] | undefined) || []).map(
                     (item, index) => ({
                         ...item,
@@ -74,17 +99,14 @@ export default function Leaderboard() {
                 const list = fullList.slice(0, 10);
                 setData(list);
                 
-                // 添加加载完成提示
-                if (list.length > 0) {
-                    message.success(`已加载${list.length}条${tabs.find(t => t.key === activeTab)?.label}数据`);
-                }
+                // 添加加载完成提示（可选，根据用户体验调整）
             } catch (err) {
                 message.error(err instanceof Error ? err.message : "加载失败");
             } finally {
                 setLoading(false);
             }
         },
-        [activeTab],
+        [activeTab, timeRange],
     );
 
     useEffect(() => {
@@ -214,81 +236,138 @@ export default function Leaderboard() {
                 ...baseColumns,
                 {
                     title: "热门内容",
-                    render: (_value: unknown, record: LeaderboardRow) => (
-                        <div style={{ maxWidth: 400 }}>
-                            <div style={{
-                                fontWeight: 600,
-                                color: "#1F2937",
-                                marginBottom: 8,
-                                fontSize: 15,
-                                lineHeight: 1.4,
-                                display: "-webkit-box",
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: "vertical",
-                                overflow: "hidden"
-                            }}>
-                                {record.title || record.Post?.title || "未命名内容"}
-                            </div>
-                            <div style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 12,
-                                color: "#6B7280",
-                                fontSize: 13,
-                                flexWrap: "wrap"
-                            }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                    <UserOutlined style={{ fontSize: 12 }} />
-                                    <span style={{ fontWeight: 500 }}>
-                    {record.author_nickname || record.author?.nickname || record.Post?.User?.nickname || record.nickname || "匿名用户"}
-                  </span>
-                                    <span style={{ color: "#9CA3AF" }}>
-                    @{record.author_username || record.author?.username || record.Post?.User?.username || record.username || "anonymous"}
-                  </span>
+                    render: (_value: unknown, record: LeaderboardRow) => {
+                        const postId = record.id;
+                        const title = record.title || record.Post?.title || "未命名内容";
+                        
+                        return (
+                            <div style={{ maxWidth: 420, cursor: "pointer" }}>
+                                <div
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (postId) {
+                                            navigate(`/community?postId=${postId}`);
+                                        }
+                                    }}
+                                    style={{
+                                        fontWeight: 600,
+                                        color: "#1F2937",
+                                        marginBottom: 8,
+                                        fontSize: 15,
+                                        lineHeight: 1.4,
+                                        display: "-webkit-box",
+                                        WebkitLineClamp: 2,
+                                        WebkitBoxOrient: "vertical",
+                                        overflow: "hidden",
+                                        transition: "color 0.2s ease",
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.color = "#667eea";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.color = "#1F2937";
+                                    }}
+                                >
+                                    {title}
+                                </div>
+                                <div style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 12,
+                                    color: "#9CA3AF",
+                                    fontSize: 12,
+                                    flexWrap: "wrap"
+                                }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                        <UserOutlined style={{ fontSize: 11 }} />
+                                        <span style={{ fontWeight: 500, color: "#6B7280" }}>
+                                            {record.author_nickname || record.author?.nickname || record.Post?.User?.nickname || record.nickname || "匿名用户"}
+                                        </span>
+                                        <span style={{ color: "#9CA3AF" }}>
+                                            @{record.author_username || record.author?.username || record.Post?.User?.username || record.username || "anonymous"}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ),
+                        );
+                    },
                     ellipsis: { showTitle: true },
                 },
                 {
                     title: "互动数据",
-                    render: (_value: unknown, record: LeaderboardRow) => (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                <EyeOutlined style={{ color: "#6366F1", fontSize: 12 }} />
-                                <Text style={{ color: "#374151", fontWeight: 500, minWidth: 40 }}>
-                                    {record.view_count || record.Post?.viewCount || 0}
-                                </Text>
-                                <Text type="secondary" style={{ fontSize: 12 }}>浏览</Text>
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                <LikeOutlined style={{ color: "#EF4444", fontSize: 12 }} />
-                                <Text style={{ color: "#374151", fontWeight: 500, minWidth: 40 }}>
-                                    {record.like_count || 0}
-                                </Text>
-                                <Text type="secondary" style={{ fontSize: 12 }}>点赞</Text>
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                <MessageOutlined style={{ color: "#10B981", fontSize: 12 }} />
-                                <Text style={{ color: "#374151", fontWeight: 500, minWidth: 40 }}>
-                                    {record.comment_count || 0}
-                                </Text>
-                                <Text type="secondary" style={{ fontSize: 12 }}>评论</Text>
-                            </div>
-                        </div>
-                    ),
-                    width: 140,
-                    align: "center",
-                },
-                {
-                    title: "热度值",
                     render: (_value: unknown, record: LeaderboardRow) => {
                         const viewCount = record.view_count || record.Post?.viewCount || 0;
                         const likeCount = record.like_count || 0;
                         const commentCount = record.comment_count || 0;
-                        // 综合计算热度值：浏览量 * 0.5 + 点赞 * 2 + 评论 * 1
-                        const score = Math.round(viewCount * 0.5 + likeCount * 2 + commentCount);
+                        
+                        return (
+                            <div style={{ 
+                                display: "flex", 
+                                flexDirection: "column", 
+                                gap: 4,
+                                fontSize: 12,
+                                color: "#9CA3AF"
+                            }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                    <EyeOutlined style={{ fontSize: 11, opacity: 0.6 }} />
+                                    <Text style={{ color: "#9CA3AF", minWidth: 32, fontSize: 12 }}>
+                                        {viewCount}
+                                    </Text>
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                    <LikeOutlined style={{ fontSize: 11, opacity: 0.6 }} />
+                                    <Text style={{ color: "#9CA3AF", minWidth: 32, fontSize: 12 }}>
+                                        {likeCount}
+                                    </Text>
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                    <MessageOutlined style={{ fontSize: 11, opacity: 0.6 }} />
+                                    <Text style={{ color: "#9CA3AF", minWidth: 32, fontSize: 12 }}>
+                                        {commentCount}
+                                    </Text>
+                                </div>
+                            </div>
+                        );
+                    },
+                    width: 80,
+                    align: "center",
+                },
+                {
+                    title: (
+                        <Space>
+                            热度值
+                            <Tooltip
+                                title={
+                                    <div style={{ maxWidth: 240, fontSize: 12 }}>
+                                        <div style={{ fontWeight: "bold", marginBottom: 8 }}>
+                                            {heatRules?.formula || "热度值 = 浏览量 × 0.5 + 点赞数 × 2 + 评论数"}
+                                        </div>
+                                        <div style={{ color: "#D1D5DB", marginBottom: 6 }}>
+                                            各维度权重：
+                                        </div>
+                                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                            <span>• 浏览：权重 {heatRules?.viewWeight || 0.5}</span>
+                                            <span>• 点赞：权重 {heatRules?.likeWeight || 2}（最高）</span>
+                                            <span>• 评论：权重 {heatRules?.commentWeight || 1}</span>
+                                        </div>
+                                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.2)" }}>
+                                            {heatRules?.description || "热度值综合考虑浏览、点赞、评论三个维度，其中点赞权重最高，评论次之，浏览最低。"}
+                                        </div>
+                                    </div>
+                                }
+                                placement="topRight"
+                            >
+                                <QuestionCircleOutlined style={{ color: "#9CA3AF", fontSize: 14, cursor: "help" }} />
+                            </Tooltip>
+                        </Space>
+                    ),
+                    render: (_value: unknown, record: LeaderboardRow) => {
+                        // 使用后端返回的热度值，如果没有则降级到前端计算
+                        const score = record.heat_score ?? Math.round(
+                            (record.view_count || record.Post?.viewCount || 0) * 0.5 + 
+                            (record.like_count || 0) * 2 + 
+                            (record.comment_count || 0)
+                        );
 
                         const getHeatLevel = (score: number) => {
                             if (score > 500) return { color: "#DC2626", bg: "#FEE2E2", border: "#FCA5A5", label: "爆款" };
@@ -299,31 +378,51 @@ export default function Leaderboard() {
 
                         const level = getHeatLevel(score);
 
-                        return (
+                        const tooltipContent = heatRules ? (
+                            <div style={{ fontSize: 12 }}>
+                                <div style={{ fontWeight: "bold", marginBottom: 6 }}>当前热度值：{score}</div>
+                                <div style={{ color: "#D1D5DB", marginBottom: 4 }}>明细：</div>
+                                <div>
+                                    浏览 {(record.view_count || record.Post?.viewCount || 0)} × {heatRules.viewWeight} = {((record.view_count || record.Post?.viewCount || 0) * heatRules.viewWeight).toFixed(1)}
+                                </div>
+                                <div>
+                                    点赞 {record.like_count || 0} × {heatRules.likeWeight} = {(record.like_count || 0) * heatRules.likeWeight}
+                                </div>
+                                <div>
+                                    评论 {record.comment_count || 0} × {heatRules.commentWeight} = {record.comment_count || 0}
+                                </div>
+                                <div style={{ marginTop: 4, fontWeight: "bold" }}>
+                                    合计：{score}
+                                </div>
+                            </div>
+                        ) : undefined;
+
+                        const heatDisplay = (
                             <div style={{
                                 background: level.bg,
-                                padding: "12px 8px",
+                                padding: "14px 12px",
                                 borderRadius: 12,
-                                border: `1px solid ${level.border}`,
+                                border: `2px solid ${level.border}`,
                                 textAlign: "center",
-                                minWidth: 100
+                                minWidth: 110,
+                                boxShadow: "0 2px 8px rgba(0,0,0,0.06)"
                             }}>
                                 <Text style={{
                                     color: level.color,
-                                    fontWeight: 700,
-                                    fontSize: 20,
+                                    fontWeight: 800,
+                                    fontSize: 24,
                                     display: "block",
                                     lineHeight: 1
                                 }}>
                                     {score}
                                 </Text>
                                 <div style={{
-                                    fontSize: 12,
+                                    fontSize: 11,
                                     color: level.color,
-                                    fontWeight: 600,
-                                    marginTop: 4,
-                                    background: "rgba(255, 255, 255, 0.7)",
-                                    padding: "2px 6px",
+                                    fontWeight: 700,
+                                    marginTop: 6,
+                                    background: "rgba(255, 255, 255, 0.8)",
+                                    padding: "3px 8px",
                                     borderRadius: 4,
                                     display: "inline-block"
                                 }}>
@@ -331,8 +430,18 @@ export default function Leaderboard() {
                                 </div>
                             </div>
                         );
+
+                        if (tooltipContent) {
+                            return (
+                                <Tooltip title={tooltipContent} placement="topRight">
+                                    {heatDisplay}
+                                </Tooltip>
+                            );
+                        }
+
+                        return heatDisplay;
                     },
-                    width: 120,
+                    width: 140,
                     align: "center",
                 }
             ];
@@ -741,6 +850,38 @@ export default function Leaderboard() {
                         </div>
                     ))}
                 </div>
+
+                {/* 时间筛选 - 仅热门内容榜显示 */}
+                {activeTab === "posts" && (
+                    <div style={{
+                        display: "flex",
+                        justifyContent: "center",
+                        marginBottom: 24,
+                    }}>
+                        <Radio.Group 
+                            value={timeRange} 
+                            onChange={(e) => setTimeRange(e.target.value)}
+                            buttonStyle="solid"
+                        >
+                            <Radio.Button value="today" style={{
+                                borderRadius: "8px 0 0 8px",
+                            }}>
+                                今日
+                            </Radio.Button>
+                            <Radio.Button value="week" style={{
+                                borderLeft: "none",
+                                borderRight: "none",
+                            }}>
+                                本周
+                            </Radio.Button>
+                            <Radio.Button value="all" style={{
+                                borderRadius: "0 8px 8px 0",
+                            }}>
+                                全部
+                            </Radio.Button>
+                        </Radio.Group>
+                    </div>
+                )}
 
                 {/* 排行榜卡片 */}
                 <Card

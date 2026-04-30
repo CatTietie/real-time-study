@@ -959,35 +959,76 @@ export const getCommunityComments = async (req: Request, res: Response) => {
   }
 };
 
+const getStartOfWeek = () => {
+  const start = new Date();
+  const day = start.getDay();
+  const diff = start.getDate() - day + (day === 0 ? -6 : 1);
+  start.setDate(diff);
+  start.setHours(0, 0, 0, 0);
+  return start;
+};
+
 export const getCommunityLeaderboard = async (req: Request, res: Response) => {
   try {
     const type = String((req.query as any)?.type || "total");
+    const timeRange = String((req.query as any)?.timeRange || "all");
 
     if (type === "post_hot") {
       // 热门内容榜 - 返回帖子相关信息，按热度排序
+      const where: any = { status: 1, publish_status: 1 };
+
+      // 时间筛选
+      if (timeRange === "today") {
+        where[Op.and] = [
+          Sequelize.where(Sequelize.col("created_at"), {
+            [Op.gte]: getStartOfDay(),
+          }),
+        ];
+      } else if (timeRange === "week") {
+        where[Op.and] = [
+          Sequelize.where(Sequelize.col("created_at"), {
+            [Op.gte]: getStartOfWeek(),
+          }),
+        ];
+      }
+
       const posts = await Post.findAll({
-        where: { status: 1, publish_status: 1 },
+        where,
         include: [{
           model: User,
           attributes: ["id", "nickname", "username", "avatar"]
         }],
         order: [
-          [Sequelize.col("view_count"), "DESC"],
-          [Sequelize.col("like_count"), "DESC"],
-          [Sequelize.col("comment_count"), "DESC"],
+          [Sequelize.literal(`(view_count * 0.5 + like_count * 2 + comment_count)`), "DESC"],
           [Sequelize.col("created_at"), "DESC"]
         ],
         limit: 50,
       });
 
+      // 热度计算规则
+      const heatRules = {
+        viewWeight: 0.5,
+        likeWeight: 2,
+        commentWeight: 1,
+        formula: "热度值 = 浏览量 × 0.5 + 点赞数 × 2 + 评论数",
+        description: "热度值综合考虑浏览、点赞、评论三个维度，其中点赞权重最高，评论次之，浏览最低。"
+      };
+
       const data = posts.map((post: any) => {
         const postData = post.toJSON();
+        // 计算热度值
+        const heatScore = Math.round(
+          (postData.view_count || 0) * 0.5 +
+          (postData.like_count || 0) * 2 +
+          (postData.comment_count || 0)
+        );
         return {
           id: postData.id,
           title: postData.title,
           view_count: postData.view_count,
           like_count: postData.like_count,
           comment_count: postData.comment_count,
+          heat_score: heatScore,
           user_id: postData.User?.id,
           user_nickname: postData.User?.nickname,
           user_username: postData.User?.username,
@@ -1000,6 +1041,8 @@ export const getCommunityLeaderboard = async (req: Request, res: Response) => {
         success: true,
         message: "获取排行榜成功",
         data,
+        heat_rules: heatRules,
+        time_range: timeRange,
       });
     }
 

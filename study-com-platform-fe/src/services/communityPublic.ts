@@ -130,9 +130,13 @@ export const fetchCommunityLeaderboard = async () => {
   return response.data;
 };
 
-export const fetchCommunityLeaderboardByType = async (type: string) => {
+export const fetchCommunityLeaderboardByType = async (type: string, timeRange?: string) => {
+  const params: Record<string, string> = { type };
+  if (timeRange) {
+    params.timeRange = timeRange;
+  }
   const response = await api.get("/community/leaderboard", {
-    params: { type },
+    params,
   });
   return response.data;
 };
