@@ -19,7 +19,7 @@ const createUser = async (userData) => {
 };
 exports.createUser = createUser;
 const getUserByEmail = async (email) => {
-    return await user_model_1.default.findOne({ where: { email } });
+    return await user_model_1.default.findOne({ where: { username: email } });
 };
 exports.getUserByEmail = getUserByEmail;
 const getUserByUsername = async (username) => {
