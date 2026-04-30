@@ -1,4 +1,5 @@
 import { Server, Socket } from 'socket.io';
+import { Op } from 'sequelize';
 import ChatMessage from '../models/chat-message.model';
 import ChatRoom from '../models/chat-room.model';
 import User from '../models/user.model';
@@ -194,66 +195,105 @@ export const initChatSockets = (io: Server) => {
         // 广播给房间内所有用户
         io.to(`chat_${data.roomId}`).emit('receive_chat_message', messageData);
         
-        // 同时广播给房间内其他用户的个人房间（用于跨页面消息接收）
+        // 获取房间信息
+        const room = await ChatRoom.findByPk(data.roomId);
+        const roomName = room?.toJSON()?.name || '未知房间';
+        
+        // 准备消息摘要
+        let messageContent = data.content;
+        let messageType = data.messageType || 'text';
+        
+        if (messageType === 'image' && data.file_name) {
+          messageContent = `[图片] ${data.file_name}`;
+        } else if (messageType === 'file' && data.file_name) {
+          messageContent = `[文件] ${data.file_name}`;
+        } else if (messageContent.length > 100) {
+          messageContent = messageContent.substring(0, 100) + '...';
+        }
+
+        // 获取当前在线的聊天室用户
         const roomUsers = roomOnlineUsers.get(data.roomId);
+        
+        // 获取所有有该聊天室未读消息的用户
+        const unreadRecords = await UnreadMessage.findAll({
+          where: {
+            room_id: data.roomId,
+            user_id: { [Op.ne]: clientInfo.userId }
+          }
+        });
+
+        // 如果没有任何用户记录，说明这是新消息，我们需要找到聊天室的成员
+        // 但是由于聊天室是公开的，我们只能处理有记录的用户和在线用户
+        // 这里我们需要一种方式来获取聊天室的成员，但如果没有成员记录，
+        // 我们至少要处理在线用户和有未读消息的用户
+
+        // 收集所有目标用户
+        const allTargetUsers = new Set<number>();
+        
+        // 添加当前在线的聊天室用户
         if (roomUsers) {
-          const room = await ChatRoom.findByPk(data.roomId);
-          const roomName = room?.toJSON()?.name || '未知房间';
-          
           for (const userId of roomUsers) {
             if (userId !== clientInfo.userId) {
-              // 向用户个人房间发送消息
-              io.to(`user_${userId}`).emit('receive_chat_message', {
-                ...messageData,
-                room_name: roomName
-              });
-              
-              // 同时也可以发送通知类型的消息
-              io.to(`user_${userId}`).emit('notification', {
-                type: 'chat_message',
-                data: {
-                  roomId: data.roomId,
-                  roomName: roomName,
-                  senderId: clientInfo.userId,
-                  senderName: clientInfo.nickname || clientInfo.username,
-                  content: data.content.substring(0, 50) + (data.content.length > 50 ? '...' : ''),
-                  messageId: messageData.id
-                }
-              });
+              allTargetUsers.add(userId);
             }
           }
         }
+        
+        // 添加有该房间未读消息的用户
+        for (const record of unreadRecords) {
+          allTargetUsers.add(record.user_id);
+        }
 
-        // 为房间内其他用户增加未读计数
-        if (roomUsers) {
-          // 准备消息摘要
-          let messageContent = data.content;
-          let messageType = data.messageType || 'text';
+        // 为所有目标用户处理消息
+        for (const userId of allTargetUsers) {
+          // 1. 增加未读计数
+          await UnreadMessage.incrementUnreadCountForUser(
+            userId,
+            data.roomId,
+            messageData.id,
+            messageContent,
+            messageType,
+            clientInfo.userId,
+            clientInfo.nickname || clientInfo.username,
+            clientInfo.avatar || ''
+          );
           
-          // 图片/文件消息使用文件名作为摘要
-          if (messageType === 'image' && data.file_name) {
-            messageContent = `[图片] ${data.file_name}`;
-          } else if (messageType === 'file' && data.file_name) {
-            messageContent = `[文件] ${data.file_name}`;
-          } else if (messageContent.length > 100) {
-            messageContent = messageContent.substring(0, 100) + '...';
-          }
-
-          // 遍历房间内所有用户，为非发送者增加未读计数
-          for (const userId of roomUsers) {
-            if (userId !== clientInfo.userId) {
-              await UnreadMessage.incrementUnreadCountForUser(
-                userId,
-                data.roomId,
-                messageData.id,
-                messageContent,
-                messageType,
-                clientInfo.userId,
-                clientInfo.nickname || clientInfo.username,
-                clientInfo.avatar || ''
-              );
+          // 2. 创建通知记录（这样刷新按钮可以获取到）
+          await Notification.create({
+            user_id: userId,
+            title: `新消息: ${clientInfo.nickname || clientInfo.username}`,
+            content: messageContent,
+            notification_type: 'chat_message',
+            reservation_id: null,
+            chat_room_id: data.roomId,
+            is_read: false,
+            metadata: {
+              message_type: messageType,
+              sender_id: clientInfo.userId,
+              sender_nickname: clientInfo.nickname,
+              sender_username: clientInfo.username,
+              room_name: roomName,
+              message_id: messageData.id
             }
-          }
+          });
+          
+          // 3. 广播到用户个人房间（实时推送）
+          io.to(`user_${userId}`).emit('receive_chat_message', {
+            ...messageData,
+            room_name: roomName
+          });
+          
+          io.to(`user_${userId}`).emit('notification', {
+            type: 'chat_message',
+            data: {
+              roomId: data.roomId,
+              roomName: roomName,
+              senderId: clientInfo.userId,
+              senderName: clientInfo.nickname || clientInfo.username,
+              content: messageContent,
+              messageId: messageData.id
+            }
+          });
         }
 
       } catch (error) {
