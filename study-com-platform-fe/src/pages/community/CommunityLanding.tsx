@@ -4,13 +4,15 @@ import {
     Card,
     Input,
     List,
+    Modal,
     Space,
+    Tabs,
     Tag,
     Typography,
     message,
 } from "antd";
-import {useCallback, useEffect, useRef, useState} from "react";
-import {useNavigate} from "react-router-dom";
+import {Suspense, lazy, useCallback, useEffect, useRef, useState} from "react";
+import {useNavigate, useSearchParams} from "react-router-dom";
 import {
     fetchCommunityPosts,
     fetchCommunityProfileSummary,
@@ -25,9 +27,17 @@ import {useAppSelector} from "../../app/hooks";
 import type {RootState} from "../../app/store";
 import CommunityFooter from "../../components/community/CommunityFooter";
 
+const PostDetail = lazy(() => import("./PostDetail"));
+
+const PostDetailLoading = () => (
+    <div style={{ padding: 40, textAlign: "center" }}>
+        <Typography.Text>加载中...</Typography.Text>
+    </div>
+);
+
 const {Title, Paragraph, Text} = Typography;
 const API_BASE = (
-    import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api"
+    import.meta.env.VITE_API_BASE_URL || "http://localhost:8081/api"
 ).replace(/\/$/, "");
 const IMAGE_BASE = API_BASE.replace(/\/api$/, "");
 const resolveImageUrl = (src?: string) => {
@@ -55,6 +65,20 @@ type PostRow = {
     like_count?: number;
     view_count?: number;
     User?: { nickname?: string; username?: string };
+    forward_post_id?: number;
+    forward_user_id?: number;
+    ForwardPost?: {
+        id: number;
+        title: string;
+        content: string;
+        like_count: number;
+        comment_count: number;
+        user_id: number;
+        User?: { nickname?: string; username?: string };
+    };
+    ForwardUser?: { nickname?: string; username?: string };
+    created_at?: string;
+    updated_at?: string;
 };
 
 type ProfileSummary = {
@@ -73,6 +97,7 @@ type ProfileSummary = {
 
 export default function CommunityLanding() {
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const {token, username, role} = useAppSelector(
         (state: RootState) => state.auth,
     );
@@ -84,6 +109,7 @@ export default function CommunityLanding() {
     const [pageSize] = useState(10);
     const [total, setTotal] = useState(0);
     const [order, /* setOrder */] = useState<"latest" | "hot">("latest");
+    const [viewMode, setViewMode] = useState<"latest" | "hot">("latest");
     const [profile, setProfile] = useState<ProfileSummary | null>(null);
     const [profileLoading, setProfileLoading] = useState(false);
     // const [onlineCount, setOnlineCount] = useState<number | null>(null); // 暂时注释，后续可能需要
@@ -100,12 +126,70 @@ export default function CommunityLanding() {
     const fetchingMoreRef = useRef(false);
     const searchTimerRef = useRef<number | null>(null);
 
+    // 帖子详情弹窗状态
+    const [postDetailVisible, setPostDetailVisible] = useState(false);
+    const [currentPostId, setCurrentPostId] = useState<number | null>(null);
+
+    // 转发内容展开状态
+    const [expandedForwardPosts, setExpandedForwardPosts] = useState<Set<number>>(new Set());
+
+    const toggleForwardExpand = (postId: number) => {
+        setExpandedForwardPosts(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(postId)) {
+                newSet.delete(postId);
+            } else {
+                newSet.add(postId);
+            }
+            return newSet;
+        });
+    };
+
+    // 从 URL 参数读取 postId 并同步弹窗状态
+    useEffect(() => {
+        const postIdFromUrl = searchParams.get("postId");
+        if (postIdFromUrl && !isNaN(Number(postIdFromUrl))) {
+            const postId = Number(postIdFromUrl);
+            setCurrentPostId(postId);
+            setPostDetailVisible(true);
+        } else {
+            setPostDetailVisible(false);
+            setCurrentPostId(null);
+        }
+    }, [searchParams]);
+
+    // 打开帖子详情弹窗
+    const openPostDetail = useCallback((postId: number) => {
+        setCurrentPostId(postId);
+        setPostDetailVisible(true);
+        setSearchParams(prev => {
+            const newParams = new URLSearchParams(prev);
+            newParams.set("postId", String(postId));
+            return newParams;
+        }, { replace: true });
+    }, [setSearchParams]);
+
+    // 关闭帖子详情弹窗
+    const closePostDetail = useCallback(() => {
+        setPostDetailVisible(false);
+        setSearchParams(prev => {
+            const newParams = new URLSearchParams(prev);
+            newParams.delete("postId");
+            return newParams;
+        }, { replace: true });
+    }, [setSearchParams]);
+
+    // 处理评论点击
+    const handleCommentClick = (postId: number) => {
+        openPostDetail(postId);
+    };
+
     const handleSearch = () => {
         loadData(1);
     };
 
     const loadData = useCallback(
-        async (pageNo = page, append = false) => {
+        async (pageNo: number, append = false) => {
             setLoading(true);
             try {
                 const res = await fetchCommunityPosts({
@@ -114,6 +198,7 @@ export default function CommunityLanding() {
                     keyword: keyword.trim() || undefined,
                     category: category || undefined,
                     order: order === "hot" ? "hot" : undefined,
+                    viewMode: viewMode,
                 });
                 const nextData = res?.data || [];
                 setData((prev) => (append ? [...prev, ...nextData] : nextData));
@@ -126,7 +211,7 @@ export default function CommunityLanding() {
                 fetchingMoreRef.current = false;
             }
         },
-        [category, keyword, order, page, pageSize],
+        [category, keyword, order, pageSize, viewMode],
     );
 
     useEffect(() => {
@@ -134,12 +219,31 @@ export default function CommunityLanding() {
         loadData(1);
         loadHotPosts();
         loadTodayStats();
-    }, [loadData, token]);
+    }, [token]);
+
+    useEffect(() => {
+        console.log('分类或视图模式变化, 重新加载数据');
+        setPage(1);
+        loadData(1);
+    }, [category, viewMode]);
 
     // 监听热榜数据变化
     useEffect(() => {
         console.log('热榜数据发生变化:', hotPosts);
     }, [hotPosts]);
+
+    // 监听弹窗状态，控制背景滚动
+    useEffect(() => {
+        if (postDetailVisible) {
+            document.body.classList.add('post-detail-modal-open');
+        } else {
+            document.body.classList.remove('post-detail-modal-open');
+        }
+        
+        return () => {
+            document.body.classList.remove('post-detail-modal-open');
+        };
+    }, [postDetailVisible]);
 
     useEffect(() => {
         const onScroll = () => {
@@ -156,7 +260,7 @@ export default function CommunityLanding() {
         };
         window.addEventListener("scroll", onScroll);
         return () => window.removeEventListener("scroll", onScroll);
-    }, [data.length, loadData, loading, page, total]);
+    }, [data.length, loading, page, total]);
 
     useEffect(() => {
         if (token) {
@@ -188,6 +292,7 @@ export default function CommunityLanding() {
             window.clearTimeout(searchTimerRef.current);
         }
         searchTimerRef.current = window.setTimeout(() => {
+            setPage(1);
             loadData(1);
         }, 300);
         return () => {
@@ -195,7 +300,7 @@ export default function CommunityLanding() {
                 window.clearTimeout(searchTimerRef.current);
             }
         };
-    }, [category, keyword, loadData, order]);
+    }, [keyword]);
 
     useEffect(() => {
         if (!token) {
@@ -359,11 +464,6 @@ export default function CommunityLanding() {
         }
     };
 
-    // 处理评论点击逻辑
-    const handleCommentClick = (postId: number) => {
-        navigate(`/community/posts/${postId}`);
-    };
-
     // 处理收藏逻辑
     const handleFavoriteClick = async (postId: number, currentFavoriteCount?: number) => {
         if (!token) {
@@ -416,94 +516,128 @@ export default function CommunityLanding() {
         <div style={{padding: 24}}>
             <Card style={{marginBottom: 16}}>
                 <Space
-                    align="center"
-                    style={{width: "100%", justifyContent: "space-between"}}
+                    direction="vertical"
+                    style={{width: "100%"}}
+                    size="middle"
                 >
-                    <Space align="center">
-                        <svg
-                            k1="1770195626963"
-                            className="icon"
-                            viewBox="0 0 1264 1024"
-                            version="1.1"
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="24"
-                            height="24"
-                            style={{marginRight: 8}}
-                        >
-                            <path
-                                d="M856.786824 323.794824V0.030118h-462.607059v137.366588a293.586824 293.586824 0 0 1 192.752941 275.727059c0 126.674824-80.293647 234.526118-192.752941 275.57647V1002.315294h848.112941V323.794824h-385.505882z"
-                                fill="#4C86C6"
-                            />
-                            <path
-                                d="M293.436235 119.657412c-162.032941 0-293.406118 131.373176-293.406117 293.466353 0 144.564706 104.568471 264.613647 242.145882 288.88847v300.303059h102.520471v-300.272941a290.936471 290.936471 0 0 0 49.483294-13.312V137.396706a292.803765 292.803765 0 0 0-100.74353-17.739294"
-                                fill="#31EC7C"
-                            />
-                            <path
-                                d="M586.932706 413.123765a293.586824 293.586824 0 0 0-192.752941-275.727059v551.303529c112.459294-41.050353 192.752941-148.901647 192.752941-275.57647"
-                                fill="#1565B2"
-                            />
-                            <path
-                                d="M671.744 917.473882h107.911529V84.811294h-107.911529zM860.611765 917.473882h107.941647V408.606118h-107.941647zM1049.509647 917.473882h107.941647V408.606118h-107.941647z"
-                                fill="#FFFFFF"
-                            />
-                        </svg>
-                        <Title
-                            level={3}
-                            style={{
-                                margin: 0,
-                                background: "linear-gradient(90deg, #1890ff, #52c41a)",
-                                WebkitBackgroundClip: "text",
-                                WebkitTextFillColor: "transparent",
-                                fontWeight: "bold",
-                                fontSize: "30px",
+                    <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        width: "100%",
+                        flexWrap: "wrap",
+                        gap: 16,
+                    }}>
+                        <Space align="center">
+                            <svg
+                                k1="1770195626963"
+                                className="icon"
+                                viewBox="0 0 1264 1024"
+                                version="1.1"
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="24"
+                                height="24"
+                                style={{marginRight: 8}}
+                            >
+                                <path
+                                    d="M856.786824 323.794824V0.030118h-462.607059v137.366588a293.586824 293.586824 0 0 1 192.752941 275.727059c0 126.674824-80.293647 234.526118-192.752941 275.57647V1002.315294h848.112941V323.794824h-385.505882z"
+                                    fill="#4C86C6"
+                                />
+                                <path
+                                    d="M293.436235 119.657412c-162.032941 0-293.406118 131.373176-293.406117 293.466353 0 144.564706 104.568471 264.613647 242.145882 288.88847v300.303059h102.520471v-300.272941a290.936471 290.936471 0 0 0 49.483294-13.312V137.396706a292.803765 292.803765 0 0 0-100.74353-17.739294"
+                                    fill="#31EC7C"
+                                />
+                                <path
+                                    d="M586.932706 413.123765a293.586824 293.586824 0 0 0-192.752941-275.727059v551.303529c112.459294-41.050353 192.752941-148.901647 192.752941-275.57647"
+                                    fill="#1565B2"
+                                />
+                                <path
+                                    d="M671.744 917.473882h107.911529V84.811294h-107.911529zM860.611765 917.473882h107.941647V408.606118h-107.941647zM1049.509647 917.473882h107.941647V408.606118h-107.941647z"
+                                    fill="#FFFFFF"
+                                />
+                            </svg>
+                            <Title
+                                level={3}
+                                style={{
+                                    margin: 0,
+                                    background: "linear-gradient(90deg, #1890ff, #52c41a)",
+                                    WebkitBackgroundClip: "text",
+                                    WebkitTextFillColor: "transparent",
+                                    fontWeight: "bold",
+                                    fontSize: "30px",
+                                }}
+                            >
+                                学习社区
+                            </Title>
+                        </Space>
+
+                        <Tabs
+                            activeKey={viewMode}
+                            onChange={(key) => {
+                                setViewMode(key as "latest" | "hot");
+                                setPage(1);
                             }}
-                        >
-                            学习社区
-                        </Title>
-                    </Space>
-                    <Space align="center" style={{gap: 16}}>
-                        <Input.Search
-                            placeholder="搜索标题/内容"
-                            allowClear
-                            onSearch={handleSearch}
-                            onChange={(e) => setKeyword(e.target.value)}
-                            style={{width: 360}}
+                            style={{
+                                flex: 1,
+                                maxWidth: 600,
+                                minWidth: 200,
+                            }}
+                            items={[
+                                {
+                                    key: "latest",
+                                    label: "最新发布",
+                                },
+                                {
+                                    key: "hot",
+                                    label: "热门推荐",
+                                },
+                            ]}
                         />
-                        <Button onClick={() => navigate("/community/posts")}>我的帖子</Button>
-                        <Button onClick={() => navigate("/community/favorites")}>我的收藏</Button>
-                        <Button onClick={() => navigate("/community/leaderboard")}>排行榜</Button>
-                        <Button
-                            type="primary"
-                            onClick={() => navigate("/community/publish")}
-                            icon={
-                                <svg
-                                    t="1770209095246"
-                                    className="icon"
-                                    viewBox="0 0 1024 1024"
-                                    version="1.1"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="20"
-                                    height="20"
-                                >
-                                    <path
-                                        d="M744.6016 148.9152l-159.9488 159.2832-62.5408 62.2336-56.3712 56.064c-16.9728 16.9216-64.4352 62.976-75.776 74.496-11.3152 11.52-18.5088 18.816-21.6064 21.888-7.1936 7.168-12.7232 13.696-16.5888 19.6096-3.84 5.888-7.3472 12.416-10.4192 19.584-2.56 4.608-5.9136 13.056-10.0352 25.344s-8.3712 25.728-12.7488 40.3456c-4.352 14.592-8.4992 28.672-12.3392 42.24-3.8656 13.568-6.3232 23.936-7.3472 31.1296-2.048 13.312-0.768 22.784 3.84 28.416 4.6592 5.632 13.9264 7.68 27.8016 6.144 6.7072-1.024 16.8704-3.328 30.5152-6.912 13.6448-3.584 28.032-7.808 43.2128-12.672a1083.904 1083.904 0 0 0 43.648-14.976c13.8752-5.12 24.4224-9.472 31.6416-13.056 7.1936-3.072 14.1568-7.168 20.8384-12.288 6.7072-5.12 12.6208-9.984 17.7664-14.592 2.048-1.536 8.4992-7.7056 19.3024-18.4576s24.448-24.4736 40.9088-41.1136c16.4608-16.64 68.3008-66.7904 88.8832-86.784l61.7728-62.208 161.2032-162.8928-145.6128-140.8zM640.512 487.296l-38.6048 37.1712c-12.8768 11.9296-45.2864 41.856-55.552 51.7888-10.3168 9.9328-18.8416 18.1248-25.6 24.5504a203.52 203.52 0 0 1-23.168 19.712c-4.1728 3.072-8.5248 5.504-13.0304 7.3472a216.3968 216.3968 0 0 1-19.7888 7.808c-8.704 3.0464-17.7664 6.016-27.264 8.9344-9.472 2.8928-18.5088 5.4272-27.0336 7.552a212.0704 212.0704 0 0 1-19.072 4.1472c-8.6784 0.9216-14.464-0.3072-17.3568-3.6608-2.8928-3.3792-3.712-9.0368-2.4064-16.9728 0.64-4.3008 2.1504-10.496 4.5824-18.5856 2.4064-8.1152 4.9664-16.512 7.7056-25.2416 2.7392-8.704 5.376-16.7168 7.9616-24.064 2.5856-7.3472 4.6848-12.3904 6.272-15.1296 1.9456-4.3008 4.096-8.192 6.528-11.6992 2.4064-3.5072 5.888-7.424 10.368-11.6992 1.9456-1.8432 6.4512-6.1952 13.5168-13.056 7.0912-6.912 304.3328-291.5072 304.3328-291.5072l91.264 86.144-183.6544 176.4608z"
-                                        fill="#ffffff"
-                                        p-id="7693"
-                                    ></path>
-                                    <path
-                                        d="M938.496 396.8256v373.1968-0.8704 30.3616c0 78.6432-66.944 142.6432-149.1968 142.6432H235.4432c-82.2528 0-149.2224-64-149.2224-142.6432V251.5456v2.0992-29.4912c0-78.6688 66.9696-142.6432 149.2224-142.6432h365.2864L701.7728 0.0512h-33.3056V0H235.4432C109.9776 0 7.168 94.72 1.2288 213.3248h-0.256V810.3424h0.256c5.9392 118.5792 108.7488 213.2992 234.2144 213.2992h553.856c125.4656 0 228.2752-94.72 234.2144-213.2992h0.256V316.7744l-85.248 80.0512zM918.2976 33.3568a47.3344 47.3344 0 0 0-13.824-2.5088c4.7104 0.3072 9.2928 1.152 13.824 2.5088z"
-                                        fill="#ffffff"
-                                        p-id="7694"
-                                    ></path>
-                                    <path
-                                        d="M1010.2784 136.0384c0.8448-14.3872-3.1488-30.208-11.5712-45.312a118.1952 118.1952 0 0 0-23.1424-29.1072c-17.3312-16-37.76-25.984-57.2672-29.44a110.1312 110.1312 0 0 0-13.824-1.3568h-2.3296a84.736 84.736 0 0 0-53.888 18.688c-7.0656 5.7344-15.872 13.5424-26.4704 23.424-10.5728 9.9072-19.712 18.3552-27.392 25.344l144.8448 140.8c4.5056-3.84 9.2928-8.32 14.4384-13.4144 4.48-4.4544 9.7792-9.5744 15.872-15.3088 6.0672-5.7344 12.9792-12.4416 20.6592-20.096 7.0656-7.68 12.1856-15.6416 15.4112-23.936a68.6592 68.6592 0 0 0 4.6592-30.2848z m-36.6848 19.84a51.9424 51.9424 0 0 1-10.5472 16.384c-5.248 5.2224-9.984 9.8048-14.1312 13.7216-4.1728 3.9424-7.7824 7.424-10.8544 10.496 3.072-2.6368-3.5072 3.4816 0 0l-100.0192-95.3856c5.2736-4.7872 2.56-2.3296 9.8048-9.088 7.2192-6.784 13.2608-12.1344 18.0736-16.0512a57.9584 57.9584 0 0 1 36.864-12.8 75.264 75.264 0 0 1 11.0592 0.9472 79.36 79.36 0 0 1 39.168 20.1472c6.656 6.1184 11.9296 12.9024 15.872 19.9168 5.76 10.3424 8.4736 21.1456 7.9104 31.0016l0.0768 3.6864c0 5.6832-1.1008 11.3664-3.2768 17.024z"
-                                        fill="#ffffff"
-                                        p-id="7695"
-                                    ></path>
-                                </svg>
-                            }
-                        />
-                    </Space>
+
+                        <Space align="center" style={{gap: 16, flexWrap: "wrap"}}>
+                            <Input.Search
+                                placeholder="搜索标题/内容"
+                                allowClear
+                                onSearch={handleSearch}
+                                onChange={(e) => setKeyword(e.target.value)}
+                                style={{width: 360}}
+                            />
+                            <Button onClick={() => navigate("/community/posts")}>我的帖子</Button>
+                            <Button onClick={() => navigate("/community/favorites")}>我的收藏</Button>
+                            <Button onClick={() => navigate("/community/leaderboard")}>排行榜</Button>
+                            <Button
+                                type="primary"
+                                onClick={() => navigate("/community/publish")}
+                                icon={
+                                    <svg
+                                        t="1770209095246"
+                                        className="icon"
+                                        viewBox="0 0 1024 1024"
+                                        version="1.1"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="20"
+                                        height="20"
+                                    >
+                                        <path
+                                            d="M744.6016 148.9152l-159.9488 159.2832-62.5408 62.2336-56.3712 56.064c-16.9728 16.9216-64.4352 62.976-75.776 74.496-11.3152 11.52-18.5088 18.816-21.6064 21.888-7.1936 7.168-12.7232 13.696-16.5888 19.6096-3.84 5.888-7.3472 12.416-10.4192 19.584-2.56 4.608-5.9136 13.056-10.0352 25.344s-8.3712 25.728-12.7488 40.3456c-4.352 14.592-8.4992 28.672-12.3392 42.24-3.8656 13.568-6.3232 23.936-7.3472 31.1296-2.048 13.312-0.768 22.784 3.84 28.416 4.6592 5.632 13.9264 7.68 27.8016 6.144 6.7072-1.024 16.8704-3.328 30.5152-6.912 13.6448-3.584 28.032-7.808 43.2128-12.672a1083.904 1083.904 0 0 0 43.648-14.976c13.8752-5.12 24.4224-9.472 31.6416-13.056 7.1936-3.072 14.1568-7.168 20.8384-12.288 6.7072-5.12 12.6208-9.984 17.7664-14.592 2.048-1.536 8.4992-7.7056 19.3024-18.4576s24.448-24.4736 40.9088-41.1136c16.4608-16.64 68.3008-66.7904 88.8832-86.784l61.7728-62.208 161.2032-162.8928-145.6128-140.8zM640.512 487.296l-38.6048 37.1712c-12.8768 11.9296-45.2864 41.856-55.552 51.7888-10.3168 9.9328-18.8416 18.1248-25.6 24.5504a203.52 203.52 0 0 1-23.168 19.712c-4.1728 3.072-8.5248 5.504-13.0304 7.3472a216.3968 216.3968 0 0 1-19.7888 7.808c-8.704 3.0464-17.7664 6.016-27.264 8.9344-9.472 2.8928-18.5088 5.4272-27.0336 7.552a212.0704 212.0704 0 0 1-19.072 4.1472c-8.6784 0.9216-14.464-0.3072-17.3568-3.6608-2.8928-3.3792-3.712-9.0368-2.4064-16.9728 0.64-4.3008 2.1504-10.496 4.5824-18.5856 2.4064-8.1152 4.9664-16.512 7.7056-25.2416 2.7392-8.704 5.376-16.7168 7.9616-24.064 2.5856-7.3472 4.6848-12.3904 6.272-15.1296 1.9456-4.3008 4.096-8.192 6.528-11.6992 2.4064-3.5072 5.888-7.424 10.368-11.6992 1.9456-1.8432 6.4512-6.1952 13.5168-13.056 7.0912-6.912 304.3328-291.5072 304.3328-291.5072l91.264 86.144-183.6544 176.4608z"
+                                            fill="#ffffff"
+                                            p-id="7693"
+                                        ></path>
+                                        <path
+                                            d="M938.496 396.8256v373.1968-0.8704 30.3616c0 78.6432-66.944 142.6432-149.1968 142.6432H235.4432c-82.2528 0-149.2224-64-149.2224-142.6432V251.5456v2.0992-29.4912c0-78.6688 66.9696-142.6432 149.2224-142.6432h365.2864L701.7728 0.0512h-33.3056V0H235.4432C109.9776 0 7.168 94.72 1.2288 213.3248h-0.256V810.3424h0.256c5.9392 118.5792 108.7488 213.2992 234.2144 213.2992h553.856c125.4656 0 228.2752-94.72 234.2144-213.2992h0.256V316.7744l-85.248 80.0512zM918.2976 33.3568a47.3344 47.3344 0 0 0-13.824-2.5088c4.7104 0.3072 9.2928 1.152 13.824 2.5088z"
+                                            fill="#ffffff"
+                                            p-id="7694"
+                                        ></path>
+                                        <path
+                                            d="M1010.2784 136.0384c0.8448-14.3872-3.1488-30.208-11.5712-45.312a118.1952 118.1952 0 0 0-23.1424-29.1072c-17.3312-16-37.76-25.984-57.2672-29.44a110.1312 110.1312 0 0 0-13.824-1.3568h-2.3296a84.736 84.736 0 0 0-53.888 18.688c-7.0656 5.7344-15.872 13.5424-26.4704 23.424-10.5728 9.9072-19.712 18.3552-27.392 25.344l144.8448 140.8c4.5056-3.84 9.2928-8.32 14.4384-13.4144 4.48-4.4544 9.7792-9.5744 15.872-15.3088 6.0672-5.7344 12.9792-12.4416 20.6592-20.096 7.0656-7.68 12.1856-15.6416 15.4112-23.936a68.6592 68.6592 0 0 0 4.6592-30.2848z m-36.6848 19.84a51.9424 51.9424 0 0 1-10.5472 16.384c-5.248 5.2224-9.984 9.8048-14.1312 13.7216-4.1728 3.9424-7.7824 7.424-10.8544 10.496 3.072-2.6368-3.5072 3.4816 0 0l-100.0192-95.3856c5.2736-4.7872 2.56-2.3296 9.8048-9.088 7.2192-6.784 13.2608-12.1344 18.0736-16.0512a57.9584 57.9584 0 0 1 36.864-12.8 75.264 75.264 0 0 1 11.0592 0.9472 79.36 79.36 0 0 1 39.168 20.1472c6.656 6.1184 11.9296 12.9024 15.872 19.9168 5.76 10.3424 8.4736 21.1456 7.9104 31.0016l0.0768 3.6864c0 5.6832-1.1008 11.3664-3.2768 17.024z"
+                                            fill="#ffffff"
+                                            p-id="7695"
+                                        ></path>
+                                    </svg>
+                                }
+                            />
+                        </Space>
+                    </div>
                 </Space>
             </Card>
 
@@ -635,7 +769,7 @@ export default function CommunityLanding() {
                                         backgroundColor: '#fff',
                                         marginBottom: '8px'
                                     }}
-                                    onClick={() => navigate(`/community/posts/${post.id}`)}
+                                    onClick={() => openPostDetail(post.id)}
                                     onMouseEnter={(e) => {
                                         e.currentTarget.style.backgroundColor = '#f8f8f8';
                                         e.currentTarget.style.boxShadow = '0 3px 6px rgba(0,0,0,0.08)';
@@ -731,6 +865,9 @@ export default function CommunityLanding() {
                             renderItem={(item) => {
                                 const summary = stripText(item.content).slice(0, 120);
                                 const cover = resolveImageUrl(item.images?.[0]);
+                                const isForwardPost = item.forward_post_id && item.ForwardPost;
+                                const isExpanded = expandedForwardPosts.has(item.id);
+
                                 return (
                                     <List.Item
                                         style={{
@@ -743,7 +880,7 @@ export default function CommunityLanding() {
                                             boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
                                             cursor: "pointer"
                                         }}
-                                        onClick={() => navigate(`/community/posts/${item.id}`)}
+                                        onClick={() => openPostDetail(item.id)}
                                     >
                                         <div
                                             style={{
@@ -780,20 +917,171 @@ export default function CommunityLanding() {
                                                     </Text>
                                                 </Space>
 
+                                                {/* 转发帖引用卡片 */}
+                                                {isForwardPost && item.ForwardPost && (
+                                                    <div
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        style={{
+                                                            backgroundColor: "#fafafa",
+                                                            border: "1px solid #e8e8e8",
+                                                            borderRadius: "8px",
+                                                            padding: "12px 16px",
+                                                            width: "100%",
+                                                        }}
+                                                    >
+                                                        {/* 转发头部：@原作者昵称：原帖标题 */}
+                                                        <div style={{
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            flexWrap: "wrap",
+                                                            gap: 4,
+                                                            marginBottom: 8,
+                                                        }}>
+                                                            <Text
+                                                                style={{
+                                                                    color: "#52c41a",
+                                                                    fontWeight: "bold",
+                                                                    cursor: "pointer",
+                                                                }}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                }}
+                                                            >
+                                                                @{item.ForwardPost.User?.nickname || item.ForwardPost.User?.username || "用户"}：
+                                                            </Text>
+                                                            <Text
+                                                                style={{
+                                                                    color: "#374151",
+                                                                    cursor: "pointer",
+                                                                    fontWeight: 500,
+                                                                }}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    openPostDetail(item.ForwardPost!.id);
+                                                                }}
+                                                                onMouseEnter={(e) => {
+                                                                    e.currentTarget.style.color = "#1890ff";
+                                                                }}
+                                                                onMouseLeave={(e) => {
+                                                                    e.currentTarget.style.color = "#374151";
+                                                                }}
+                                                            >
+                                                                {item.ForwardPost.title}
+                                                            </Text>
+                                                        </div>
+
+                                                        {/* 原帖内容 */}
+                                                        <div style={{
+                                                            whiteSpace: "pre-wrap",
+                                                            wordBreak: "break-word",
+                                                            color: "#666",
+                                                            fontSize: 14,
+                                                            lineHeight: 1.6,
+                                                        }}>
+                                                            {isExpanded ? (
+                                                                <>
+                                                                    {item.ForwardPost.content}
+                                                                    <Text
+                                                                        style={{
+                                                                            color: "#1890ff",
+                                                                            cursor: "pointer",
+                                                                            marginLeft: 8,
+                                                                        }}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            toggleForwardExpand(item.id);
+                                                                        }}
+                                                                    >
+                                                                        收起
+                                                                    </Text>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    {item.ForwardPost.content.length > 100
+                                                                        ? `${item.ForwardPost.content.slice(0, 100)}...`
+                                                                        : item.ForwardPost.content
+                                                                    }
+                                                                    {item.ForwardPost.content.length > 100 && (
+                                                                        <Text
+                                                                            style={{
+                                                                                color: "#1890ff",
+                                                                                cursor: "pointer",
+                                                                                marginLeft: 8,
+                                                                            }}
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                toggleForwardExpand(item.id);
+                                                                            }}
+                                                                        >
+                                                                            查看更多
+                                                                        </Text>
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                        </div>
+
+                                                        {/* 原帖互动数据 */}
+                                                        <div style={{
+                                                            marginTop: 12,
+                                                            paddingTop: 8,
+                                                            borderTop: "1px solid #f0f0f0",
+                                                            display: "flex",
+                                                            gap: 16,
+                                                        }}>
+                                                            <Text type="secondary" style={{ fontSize: 12 }}>
+                                                                👍 {item.ForwardPost.like_count || 0}
+                                                            </Text>
+                                                            <Text type="secondary" style={{ fontSize: 12 }}>
+                                                                |
+                                                            </Text>
+                                                            <Text type="secondary" style={{ fontSize: 12 }}>
+                                                                💬 {item.ForwardPost.comment_count || 0}
+                                                            </Text>
+                                                        </div>
+                                                    </div>
+                                                )}
+
                                                 {/* 分类标签 */}
                                                 {item.category && (
                                                     <Tag color="blue" style={{marginBottom: 4}}>
                                                         {item.category}
                                                     </Tag>
                                                 )}
-                                                <Text strong style={{fontSize: 18, display: "block"}}>
+
+                                                {/* 标题 - 如果是转发帖，可能标题是"转发: xxx"，但我们已经通过引用卡片展示了，所以可以简化或保留 */}
+                                                <Text
+                                                    strong
+                                                    style={{
+                                                        fontSize: 18,
+                                                        display: "block",
+                                                        cursor: "pointer",
+                                                        transition: "color 0.2s ease",
+                                                        color: "#1F2937",
+                                                    }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        openPostDetail(item.id);
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.color = "#1890ff";
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.color = "#1F2937";
+                                                    }}
+                                                >
                                                     {item.title}
                                                 </Text>
 
                                                 {/* 正文摘要 */}
-                                                <Paragraph ellipsis={{rows: 2}} style={{marginBottom: 8, margin: 0}}>
-                                                    {summary}
-                                                    {summary.length >= 120 ? "...【阅读更多】" : ""}
+                                                <Paragraph
+                                                    ellipsis={{rows: 2}}
+                                                    style={{
+                                                        marginBottom: 8,
+                                                        margin: 0,
+                                                        color: "#6B7280",
+                                                    }}
+                                                >
+                                                    {stripText(item.content) || "暂无内容"}
                                                 </Paragraph>
 
                                                 {/* 标签模块 */}
@@ -1419,6 +1707,48 @@ export default function CommunityLanding() {
                 </div>
             </div>
             <CommunityFooter/>
+
+            {/* 帖子详情弹窗 */}
+            <Modal
+                title={null}
+                open={postDetailVisible}
+                onCancel={closePostDetail}
+                footer={null}
+                width="800px"
+                destroyOnHidden={true}
+                closable={true}
+                maskClosable={true}
+                className="post-detail-modal"
+                styles={{
+                    mask: {
+                        backdropFilter: "blur(4px)"
+                    },
+                    body: {
+                        padding: 0,
+                        maxHeight: "90vh",
+                        height: "90vh",
+                        overflow: "hidden",
+                        display: "flex",
+                        flexDirection: "column"
+                    },
+                    content: {
+                        maxHeight: "90vh",
+                        height: "90vh",
+                        display: "flex",
+                        flexDirection: "column",
+                        overflow: "hidden"
+                    }
+                }}
+            >
+                {currentPostId && (
+                    <Suspense fallback={<PostDetailLoading />}>
+                        <PostDetail
+                            postId={currentPostId}
+                            onClose={closePostDetail}
+                        />
+                    </Suspense>
+                )}
+            </Modal>
         </div>
     );
 }
