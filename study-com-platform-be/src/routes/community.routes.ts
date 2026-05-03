@@ -42,6 +42,9 @@ import {
   getLoginStreakDetail,
   getContentQualityDetail,
   getDailyStudyRecords,
+  getMultiDimTrend,
+  getWeeklyComparison,
+  getActivityHeatmap,
 } from "../controllers/study-stats.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { conditionalPostImages } from "../middlewares/upload.middleware";
@@ -111,5 +114,10 @@ router.get("/learning-stats/duration", authMiddleware, getStudyDurationDetail);
 router.get("/learning-stats/streak", authMiddleware, getLoginStreakDetail);
 router.get("/learning-stats/quality", authMiddleware, getContentQualityDetail);
 router.get("/learning-stats/daily", authMiddleware, getDailyStudyRecords);
+
+// 增强学习统计API - 多维趋势、对比、热力图
+router.get("/learning-stats/trend", authMiddleware, getMultiDimTrend);
+router.get("/learning-stats/comparison", authMiddleware, getWeeklyComparison);
+router.get("/learning-stats/heatmap", authMiddleware, getActivityHeatmap);
 
 export default router;

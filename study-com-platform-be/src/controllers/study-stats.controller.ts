@@ -8,8 +8,14 @@ import {
   getLoginStreak,
   getContentQualityScore,
   getDailyRecords,
+  getMultiDimTrendData,
+  getComparisonData,
+  getHeatmapData,
   type LearningStatsCardData,
-  type DailyStudyRecord
+  type DailyStudyRecord,
+  type MultiDimTrendData,
+  type ComparisonData,
+  type HeatmapData
 } from "../services/learning-stats.service";
 
 interface DailyDuration {
@@ -293,6 +299,72 @@ export const getDailyStudyRecords = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('获取每日学习记录失败:', error);
+    const message = error instanceof Error ? error.message : "获取失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+export const getMultiDimTrend = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const { days = 14 } = req.query;
+    const daysNum = parseInt(String(days)) || 14;
+
+    const data = await getMultiDimTrendData(req.user.id, daysNum);
+
+    res.json({
+      success: true,
+      message: "获取多维趋势数据成功",
+      data
+    });
+  } catch (error) {
+    console.error('获取多维趋势数据失败:', error);
+    const message = error instanceof Error ? error.message : "获取失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+export const getWeeklyComparison = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const data = await getComparisonData(req.user.id);
+
+    res.json({
+      success: true,
+      message: "获取周对比数据成功",
+      data
+    });
+  } catch (error) {
+    console.error('获取周对比数据失败:', error);
+    const message = error instanceof Error ? error.message : "获取失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+export const getActivityHeatmap = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const { weeks = 12 } = req.query;
+    const weeksNum = parseInt(String(weeks)) || 12;
+
+    const data = await getHeatmapData(req.user.id, weeksNum);
+
+    res.json({
+      success: true,
+      message: "获取热力图数据成功",
+      data
+    });
+  } catch (error) {
+    console.error('获取热力图数据失败:', error);
     const message = error instanceof Error ? error.message : "获取失败";
     res.status(500).json({ success: false, message });
   }

@@ -15,7 +15,12 @@ import {
   List,
   Tag,
   Divider,
-  Tooltip
+  Tooltip,
+  Radio,
+  Switch,
+  Empty,
+  ConfigProvider,
+  theme
 } from "antd";
 import { SyncOutlined } from "@ant-design/icons";
 import * as echarts from 'echarts';
@@ -32,7 +37,11 @@ import {
   FireOutlined,
   StarOutlined,
   LineChartOutlined,
-  CheckCircleOutlined
+  CheckCircleOutlined,
+  HeatMapOutlined,
+  PlusOutlined,
+  RiseOutlined,
+  PlayCircleOutlined
 } from "@ant-design/icons";
 import { useAppSelector } from "../../app/hooks";
 import type { RootState } from "../../app/store";
@@ -44,8 +53,15 @@ import {
   fetchLoginStreakDetail,
   fetchContentQualityDetail,
   fetchDailyStudyRecords,
+  fetchMultiDimTrend,
+  fetchWeeklyComparison,
+  fetchActivityHeatmap,
   type LearningStatsCardsData,
-  type DailyStudyRecord
+  type DailyStudyRecord,
+  type MultiDimTrendData,
+  type ComparisonData,
+  type HeatmapData,
+  type TrendDataType
 } from "../../services/communityPublic";
 import {
   fetchCommunityProfileSummary,
@@ -55,8 +71,8 @@ import {
 const { Title, Text, Paragraph } = Typography;
 const { RangePicker } = DatePicker;
 const { Option } = Select;
+const { RadioGroup, RadioButton } = Radio;
 
-// 学习统计数据类型定义
 interface StudyStat {
   date: string;
   postsCount: number;
@@ -70,13 +86,11 @@ interface StudyStat {
   likesReceived: number;
 }
 
-// 趋势数据类型定义
 interface TrendDataPoint {
   date: string;
   postsCount: number;
 }
 
-// 帖子数据类型定义
 interface PostData {
   id: number;
   user_id: number;
@@ -89,7 +103,6 @@ interface PostData {
   [key: string]: unknown;
 }
 
-// 用户资料类型定义
 interface UserProfile {
   todayPosts?: number;
   todayComments?: number;
@@ -111,10 +124,15 @@ interface WeeklySummary {
   hotPostsCount: number;
 }
 
-// 抽屉详情类型
 type DrawerType = 'duration' | 'streak' | 'quality' | 'posts' | 'completion' | 'points' | null;
 
-// 从用户帖子数据生成趋势数据
+const trendTabConfig: Record<TrendDataType, { label: string; icon: React.ReactNode; color: string }> = {
+  posts: { label: '发帖数量', icon: <BookOutlined />, color: '#667eea' },
+  views: { label: '浏览量', icon: <LineChartOutlined />, color: '#4facfe' },
+  points: { label: '积分', icon: <TrophyOutlined />, color: '#f59e0b' },
+  duration: { label: '学习时长', icon: <ClockCircleOutlined />, color: '#10b981' }
+};
+
 const generateTrendDataFromPosts = (posts: PostData[]): TrendDataPoint[] => {
   if (!posts || posts.length === 0) {
     return [];
@@ -156,17 +174,6 @@ const generateTrendDataFromPosts = (posts: PostData[]): TrendDataPoint[] => {
   return trendData;
 };
 
-// 从学习统计数据生成趋势数据
-const generateTrendDataFromStudyData = (studyData: StudyStat[]): TrendDataPoint[] => {
-  const recentData = studyData.slice(-30);
-
-  return recentData.map(day => ({
-    date: day.date,
-    postsCount: day.postsCount
-  }));
-};
-
-// 备用：生成趋势数据
 const generateFallbackTrendData = (): TrendDataPoint[] => {
   const data: TrendDataPoint[] = [];
   const today = new Date();
@@ -184,297 +191,6 @@ const generateFallbackTrendData = (): TrendDataPoint[] => {
   return data;
 };
 
-// 社区参与趋势折线图组件
-interface TrendChartProps {
-  userPosts: PostData[];
-  fallbackStudyData: StudyStat[];
-}
-
-const TrendChart = ({ userPosts, fallbackStudyData }: TrendChartProps) => {
-  const chartRef = useRef<HTMLDivElement>(null);
-  const chartInstance = useRef<echarts.ECharts | null>(null);
-
-  let trendData: TrendDataPoint[] = [];
-  try {
-    trendData = userPosts && userPosts.length > 0
-        ? generateTrendDataFromPosts(userPosts)
-        : (fallbackStudyData && fallbackStudyData.length > 0
-            ? generateTrendDataFromStudyData(fallbackStudyData)
-            : generateFallbackTrendData());
-  } catch (error) {
-    console.error('生成趋势数据时出错:', error);
-    trendData = generateFallbackTrendData();
-  }
-
-  const filteredData = trendData.slice(-7);
-
-  const dates = filteredData.map(point =>
-      new Date(point.date).toLocaleDateString('zh-CN', {
-        month: 'numeric',
-        day: 'numeric'
-      })
-  );
-  const postsCounts = filteredData.map(point => point.postsCount);
-
-  useEffect(() => {
-    if (!chartRef.current) return;
-
-    if (!chartInstance.current) {
-      chartInstance.current = echarts.init(chartRef.current);
-    }
-
-    const option = {
-      title: {
-        text: postsCounts.every(count => count === 0) 
-          ? '📈 发帖数量趋势 (暂无发帖记录)' 
-          : '📈 发帖数量趋势 (近7天)',
-        left: 'center',
-        textStyle: {
-          color: '#1f2937',
-          fontSize: 16,
-          fontWeight: 'bold'
-        },
-        top: 10
-      },
-      tooltip: {
-        trigger: 'axis',
-        formatter: (params: echarts.CallbackDataParams[]) => {
-          const data = params[0];
-          const dateIndex = data.dataIndex;
-          const fullDate = new Date(filteredData[dateIndex].date).toLocaleDateString('zh-CN', {
-            month: 'long',
-            day: 'numeric',
-            weekday: 'short'
-          });
-          return `${fullDate}<br/>发帖数量: ${data.value} 篇`;
-        }
-      },
-      xAxis: {
-        type: 'category',
-        data: dates,
-        axisLine: { lineStyle: { color: '#e5e7eb' } },
-        axisLabel: { color: '#6b7280', fontSize: 11 }
-      },
-      yAxis: {
-        type: 'value',
-        min: 0,
-        max: postsCounts.every(count => count === 0) ? 1 : Math.max(5, Math.max(...postsCounts) + 1),
-        axisLine: { show: false },
-        axisTick: { show: false },
-        axisLabel: { color: '#6b7280', fontSize: 12 },
-        splitLine: {
-          lineStyle: {
-            color: 'rgba(102, 126, 234, 0.1)',
-            type: 'dashed'
-          }
-        }
-      },
-      series: [{
-        data: postsCounts,
-        type: 'line',
-        smooth: true,
-        symbol: 'circle',
-        symbolSize: 10,
-        lineStyle: {
-          width: 3,
-          color: {
-            type: 'linear',
-            x: 0,
-            y: 0,
-            x2: 1,
-            y2: 0,
-            colorStops: [
-              { offset: 0, color: '#667eea' },
-              { offset: 1, color: '#764ba2' }
-            ]
-          }
-        },
-        itemStyle: {
-          color: '#667eea',
-          borderColor: '#fff',
-          borderWidth: 2,
-          shadowColor: 'rgba(0,0,0,0.1)',
-          shadowBlur: 3
-        },
-        emphasis: {
-          focus: 'series',
-          itemStyle: { symbolSize: 14, borderWidth: 3 }
-        },
-        areaStyle: {
-          color: {
-            type: 'linear',
-            x: 0,
-            y: 0,
-            x2: 0,
-            y2: 1,
-            colorStops: [
-              { offset: 0, color: 'rgba(102, 126, 234, 0.2)' },
-              { offset: 1, color: 'rgba(102, 126, 234, 0.05)' }
-            ]
-          }
-        }
-      }],
-      grid: { left: '60', right: '20', top: '60', bottom: '40' },
-      backgroundColor: '#ffffff'
-    };
-
-    chartInstance.current.setOption(option, true);
-
-    const handleResize = () => chartInstance.current?.resize();
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [dates, postsCounts]);
-
-  return (
-      <div style={{ height: 300, padding: '10px', borderRadius: 12, overflow: 'hidden' }}>
-        <div ref={chartRef} style={{ height: '100%', width: '100%' }} />
-      </div>
-  );
-};
-
-// 学习目标类型定义
-interface LearningGoals {
-  goal_posts: number;
-  goal_comments: number;
-  goal_hot_posts: number;
-  goal_points: number;
-}
-
-// 从后端接口数据生成学习统计数据
-const generateStudyDataFromApi = (posts: PostData[]): StudyStat[] => {
-  if (!posts || posts.length === 0) {
-    return [];
-  }
-
-  const dateMap = new Map<string, {
-    postsCount: number;
-    viewCount: number;
-    commentsMade: number;
-    likesReceived: number;
-  }>();
-
-  posts.forEach(post => {
-    try {
-      const dateStr = post.created_at;
-      if (!dateStr) return;
-      
-      const postDate = new Date(dateStr);
-      if (isNaN(postDate.getTime())) return;
-      
-      const date = postDate.toISOString().split('T')[0];
-      
-      const currentDateData = dateMap.get(date) || {
-        postsCount: 0,
-        viewCount: 0,
-        commentsMade: 0,
-        likesReceived: 0
-      };
-      
-      dateMap.set(date, {
-        postsCount: currentDateData.postsCount + 1,
-        viewCount: currentDateData.viewCount + (post.view_count || 0),
-        commentsMade: currentDateData.commentsMade + (post.comment_count || 0),
-        likesReceived: currentDateData.likesReceived + (post.like_count || 0)
-      });
-    } catch (error) {
-      console.warn('处理帖子数据时出错:', post, error);
-    }
-  });
-
-  const result: StudyStat[] = [];
-
-  const today = new Date();
-  for (let i = 29; i >= 0; i -= 1) {
-    const date = new Date(today);
-    date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().split('T')[0];
-    
-    const currentData = dateMap.get(dateStr);
-    const yesterdayDate = new Date(date);
-    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-    const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
-    const yesterdayData = dateMap.get(yesterdayStr);
-    
-    let viewChange = 0;
-    let viewChangePercent = 0;
-    let viewChangeType: 'increase' | 'decrease' | 'no-change' = 'no-change';
-    
-    if (currentData) {
-      if (yesterdayData) {
-        viewChange = currentData.viewCount - yesterdayData.viewCount;
-        viewChangePercent = yesterdayData.viewCount > 0 
-          ? Math.round((viewChange / yesterdayData.viewCount) * 100)
-          : (viewChange > 0 ? 100 : 0);
-        viewChangeType = viewChange > 0 ? 'increase' : viewChange < 0 ? 'decrease' : 'no-change';
-      } else {
-        viewChange = currentData.viewCount;
-        viewChangePercent = 100;
-        viewChangeType = 'increase';
-      }
-    }
-    
-    result.push({
-      date: dateStr,
-      postsCount: currentData?.postsCount || 0,
-      todayPosts: currentData?.postsCount || 0,
-      viewCount: currentData?.viewCount || 0,
-      viewChange,
-      viewChangePercent,
-      viewChangeType,
-      communityPoints: 0,
-      commentsMade: currentData?.commentsMade || 0,
-      likesReceived: currentData?.likesReceived || 0
-    });
-  }
-
-  return result;
-};
-
-const generateWeeklySummary = (data: StudyStat[], userProfile: UserProfile | null, learningGoals: LearningGoals | null): WeeklySummary => {
-  const totalPosts = userProfile?.totalPosts || userProfile?.hotPostsCount || 0;
-  const todayPosts = userProfile?.todayPosts || 0;
-  const totalCommunityPoints = userProfile?.points || 0;
-  
-  const goalPosts = learningGoals?.goal_posts || 3;
-  const goalComments = learningGoals?.goal_comments || 20;
-  const goalHotPosts = learningGoals?.goal_hot_posts || 1;
-  const goalPoints = learningGoals?.goal_points || 500;
-  
-  const postsCompletion = Math.min(100, Math.round((todayPosts / goalPosts) * 100));
-  const commentsCompletion = userProfile?.todayComments !== undefined 
-    ? Math.min(100, Math.round((userProfile.todayComments / goalComments) * 100))
-    : 0;
-  const hotPostsCompletion = userProfile?.hotPostsCount !== undefined
-    ? Math.min(100, Math.round((userProfile.hotPostsCount / goalHotPosts) * 100))
-    : 0;
-  const pointsCompletion = totalCommunityPoints !== undefined
-    ? Math.min(100, Math.round((totalCommunityPoints / goalPoints) * 100))
-    : 0;
-  
-  const taskCompletionRate = Math.round((postsCompletion + commentsCompletion + hotPostsCompletion + pointsCompletion) / 4);
-  
-  const completedTasks = [
-    postsCompletion >= 80 ? 1 : 0,
-    commentsCompletion >= 80 ? 1 : 0,
-    hotPostsCompletion >= 80 ? 1 : 0,
-    pointsCompletion >= 80 ? 1 : 0
-  ].reduce((sum, val) => sum + val, 0);
-
-  return {
-    totalPosts,
-    todayPosts,
-    taskCompletionRate: Math.max(0, Math.min(100, taskCompletionRate)),
-    totalCommunityPoints,
-    completedTasks,
-    rank: userProfile?.rank || 1,
-    hotPostsCount: userProfile?.hotPostsCount || 0
-  };
-};
-
-// 数字跳动动画 Hook
 const useCountUp = (end: number, duration: number = 1000, start: boolean = true) => {
   const [count, setCount] = useState(0);
   
@@ -505,7 +221,6 @@ const useCountUp = (end: number, duration: number = 1000, start: boolean = true)
   return count;
 };
 
-// 统计卡片组件
 interface StatCardProps {
   title: string;
   icon: React.ReactNode;
@@ -619,6 +334,478 @@ const StatCard: React.FC<StatCardProps> = ({
   );
 };
 
+interface EmptyStateProps {
+  title: string;
+  description: string;
+  icon?: React.ReactNode;
+  actionText?: string;
+  onAction?: () => void;
+}
+
+const EmptyState: React.FC<EmptyStateProps> = ({
+  title,
+  description,
+  icon,
+  actionText,
+  onAction
+}) => {
+  return (
+    <div style={{
+      textAlign: 'center',
+      padding: '48px 24px',
+      background: 'rgba(255, 255, 255, 0.9)',
+      borderRadius: 16
+    }}>
+      <div style={{
+        fontSize: 64,
+        marginBottom: 16,
+        opacity: 0.6
+      }}>
+        {icon || <BarChartOutlined />}
+      </div>
+      <Title level={4} style={{
+        color: '#374151',
+        marginBottom: 8
+      }}>
+        {title}
+      </Title>
+      <Text type="secondary" style={{
+        fontSize: 14,
+        display: 'block',
+        marginBottom: 24
+      }}>
+        {description}
+      </Text>
+      {actionText && onAction && (
+        <Button
+          type="primary"
+          size="large"
+          icon={<PlusOutlined />}
+          onClick={onAction}
+          style={{
+            borderRadius: 24,
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            border: 'none'
+          }}
+        >
+          {actionText}
+        </Button>
+      )}
+    </div>
+  );
+};
+
+interface MultiDimTrendChartProps {
+  data: MultiDimTrendData[];
+  comparisonData?: ComparisonData;
+  dataType: TrendDataType;
+  showComparison: boolean;
+  hasData: boolean;
+}
+
+const MultiDimTrendChart: React.FC<MultiDimTrendChartProps> = ({
+  data,
+  comparisonData,
+  dataType,
+  showComparison,
+  hasData
+}) => {
+  const chartRef = useRef<HTMLDivElement>(null);
+  const chartInstance = useRef<echarts.ECharts | null>(null);
+  const config = trendTabConfig[dataType];
+
+  const getDataValue = (item: MultiDimTrendData): number => {
+    switch (dataType) {
+      case 'posts': return item.posts;
+      case 'views': return item.views;
+      case 'points': return item.points;
+      case 'duration': return item.duration;
+      default: return 0;
+    }
+  };
+
+  const getFormattedValue = (value: number): string => {
+    if (dataType === 'duration') {
+      if (value >= 60) {
+        const hours = Math.floor(value / 60);
+        const mins = value % 60;
+        return mins > 0 ? `${hours}h${mins}m` : `${hours}h`;
+      }
+      return `${value}分钟`;
+    }
+    if (dataType === 'points') {
+      return `${value}分`;
+    }
+    if (dataType === 'views') {
+      return `${value}次`;
+    }
+    return `${value}篇`;
+  };
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+
+    if (!chartInstance.current) {
+      chartInstance.current = echarts.init(chartRef.current);
+    }
+
+    const dates = data.map(item =>
+      new Date(item.date).toLocaleDateString('zh-CN', {
+        month: 'numeric',
+        day: 'numeric'
+      })
+    );
+
+    const values = data.map(getDataValue);
+
+    const series: echarts.SeriesOption[] = [{
+      name: trendTabConfig[dataType].label,
+      data: values,
+      type: 'line',
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: 10,
+      lineStyle: {
+        width: 3,
+        color: config.color
+      },
+      itemStyle: {
+        color: config.color,
+        borderColor: '#fff',
+        borderWidth: 2
+      },
+      emphasis: {
+        focus: 'series',
+        itemStyle: { symbolSize: 14, borderWidth: 3 }
+      },
+      areaStyle: {
+        color: {
+          type: 'linear',
+          x: 0,
+          y: 0,
+          x2: 0,
+          y2: 1,
+          colorStops: [
+            { offset: 0, color: `${config.color}33` },
+            { offset: 1, color: `${config.color}08` }
+          ]
+        }
+      }
+    }];
+
+    if (showComparison && comparisonData) {
+      const prevWeekValues = comparisonData.previousWeek.map(getDataValue);
+      
+      series.push({
+        name: '上周数据',
+        data: prevWeekValues,
+        type: 'line',
+        smooth: true,
+        symbol: 'diamond',
+        symbolSize: 8,
+        lineStyle: {
+          width: 2,
+          color: '#94a3b8',
+          type: 'dashed'
+        },
+        itemStyle: {
+          color: '#94a3b8',
+          borderColor: '#fff',
+          borderWidth: 2
+        }
+      });
+    }
+
+    const maxValue = Math.max(...values, 1);
+    
+    const option: echarts.EChartsOption = {
+      title: {
+        text: hasData ? `${trendTabConfig[dataType].label}趋势` : `暂无${trendTabConfig[dataType].label}数据`,
+        left: 'center',
+        textStyle: {
+          color: '#1f2937',
+          fontSize: 16,
+          fontWeight: 'bold'
+        },
+        top: 10
+      },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        borderColor: '#e5e7eb',
+        borderWidth: 1,
+        padding: [12, 16],
+        textStyle: {
+          color: '#374151',
+          fontSize: 13
+        },
+        formatter: (params: any[]) => {
+          const data = params[0];
+          const dateIndex = data.dataIndex;
+          const fullDate = new Date(data.date || dates[dateIndex]).toLocaleDateString('zh-CN', {
+            month: 'long',
+            day: 'numeric',
+            weekday: 'short'
+          });
+          
+          let result = `<div style="font-weight: bold; margin-bottom: 8px;">${fullDate}</div>`;
+          
+          params.forEach((param) => {
+            const value = param.value as number;
+            const formattedValue = getFormattedValue(value);
+            const color = param.color;
+            
+            result += `<div style="display: flex; justify-content: space-between; gap: 16px; margin-top: 4px;">
+              <span><span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: ${color}; margin-right: 6px;"></span>${param.seriesName}</span>
+              <span style="font-weight: 600;">${formattedValue}</span>
+            </div>`;
+          });
+          
+          return result;
+        }
+      },
+      legend: showComparison ? {
+        data: [trendTabConfig[dataType].label, '上周数据'],
+        top: 50,
+        textStyle: { color: '#6b7280' }
+      } : undefined,
+      xAxis: {
+        type: 'category',
+        data: dates,
+        axisLine: { lineStyle: { color: '#e5e7eb' } },
+        axisLabel: { color: '#6b7280', fontSize: 11 }
+      },
+      yAxis: {
+        type: 'value',
+        min: 0,
+        max: Math.max(5, maxValue + Math.ceil(maxValue * 0.2)),
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: {
+          color: '#6b7280',
+          fontSize: 12,
+          formatter: (value: number) => {
+            if (dataType === 'duration' && value >= 60) {
+              return `${Math.floor(value / 60)}h`;
+            }
+            return value.toString();
+          }
+        },
+        splitLine: {
+          lineStyle: {
+            color: `${config.color}11`,
+            type: 'dashed'
+          }
+        }
+      },
+      series,
+      grid: { left: '60', right: '40', top: showComparison ? '100' : '60', bottom: '40' },
+      backgroundColor: 'transparent'
+    };
+
+    chartInstance.current.setOption(option);
+
+    const handleResize = () => chartInstance.current?.resize();
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [data, comparisonData, dataType, showComparison, hasData, config]);
+
+  return (
+    <div style={{ height: 320, padding: '10px', borderRadius: 12, overflow: 'hidden' }}>
+      <div ref={chartRef} style={{ height: '100%', width: '100%' }} />
+    </div>
+  );
+};
+
+interface ActivityHeatmapProps {
+  data: HeatmapData[];
+  hasData: boolean;
+}
+
+const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({ data, hasData }) => {
+  const chartRef = useRef<HTMLDivElement>(null);
+  const chartInstance = useRef<echarts.ECharts | null>(null);
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+
+    if (!chartInstance.current) {
+      chartInstance.current = echarts.init(chartRef.current);
+    }
+
+    const weeks: { date: string; level: number; count: number }[][] = [];
+    const daysInWeek = 7;
+    const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+    
+    const sortedData = [...data].sort((a, b) => a.date.localeCompare(b.date));
+    
+    let currentWeek: typeof weeks[0] = [];
+    
+    sortedData.forEach((item) => {
+      const d = new Date(item.date);
+      const dayOfWeek = d.getDay();
+      
+      if (currentWeek.length === 0 && dayOfWeek !== 0) {
+        for (let i = 0; i < dayOfWeek; i++) {
+          currentWeek.push({ date: '', level: 0, count: 0 });
+        }
+      }
+      
+      currentWeek.push(item);
+      
+      if (dayOfWeek === 6) {
+        weeks.push(currentWeek);
+        currentWeek = [];
+      }
+    });
+    
+    if (currentWeek.length > 0) {
+      while (currentWeek.length < daysInWeek) {
+        currentWeek.push({ date: '', level: 0, count: 0 });
+      }
+      weeks.push(currentWeek);
+    }
+
+    const heatmapData: [number, number, number][] = [];
+    const dateMap = new Map<string, { level: number; count: number }>();
+    
+    weeks.forEach((week, weekIndex) => {
+      week.forEach((item, dayIndex) => {
+        if (item.date) {
+          heatmapData.push([weekIndex, dayIndex, item.level]);
+          dateMap.set(`${weekIndex}-${dayIndex}`, { level: item.level, count: item.count });
+        }
+      });
+    });
+
+    const colors = ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'];
+
+    const option: echarts.EChartsOption = {
+      title: {
+        text: hasData ? '活跃时间热力图' : '暂无活跃数据',
+        left: 'center',
+        textStyle: {
+          color: '#1f2937',
+          fontSize: 16,
+          fontWeight: 'bold'
+        },
+        top: 10
+      },
+      tooltip: {
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        borderColor: '#e5e7eb',
+        borderWidth: 1,
+        padding: [12, 16],
+        formatter: (params: any) => {
+          const { data } = params;
+          const weekIndex = data[0] as number;
+          const dayIndex = data[1] as number;
+          const level = data[2] as number;
+          
+          const weekData = weeks[weekIndex];
+          const dayData = weekData?.[dayIndex];
+          
+          if (!dayData || !dayData.date) {
+            return '暂无数据';
+          }
+          
+          const fullDate = new Date(dayData.date).toLocaleDateString('zh-CN', {
+            month: 'long',
+            day: 'numeric',
+            weekday: 'long'
+          });
+          
+          const levelDesc = level === 0 ? '暂无活跃度' :
+                           level === 1 ? '低活跃度' :
+                           level === 2 ? '中活跃度' :
+                           level === 3 ? '高活跃度' : '非常活跃';
+          
+          return `<div style="font-weight: bold; margin-bottom: 8px;">${fullDate}</div>
+            <div>活跃等级: <span style="color: ${level === 0 ? '#999' : colors[level]}; font-weight: 600;">${levelDesc}</span></div>
+            ${dayData.count > 0 ? `<div>活跃计数: <span style="font-weight: 600;">${dayData.count}</span></div>` : ''}`;
+        }
+      },
+      grid: {
+        left: '15%',
+        right: '10%',
+        top: '20%',
+        bottom: '15%'
+      },
+      xAxis: {
+        type: 'category',
+        data: weeks.map((_, i) => `第${i + 1}周`),
+        splitArea: { show: true },
+        axisLabel: {
+          fontSize: 10,
+          color: '#6b7280'
+        },
+        axisLine: { show: false },
+        axisTick: { show: false }
+      },
+      yAxis: {
+        type: 'category',
+        data: dayNames,
+        splitArea: { show: true },
+        axisLabel: {
+          fontSize: 12,
+          color: '#6b7280'
+        },
+        axisLine: { show: false },
+        axisTick: { show: false }
+      },
+      visualMap: {
+        show: true,
+        min: 0,
+        max: 4,
+        left: 'center',
+        bottom: '2%',
+        orient: 'horizontal',
+        inRange: {
+          color: colors
+        },
+        text: ['非常活跃', '低'],
+        textStyle: {
+          color: '#6b7280'
+        }
+      },
+      series: [{
+        type: 'heatmap',
+        data: heatmapData,
+        label: {
+          show: false
+        },
+        itemStyle: {
+          borderRadius: 4
+        },
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowColor: 'rgba(0, 0, 0, 0.3)'
+          }
+        }
+      }]
+    };
+
+    chartInstance.current.setOption(option);
+
+    const handleResize = () => chartInstance.current?.resize();
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [data, hasData]);
+
+  return (
+    <div style={{ height: 350, padding: '10px', borderRadius: 12, overflow: 'hidden' }}>
+      <div ref={chartRef} style={{ height: '100%', width: '100%' }} />
+    </div>
+  );
+};
+
 export default function LearningAnalytics() {
   const authState = useAppSelector((state: RootState) => state.auth);
   const { userId } = authState;
@@ -629,16 +816,26 @@ export default function LearningAnalytics() {
   const [userPosts, setUserPosts] = useState<PostData[]>([]);
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'custom'>('week');
   
-  // 新的学习统计数据
   const [learningStats, setLearningStats] = useState<LearningStatsCardsData | null>(null);
   const [dailyRecords, setDailyRecords] = useState<DailyStudyRecord[]>([]);
   
-  // 抽屉状态
+  const [multiDimTrendData, setMultiDimTrendData] = useState<MultiDimTrendData[]>([]);
+  const [comparisonData, setComparisonData] = useState<ComparisonData | null>(null);
+  const [heatmapData, setHeatmapData] = useState<HeatmapData[]>([]);
+  
+  const [currentTrendType, setCurrentTrendType] = useState<TrendDataType>('posts');
+  const [showComparison, setShowComparison] = useState(false);
+  
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [drawerType, setDrawerType] = useState<DrawerType>(null);
   const [drawerLoading, setDrawerLoading] = useState(false);
 
-  // 导出统计数据到Excel
+  const hasTrendData = multiDimTrendData.some(item => 
+    item.posts > 0 || item.views > 0 || item.points > 0 || item.duration > 0
+  );
+  
+  const hasHeatmapData = heatmapData.some(item => item.level > 0);
+
   const exportToExcel = () => {
     try {
       const exportData = studyData.map(day => ({
@@ -693,7 +890,6 @@ export default function LearningAnalytics() {
     void loadData();
   }, [userId]);
 
-  // 获取学习目标数据
   const fetchLearningGoals = async () => {
     if (!userId) return null;
     
@@ -708,30 +904,161 @@ export default function LearningAnalytics() {
     return null;
   };
 
+  const generateStudyDataFromApi = (posts: PostData[]): StudyStat[] => {
+    if (!posts || posts.length === 0) {
+      return [];
+    }
+
+    const dateMap = new Map<string, {
+      postsCount: number;
+      viewCount: number;
+      commentsMade: number;
+      likesReceived: number;
+    }>();
+
+    posts.forEach(post => {
+      try {
+        const dateStr = post.created_at;
+        if (!dateStr) return;
+        
+        const postDate = new Date(dateStr);
+        if (isNaN(postDate.getTime())) return;
+        
+        const date = postDate.toISOString().split('T')[0];
+        
+        const currentDateData = dateMap.get(date) || {
+          postsCount: 0,
+          viewCount: 0,
+          commentsMade: 0,
+          likesReceived: 0
+        };
+        
+        dateMap.set(date, {
+          postsCount: currentDateData.postsCount + 1,
+          viewCount: currentDateData.viewCount + (post.view_count || 0),
+          commentsMade: currentDateData.commentsMade + (post.comment_count || 0),
+          likesReceived: currentDateData.likesReceived + (post.like_count || 0)
+        });
+      } catch (error) {
+        console.warn('处理帖子数据时出错:', post, error);
+      }
+    });
+
+    const result: StudyStat[] = [];
+
+    const today = new Date();
+    for (let i = 29; i >= 0; i -= 1) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      const currentData = dateMap.get(dateStr);
+      const yesterdayDate = new Date(date);
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+      const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+      const yesterdayData = dateMap.get(yesterdayStr);
+      
+      let viewChange = 0;
+      let viewChangePercent = 0;
+      let viewChangeType: 'increase' | 'decrease' | 'no-change' = 'no-change';
+      
+      if (currentData) {
+        if (yesterdayData) {
+          viewChange = currentData.viewCount - yesterdayData.viewCount;
+          viewChangePercent = yesterdayData.viewCount > 0 
+            ? Math.round((viewChange / yesterdayData.viewCount) * 100)
+            : (viewChange > 0 ? 100 : 0);
+          viewChangeType = viewChange > 0 ? 'increase' : viewChange < 0 ? 'decrease' : 'no-change';
+        } else {
+          viewChange = currentData.viewCount;
+          viewChangePercent = 100;
+          viewChangeType = 'increase';
+        }
+      }
+      
+      result.push({
+        date: dateStr,
+        postsCount: currentData?.postsCount || 0,
+        todayPosts: currentData?.postsCount || 0,
+        viewCount: currentData?.viewCount || 0,
+        viewChange,
+        viewChangePercent,
+        viewChangeType,
+        communityPoints: 0,
+        commentsMade: currentData?.commentsMade || 0,
+        likesReceived: currentData?.likesReceived || 0
+      });
+    }
+
+    return result;
+  };
+
+  const generateWeeklySummary = (data: StudyStat[], userProfile: UserProfile | null, learningGoals: any | null): WeeklySummary => {
+    const totalPosts = userProfile?.totalPosts || userProfile?.hotPostsCount || 0;
+    const todayPosts = userProfile?.todayPosts || 0;
+    const totalCommunityPoints = userProfile?.points || 0;
+    
+    const goalPosts = learningGoals?.goal_posts || 3;
+    const goalComments = learningGoals?.goal_comments || 20;
+    const goalHotPosts = learningGoals?.goal_hot_posts || 1;
+    const goalPoints = learningGoals?.goal_points || 500;
+    
+    const postsCompletion = Math.min(100, Math.round((todayPosts / goalPosts) * 100));
+    const commentsCompletion = userProfile?.todayComments !== undefined 
+      ? Math.min(100, Math.round((userProfile.todayComments / goalComments) * 100))
+      : 0;
+    const hotPostsCompletion = userProfile?.hotPostsCount !== undefined
+      ? Math.min(100, Math.round((userProfile.hotPostsCount / goalHotPosts) * 100))
+      : 0;
+    const pointsCompletion = totalCommunityPoints !== undefined
+      ? Math.min(100, Math.round((totalCommunityPoints / goalPoints) * 100))
+      : 0;
+    
+    const taskCompletionRate = Math.round((postsCompletion + commentsCompletion + hotPostsCompletion + pointsCompletion) / 4);
+    
+    const completedTasks = [
+      postsCompletion >= 80 ? 1 : 0,
+      commentsCompletion >= 80 ? 1 : 0,
+      hotPostsCompletion >= 80 ? 1 : 0,
+      pointsCompletion >= 80 ? 1 : 0
+    ].reduce((sum, val) => sum + val, 0);
+
+    return {
+      totalPosts,
+      todayPosts,
+      taskCompletionRate: Math.max(0, Math.min(100, taskCompletionRate)),
+      totalCommunityPoints,
+      completedTasks,
+      rank: userProfile?.rank || 1,
+      hotPostsCount: userProfile?.hotPostsCount || 0
+    };
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
       console.log('开始加载学习统计数据，userId:', userId);
 
       if (userId) {
-        // 并行获取所有数据
         const [profileResponse, goalsData, learningStatsResponse] = await Promise.all([
           api.get(`/user/profile/${userId}`),
           fetchLearningGoals(),
           fetchLearningStatsCards()
         ]);
         
-        // 获取用户所有帖子数据
         const postsResponse = await api.get(`/community/posts?userId=${userId}&page=1&pageSize=1000`);
         
-        console.log('用户帖子API响应:', postsResponse.data);
+        const [trendResponse, comparisonResponse, heatmapResponse] = await Promise.all([
+          fetchMultiDimTrend(14),
+          fetchWeeklyComparison(),
+          fetchActivityHeatmap(12)
+        ]);
 
         if (postsResponse.data.success) {
           const userPostsData: PostData[] = postsResponse.data.data || [];
           console.log('用户帖子数据:', userPostsData);
           setUserPosts(userPostsData);
 
-          // 设置用户资料
           if (profileResponse.data.success) {
             const profileData = profileResponse.data.data;
             const userProfileData: UserProfile = {
@@ -746,17 +1073,26 @@ export default function LearningAnalytics() {
             
             setUserProfile(userProfileData);
             
-            // 从帖子数据生成学习统计数据
             const studyDataFromApi = generateStudyDataFromApi(userPostsData);
             setStudyData(studyDataFromApi);
             
-            // 生成汇总数据
             const summary = generateWeeklySummary(studyDataFromApi, userProfileData, goalsData);
             setWeeklySummary(summary);
             
-            // 设置新的学习统计数据
             if (learningStatsResponse.success && learningStatsResponse.data) {
               setLearningStats(learningStatsResponse.data);
+            }
+            
+            if (trendResponse.success && trendResponse.data) {
+              setMultiDimTrendData(trendResponse.data);
+            }
+            
+            if (comparisonResponse.success && comparisonResponse.data) {
+              setComparisonData(comparisonResponse.data);
+            }
+            
+            if (heatmapResponse.success && heatmapResponse.data) {
+              setHeatmapData(heatmapResponse.data);
             }
           }
           
@@ -785,7 +1121,6 @@ export default function LearningAnalytics() {
     }
   };
 
-  // 打开抽屉
   const openDrawer = async (type: DrawerType) => {
     setDrawerType(type);
     setDrawerVisible(true);
@@ -795,17 +1130,14 @@ export default function LearningAnalytics() {
       if (type === 'duration') {
         const res = await fetchStudyDurationDetail();
         if (res.success && res.data) {
-          // 可以在这里处理数据
         }
       } else if (type === 'streak') {
         const res = await fetchLoginStreakDetail();
         if (res.success && res.data) {
-          // 可以在这里处理数据
         }
       } else if (type === 'quality') {
         const res = await fetchContentQualityDetail();
         if (res.success && res.data) {
-          // 可以在这里处理数据
         }
       } else if (type === 'posts' || type === 'completion' || type === 'points') {
         const res = await fetchDailyStudyRecords(7);
@@ -820,13 +1152,11 @@ export default function LearningAnalytics() {
     }
   };
 
-  // 关闭抽屉
   const closeDrawer = () => {
     setDrawerVisible(false);
     setDrawerType(null);
   };
 
-  // 获取抽屉标题
   const getDrawerTitle = () => {
     switch (drawerType) {
       case 'duration': return '学习时长详情';
@@ -841,7 +1171,6 @@ export default function LearningAnalytics() {
 
   const filteredData = studyData.slice(-7);
 
-  // 卡片渐变配置
   const cardGradients = {
     blue: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     orange: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
@@ -849,6 +1178,14 @@ export default function LearningAnalytics() {
     cyan: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
     pink: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
     green: 'linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%)'
+  };
+
+  const handleCreatePost = () => {
+    message.info('正在跳转到发帖页面...');
+  };
+
+  const handleStartLearning = () => {
+    message.info('正在跳转到自习室...');
   };
 
   return (
@@ -871,7 +1208,6 @@ export default function LearningAnalytics() {
         }} />
 
         <div style={{ maxWidth: 1400, margin: "0 auto", position: "relative", zIndex: 1 }}>
-          {/* 标题区域 */}
           <div style={{ textAlign: "center", marginBottom: 24, paddingTop: 16 }}>
             <div style={{
               display: "inline-flex",
@@ -909,7 +1245,6 @@ export default function LearningAnalytics() {
             </Text>
           </div>
 
-          {/* 操作按钮区域 - 右上角 */}
           <div style={{
             position: "absolute",
             top: 24,
@@ -950,9 +1285,7 @@ export default function LearningAnalytics() {
 
           <Spin spinning={loading}>
             <div>
-              {/* 统计卡片区域 - 6个指标 */}
               <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-                {/* 1. 学习时长 */}
                 <Col xs={24} sm={12} md={8} lg={4}>
                   <StatCard
                     title="学习时长"
@@ -966,7 +1299,6 @@ export default function LearningAnalytics() {
                   />
                 </Col>
 
-                {/* 2. 连续活跃天数 */}
                 <Col xs={24} sm={12} md={8} lg={4}>
                   <StatCard
                     title="连续活跃"
@@ -988,7 +1320,6 @@ export default function LearningAnalytics() {
                   />
                 </Col>
 
-                {/* 3. 内容质量分 */}
                 <Col xs={24} sm={12} md={8} lg={4}>
                   <StatCard
                     title="内容质量分"
@@ -1001,7 +1332,6 @@ export default function LearningAnalytics() {
                   />
                 </Col>
 
-                {/* 4. 发帖统计 */}
                 <Col xs={24} sm={12} md={8} lg={4}>
                   <StatCard
                     title="发帖统计"
@@ -1015,7 +1345,6 @@ export default function LearningAnalytics() {
                   />
                 </Col>
 
-                {/* 5. 任务完成率 */}
                 <Col xs={24} sm={12} md={8} lg={4}>
                   <StatCard
                     title="任务完成率"
@@ -1029,7 +1358,6 @@ export default function LearningAnalytics() {
                   />
                 </Col>
 
-                {/* 6. 社区积分 */}
                 <Col xs={24} sm={12} md={8} lg={4}>
                   <StatCard
                     title="社区积分"
@@ -1044,7 +1372,6 @@ export default function LearningAnalytics() {
                 </Col>
               </Row>
 
-              {/* 任务完成进度条 */}
               {learningStats?.taskCompletion && (
                 <Card style={{ 
                   marginBottom: 24, 
@@ -1091,15 +1418,33 @@ export default function LearningAnalytics() {
               )}
 
               <Card
-                  title={<Space><BarChartOutlined /><span>社区参与趋势</span></Space>}
                   extra={
-                    <Space>
-                      <Select defaultValue="week" style={{ width: 120 }} onChange={setTimeRange}>
-                        <Option value="week">近一周</Option>
-                        <Option value="month">近一月</Option>
-                        <Option value="custom">自定义</Option>
-                      </Select>
-                      {timeRange === 'custom' && <RangePicker />}
+                    <Space style={{ alignItems: 'center' }}>
+                      <RadioGroup
+                        value={currentTrendType}
+                        onChange={(e) => setCurrentTrendType(e.target.value)}
+                        optionType="button"
+                        buttonStyle="solid"
+                      >
+                        {(Object.keys(trendTabConfig) as TrendDataType[]).map((type) => (
+                          <RadioButton key={type} value={type}>
+                            <Space size={4}>
+                              {trendTabConfig[type].icon}
+                              <span>{trendTabConfig[type].label}</span>
+                            </Space>
+                          </RadioButton>
+                        ))}
+                      </RadioGroup>
+                      <Divider type="vertical" style={{ height: 32 }} />
+                      <Space>
+                        <Text type="secondary" style={{ fontSize: 13 }}>对比上周</Text>
+                        <Switch
+                          checked={showComparison}
+                          onChange={setShowComparison}
+                          checkedChildren="开"
+                          unCheckedChildren="关"
+                        />
+                      </Space>
                     </Space>
                   }
                   style={{ 
@@ -1109,7 +1454,52 @@ export default function LearningAnalytics() {
                     background: 'rgba(255, 255, 255, 0.95)'
                   }}
               >
-                <TrendChart userPosts={userPosts} fallbackStudyData={studyData} />
+                {hasTrendData ? (
+                  <MultiDimTrendChart
+                    data={multiDimTrendData}
+                    comparisonData={comparisonData || undefined}
+                    dataType={currentTrendType}
+                    showComparison={showComparison}
+                    hasData={hasTrendData}
+                  />
+                ) : (
+                  <EmptyState
+                    title={`暂无${trendTabConfig[currentTrendType].label}数据`}
+                    description="开始你的学习之旅，记录每一次进步"
+                    icon={<LineChartOutlined />}
+                    actionText="去发帖"
+                    onAction={handleCreatePost}
+                  />
+                )}
+              </Card>
+
+              <Card
+                  extra={
+                    <Space>
+                      <Tag color="green"><RiseOutlined /> 活跃度越高，颜色越深</Tag>
+                    </Space>
+                  }
+                  style={{ 
+                    marginBottom: 24, 
+                    borderRadius: 16,
+                    backdropFilter: 'blur(10px)',
+                    background: 'rgba(255, 255, 255, 0.95)'
+                  }}
+              >
+                {hasHeatmapData ? (
+                  <ActivityHeatmap
+                    data={heatmapData}
+                    hasData={hasHeatmapData}
+                  />
+                ) : (
+                  <EmptyState
+                    title="暂无活跃数据"
+                    description="开始学习并参与社区互动，积累你的活跃记录"
+                    icon={<HeatMapOutlined />}
+                    actionText="去学习"
+                    onAction={handleStartLearning}
+                  />
+                )}
               </Card>
 
               <Card 
@@ -1120,60 +1510,70 @@ export default function LearningAnalytics() {
                   background: 'rgba(255, 255, 255, 0.95)'
                 }}
               >
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead>
-                    <tr style={{ background: "#fafafa" }}>
-                      <th style={{ padding: "12px 16px", textAlign: "left", borderBottom: "2px solid #f0f0f0" }}>日期</th>
-                      <th style={{ padding: "12px 16px", textAlign: "center", borderBottom: "2px solid #f0f0f0" }}>发帖数量</th>
-                      <th style={{ padding: "12px 16px", textAlign: "center", borderBottom: "2px solid #f0f0f0" }}>浏览量变化</th>
-                      <th style={{ padding: "12px 16px", textAlign: "center", borderBottom: "2px solid #f0f0f0" }}>社区积分</th>
-                      <th style={{ padding: "12px 16px", textAlign: "center", borderBottom: "2px solid #f0f0f0" }}>评论数</th>
-                      <th style={{ padding: "12px 16px", textAlign: "center", borderBottom: "2px solid #f0f0f0" }}>获赞数</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {filteredData.map((day) => (
-                        <tr key={day.date} style={{ borderBottom: "1px solid #f0f0f0" }}>
-                          <td style={{ padding: "12px 16px" }}>
-                            {new Date(day.date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', weekday: 'short' })}
-                          </td>
-                          <td style={{ padding: "12px 16px", textAlign: "center" }}>
-                            <Text strong>{day.postsCount}</Text><Text type="secondary" style={{ fontSize: 12 }}> 篇</Text>
-                          </td>
-                          <td style={{ padding: "12px 16px", textAlign: "center" }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-                              <Text strong>{day.viewCount}</Text>
-                              <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                                {day.viewChangeType === 'increase' ? (
-                                  <span style={{ color: "#52c41a", fontSize: "16px" }}>↑</span>
-                                ) : day.viewChangeType === 'decrease' ? (
-                                  <span style={{ color: "#ff4d4f", fontSize: "16px" }}>↓</span>
-                                ) : (
-                                  <span style={{ color: "#faad14", fontSize: "16px" }}>-</span>
-                                )}
-                                <Text 
-                                  style={{ 
-                                    color: day.viewChangeType === 'increase' ? "#52c41a" : 
-                                           day.viewChangeType === 'decrease' ? "#ff4d4f" : "#faad14",
-                                    fontSize: "12px" 
-                                  }}
-                                >
-                                  {day.viewChange > 0 ? '+' : ''}{day.viewChange} ({day.viewChange > 0 ? '+' : ''}{day.viewChangePercent}%)
-                                </Text>
+                {filteredData.some(d => d.postsCount > 0) ? (
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                      <tr style={{ background: "#fafafa" }}>
+                        <th style={{ padding: "12px 16px", textAlign: "left", borderBottom: "2px solid #f0f0f0" }}>日期</th>
+                        <th style={{ padding: "12px 16px", textAlign: "center", borderBottom: "2px solid #f0f0f0" }}>发帖数量</th>
+                        <th style={{ padding: "12px 16px", textAlign: "center", borderBottom: "2px solid #f0f0f0" }}>浏览量变化</th>
+                        <th style={{ padding: "12px 16px", textAlign: "center", borderBottom: "2px solid #f0f0f0" }}>社区积分</th>
+                        <th style={{ padding: "12px 16px", textAlign: "center", borderBottom: "2px solid #f0f0f0" }}>评论数</th>
+                        <th style={{ padding: "12px 16px", textAlign: "center", borderBottom: "2px solid #f0f0f0" }}>获赞数</th>
+                      </tr>
+                      </thead>
+                      <tbody>
+                      {filteredData.map((day) => (
+                          <tr key={day.date} style={{ borderBottom: "1px solid #f0f0f0" }}>
+                            <td style={{ padding: "12px 16px" }}>
+                              {new Date(day.date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', weekday: 'short' })}
+                            </td>
+                            <td style={{ padding: "12px 16px", textAlign: "center" }}>
+                              <Text strong>{day.postsCount}</Text><Text type="secondary" style={{ fontSize: 12 }}> 篇</Text>
+                            </td>
+                            <td style={{ padding: "12px 16px", textAlign: "center" }}>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+                                <Text strong>{day.viewCount}</Text>
+                                <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                  {day.viewChangeType === 'increase' ? (
+                                    <span style={{ color: "#52c41a", fontSize: "16px" }}>↑</span>
+                                  ) : day.viewChangeType === 'decrease' ? (
+                                    <span style={{ color: "#ff4d4f", fontSize: "16px" }}>↓</span>
+                                  ) : (
+                                    <span style={{ color: "#faad14", fontSize: "16px" }}>-</span>
+                                  )}
+                                  <Text 
+                                    style={{ 
+                                      color: day.viewChangeType === 'increase' ? "#52c41a" : 
+                                             day.viewChangeType === 'decrease' ? "#ff4d4f" : "#faad14",
+                                      fontSize: "12px" 
+                                    }}
+                                  >
+                                    {day.viewChange > 0 ? '+' : ''}{day.viewChange} ({day.viewChange > 0 ? '+' : ''}{day.viewChangePercent}%)
+                                  </Text>
+                                </div>
                               </div>
-                            </div>
-                          </td>
-                          <td style={{ padding: "12px 16px", textAlign: "center" }}>
-                            <Text strong style={{ color: "#1890ff" }}>+{day.communityPoints}</Text>
-                          </td>
-                          <td style={{ padding: "12px 16px", textAlign: "center" }}><Text>{day.commentsMade}</Text></td>
-                          <td style={{ padding: "12px 16px", textAlign: "center" }}><Text>{day.likesReceived}</Text></td>
-                        </tr>
-                    ))}
-                    </tbody>
-                  </table>
-                </div>
+                            </td>
+                            <td style={{ padding: "12px 16px", textAlign: "center" }}>
+                              <Text strong style={{ color: "#1890ff" }}>+{day.communityPoints}</Text>
+                            </td>
+                            <td style={{ padding: "12px 16px", textAlign: "center" }}><Text>{day.commentsMade}</Text></td>
+                            <td style={{ padding: "12px 16px", textAlign: "center" }}><Text>{day.likesReceived}</Text></td>
+                          </tr>
+                      ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <EmptyState
+                    title="暂无参与记录"
+                    description="在社区发帖、评论、点赞，开始记录你的学习之旅"
+                    icon={<BookOutlined />}
+                    actionText="去发帖"
+                    onAction={handleCreatePost}
+                  />
+                )}
               </Card>
             </div>
           </Spin>
@@ -1181,16 +1581,17 @@ export default function LearningAnalytics() {
 
         </div>
 
-        <CommunityFooter style={{
+        <div style={{
           marginTop: 48,
           background: "rgba(255, 255, 255, 0.1)",
           backdropFilter: "blur(10px)",
           borderRadius: 16,
           padding: 24,
           border: "1px solid rgba(255, 255, 255, 0.2)"
-        }} />
+        }}>
+          <CommunityFooter />
+        </div>
 
-        {/* 抽屉组件 */}
         <Drawer
           title={getDrawerTitle()}
           placement="right"
@@ -1308,7 +1709,7 @@ export default function LearningAnalytics() {
                   </Col>
                   <Col span={12}>
                     <Statistic 
-                      title="评论总数" 
+                      title="评论总数"
                       value={learningStats.contentQuality.totalComments}
                       valueStyle={{ color: '#1890ff' }}
                     />
@@ -1316,65 +1717,176 @@ export default function LearningAnalytics() {
                 </Row>
                 <Divider />
                 <Statistic 
-                  title="热榜帖子" 
+                  title="热榜帖子数" 
                   value={learningStats.contentQuality.hotPostsCount}
-                  suffix="篇"
                   valueStyle={{ color: '#faad14' }}
+                  prefix={<TrophyOutlined />}
                 />
-                <Divider />
-                <Title level={5}>分类质量分布</Title>
-                <List
-                  dataSource={learningStats.contentQuality.qualityBreakdown || []}
-                  renderItem={(item: any) => (
-                    <List.Item>
-                      <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                        <Tag color="blue">{item.category}</Tag>
-                        <Space>
-                          <Text>质量分: <Text strong>{item.score}</Text></Text>
-                          <Text type="secondary">({item.count} 篇)</Text>
-                        </Space>
-                      </Space>
-                    </List.Item>
-                  )}
-                />
+                {learningStats.contentQuality.qualityBreakdown && learningStats.contentQuality.qualityBreakdown.length > 0 && (
+                  <>
+                    <Divider />
+                    <Title level={5}>分类质量分析</Title>
+                    <List
+                      dataSource={learningStats.contentQuality.qualityBreakdown}
+                      renderItem={(item: any) => (
+                        <List.Item>
+                          <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                            <Text strong>{item.category}</Text>
+                            <Space>
+                              <Tag color="blue">{item.count} 篇</Tag>
+                              <Tag color="green">{item.score} 分</Tag>
+                            </Space>
+                          </Space>
+                        </List.Item>
+                      )}
+                    />
+                  </>
+                )}
               </div>
             )}
 
-            {(drawerType === 'posts' || drawerType === 'completion' || drawerType === 'points') && (
+            {drawerType === 'posts' && learningStats?.postsStats && (
               <div>
-                <Title level={5}>
-                  {drawerType === 'posts' && '发帖统计详情'}
-                  {drawerType === 'completion' && '任务完成详情'}
-                  {drawerType === 'points' && '社区积分详情'}
-                </Title>
-                <List
-                  dataSource={dailyRecords || []}
-                  renderItem={(item) => (
-                    <List.Item>
-                      <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                        <Text strong>{item.date}</Text>
-                        <Space>
-                          {drawerType === 'posts' && (
-                            <Tag color="blue">发帖 {item.posts} 篇</Tag>
-                          )}
-                          {drawerType === 'completion' && (
-                            <Space>
-                              <Tag color="blue">发帖 {item.posts}</Tag>
-                              <Tag color="green">评论 {item.comments}</Tag>
-                            </Space>
-                          )}
-                          {drawerType === 'points' && (
-                            <Tag color="orange">学习时长 {item.studyDuration} 分钟</Tag>
-                          )}
-                        </Space>
-                      </Space>
-                    </List.Item>
-                  )}
+                <Title level={5}>发帖统计详情</Title>
+                <Statistic 
+                  title="今日发帖" 
+                  value={learningStats.postsStats.today}
+                  suffix="篇"
+                  valueStyle={{ color: '#667eea' }}
                 />
+                <Divider />
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Statistic 
+                      title="累计发帖" 
+                      value={learningStats.postsStats.total}
+                      suffix="篇"
+                      valueStyle={{ color: '#4facfe' }}
+                    />
+                  </Col>
+                  <Col span={12}>
+                    <Statistic 
+                      title="热榜帖子" 
+                      value={learningStats.postsStats.hotPosts}
+                      suffix="篇"
+                      valueStyle={{ color: '#faad14' }}
+                      prefix={<TrophyOutlined />}
+                    />
+                  </Col>
+                </Row>
+                {dailyRecords && dailyRecords.length > 0 && (
+                  <>
+                    <Divider />
+                    <Title level={5}>近7天记录</Title>
+                    <List
+                      dataSource={dailyRecords}
+                      renderItem={(item) => (
+                        <List.Item>
+                          <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                            <Text>{new Date(item.date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', weekday: 'short' })}</Text>
+                            <Space>
+                              <Tag color={item.posts > 0 ? 'blue' : 'default'}>
+                                {item.posts} 篇
+                              </Tag>
+                              <Tag color={item.comments > 0 ? 'green' : 'default'}>
+                                {item.comments} 评论
+                              </Tag>
+                              {item.studyDuration > 0 && (
+                                <Tag color="purple">
+                                  {item.studyDuration} 分钟
+                                </Tag>
+                              )}
+                            </Space>
+                          </Space>
+                        </List.Item>
+                      )}
+                    />
+                  </>
+                )}
+              </div>
+            )}
+
+            {drawerType === 'completion' && learningStats?.taskCompletion && (
+              <div>
+                <Title level={5}>任务完成详情</Title>
+                <Statistic 
+                  title="任务完成率" 
+                  value={learningStats.taskCompletion.rate}
+                  suffix="%"
+                  valueStyle={{ color: '#10b981' }}
+                />
+                <Divider />
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Statistic 
+                      title="已完成任务" 
+                      value={learningStats.taskCompletion.completedTasks}
+                      valueStyle={{ color: '#52c41a' }}
+                      prefix={<CheckCircleOutlined />}
+                    />
+                  </Col>
+                  <Col span={12}>
+                    <Statistic 
+                      title="总任务数" 
+                      value={learningStats.taskCompletion.totalTasks}
+                      valueStyle={{ color: '#1890ff' }}
+                    />
+                  </Col>
+                </Row>
+                <Divider />
+                <Title level={5}>任务进度</Title>
+                <Progress 
+                  percent={learningStats.taskCompletion.rate} 
+                  strokeColor={{
+                    '0%': '#10b981',
+                    '100%': '#059669',
+                  }}
+                  status={learningStats.taskCompletion.rate >= 100 ? 'success' : 'active'}
+                />
+                <div style={{ marginTop: 16, textAlign: 'center' }}>
+                  <Tag color={learningStats.taskCompletion.rate >= 80 ? 'success' : 'warning'}>
+                    {learningStats.taskCompletion.rate >= 80 ? '🎉 任务完成良好！' : '💪 继续加油！'}
+                  </Tag>
+                </div>
+              </div>
+            )}
+
+            {drawerType === 'points' && learningStats?.communityPoints && (
+              <div>
+                <Title level={5}>社区积分详情</Title>
+                <Statistic 
+                  title="当前积分" 
+                  value={learningStats.communityPoints.total}
+                  suffix="分"
+                  valueStyle={{ color: '#f59e0b' }}
+                  prefix={<TrophyOutlined />}
+                />
+                <Divider />
+                <Statistic 
+                  title="当前排名" 
+                  value={learningStats.communityPoints.rank}
+                  suffix="名"
+                  valueStyle={{ color: '#8b5cf6' }}
+                  prefix={<RiseOutlined />}
+                />
+                <Divider />
+                <div style={{ 
+                  padding: 16, 
+                  background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', 
+                  borderRadius: 12,
+                  textAlign: 'center'
+                }}>
+                  <Text strong style={{ color: '#92400e' }}>
+                    {learningStats.communityPoints.rank <= 10 ? '🏆 恭喜进入前10名！' : 
+                     learningStats.communityPoints.rank <= 50 ? '⭐ 表现不错，继续保持！' : 
+                     '💪 多参与社区互动，提升排名！'}
+                  </Text>
+                </div>
               </div>
             )}
           </Spin>
         </Drawer>
       </div>
-  );
-}
+    );
+  }
+} 

@@ -326,3 +326,49 @@ export const fetchDailyStudyRecords = async (days: number = 7) => {
   const response = await api.get(`/community/learning-stats/daily?days=${days}`);
   return response.data;
 };
+
+// ========================================
+// 增强学习统计 API - 多维趋势、对比、热力图
+// ========================================
+
+export interface MultiDimTrendData {
+  date: string;
+  posts: number;
+  views: number;
+  points: number;
+  duration: number;
+}
+
+export interface ComparisonData {
+  currentWeek: MultiDimTrendData[];
+  previousWeek: MultiDimTrendData[];
+}
+
+export interface HeatmapData {
+  date: string;
+  level: number;
+  count: number;
+  details: {
+    posts: number;
+    comments: number;
+    likes: number;
+    duration: number;
+  };
+}
+
+export type TrendDataType = 'posts' | 'views' | 'points' | 'duration';
+
+export const fetchMultiDimTrend = async (days: number = 14) => {
+  const response = await api.get(`/community/learning-stats/trend?days=${days}`);
+  return response.data;
+};
+
+export const fetchWeeklyComparison = async () => {
+  const response = await api.get("/community/learning-stats/comparison");
+  return response.data;
+};
+
+export const fetchActivityHeatmap = async (weeks: number = 12) => {
+  const response = await api.get(`/community/learning-stats/heatmap?weeks=${weeks}`);
+  return response.data;
+};

@@ -425,6 +425,366 @@ export const getDailyRecords = async (userId: number, days: number = 7): Promise
   return records;
 };
 
+export interface MultiDimTrendData {
+  date: string;
+  posts: number;
+  views: number;
+  points: number;
+  duration: number;
+}
+
+export interface ComparisonData {
+  currentWeek: MultiDimTrendData[];
+  previousWeek: MultiDimTrendData[];
+}
+
+export interface HeatmapData {
+  date: string;
+  level: number;
+  count: number;
+  details: {
+    posts: number;
+    comments: number;
+    likes: number;
+    duration: number;
+  };
+}
+
+export const getMultiDimTrendData = async (
+  userId: number,
+  days: number = 14
+): Promise<MultiDimTrendData[]> => {
+  const startDate = getStartOfNDaysAgo(days - 1);
+  const endDate = new Date();
+
+  const posts = await Post.findAll({
+    where: {
+      user_id: userId,
+      created_at: {
+        [Op.gte]: startDate,
+        [Op.lte]: endDate
+      }
+    },
+    attributes: ['id', 'createdAt', 'view_count', 'like_count', 'comment_count']
+  });
+
+  const comments = await Comment.findAll({
+    where: {
+      user_id: userId,
+      is_deleted: 0,
+      created_at: {
+        [Op.gte]: startDate,
+        [Op.lte]: endDate
+      }
+    },
+    attributes: ['id', 'createdAt']
+  });
+
+  const pointsLogs = await PointsLog.findAll({
+    where: {
+      user_id: userId,
+      createdAt: {
+        [Op.gte]: startDate,
+        [Op.lte]: endDate
+      }
+    },
+    attributes: ['id', 'createdAt', 'change']
+  });
+
+  const reservations = await RoomReservation.findAll({
+    where: {
+      user_id: userId,
+      status: 'ended',
+      end_time: {
+        [Op.gte]: startDate,
+        [Op.lte]: endDate
+      }
+    },
+    attributes: ['start_time', 'end_time']
+  });
+
+  const dailyMap = new Map<string, {
+    posts: number;
+    views: number;
+    points: number;
+    duration: number;
+  }>();
+
+  for (let i = 0; i < days; i += 1) {
+    const d = new Date();
+    d.setDate(d.getDate() - (days - 1 - i));
+    const dateKey = d.toISOString().split('T')[0];
+    dailyMap.set(dateKey, { posts: 0, views: 0, points: 0, duration: 0 });
+  }
+
+  posts.forEach((post) => {
+    const dateKey = new Date(post.createdAt).toISOString().split('T')[0];
+    const record = dailyMap.get(dateKey);
+    if (record) {
+      record.posts += 1;
+      record.views += post.view_count || 0;
+    }
+  });
+
+  comments.forEach(() => {});
+
+  pointsLogs.forEach((log: any) => {
+    const dateKey = new Date(log.createdAt).toISOString().split('T')[0];
+    const record = dailyMap.get(dateKey);
+    if (record) {
+      record.points += log.change || 0;
+    }
+  });
+
+  reservations.forEach((res: any) => {
+    const startTime = new Date(res.start_time);
+    const endTime = new Date(res.end_time);
+    const duration = Math.round((endTime.getTime() - startTime.getTime()) / 1000 / 60);
+    if (duration > 0) {
+      const dateKey = startTime.toISOString().split('T')[0];
+      const record = dailyMap.get(dateKey);
+      if (record) {
+        record.duration += duration;
+      }
+    }
+  });
+
+  const records: MultiDimTrendData[] = [];
+  dailyMap.forEach((data, date) => {
+    records.push({
+      date,
+      posts: data.posts,
+      views: data.views,
+      points: data.points,
+      duration: data.duration
+    });
+  });
+
+  records.sort((a, b) => a.date.localeCompare(b.date));
+
+  return records;
+};
+
+export const getComparisonData = async (
+  userId: number
+): Promise<ComparisonData> => {
+  const currentWeekData = await getMultiDimTrendData(userId, 7);
+  
+  const previousWeekStart = getStartOfNDaysAgo(14);
+  const previousWeekEnd = getStartOfNDaysAgo(7);
+  
+  const posts = await Post.findAll({
+    where: {
+      user_id: userId,
+      created_at: {
+        [Op.gte]: previousWeekStart,
+        [Op.lt]: previousWeekEnd
+      }
+    },
+    attributes: ['id', 'createdAt', 'view_count']
+  });
+
+  const pointsLogs = await PointsLog.findAll({
+    where: {
+      user_id: userId,
+      createdAt: {
+        [Op.gte]: previousWeekStart,
+        [Op.lt]: previousWeekEnd
+      }
+    },
+    attributes: ['id', 'createdAt', 'change']
+  });
+
+  const reservations = await RoomReservation.findAll({
+    where: {
+      user_id: userId,
+      status: 'ended',
+      end_time: {
+        [Op.gte]: previousWeekStart,
+        [Op.lt]: previousWeekEnd
+      }
+    },
+    attributes: ['start_time', 'end_time']
+  });
+
+  const dailyMap = new Map<string, {
+    posts: number;
+    views: number;
+    points: number;
+    duration: number;
+  }>();
+
+  for (let i = 7; i < 14; i += 1) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateKey = d.toISOString().split('T')[0];
+    dailyMap.set(dateKey, { posts: 0, views: 0, points: 0, duration: 0 });
+  }
+
+  posts.forEach((post) => {
+    const dateKey = new Date(post.createdAt).toISOString().split('T')[0];
+    const record = dailyMap.get(dateKey);
+    if (record) {
+      record.posts += 1;
+      record.views += post.view_count || 0;
+    }
+  });
+
+  pointsLogs.forEach((log: any) => {
+    const dateKey = new Date(log.createdAt).toISOString().split('T')[0];
+    const record = dailyMap.get(dateKey);
+    if (record) {
+      record.points += log.change || 0;
+    }
+  });
+
+  reservations.forEach((res: any) => {
+    const startTime = new Date(res.start_time);
+    const endTime = new Date(res.end_time);
+    const duration = Math.round((endTime.getTime() - startTime.getTime()) / 1000 / 60);
+    if (duration > 0) {
+      const dateKey = startTime.toISOString().split('T')[0];
+      const record = dailyMap.get(dateKey);
+      if (record) {
+        record.duration += duration;
+      }
+    }
+  });
+
+  const previousWeekData: MultiDimTrendData[] = [];
+  dailyMap.forEach((data, date) => {
+    previousWeekData.push({
+      date,
+      posts: data.posts,
+      views: data.views,
+      points: data.points,
+      duration: data.duration
+    });
+  });
+
+  previousWeekData.sort((a, b) => a.date.localeCompare(b.date));
+
+  return {
+    currentWeek: currentWeekData,
+    previousWeek: previousWeekData
+  };
+};
+
+export const getHeatmapData = async (
+  userId: number,
+  weeks: number = 12
+): Promise<HeatmapData[]> => {
+  const days = weeks * 7;
+  const startDate = getStartOfNDaysAgo(days - 1);
+  const endDate = new Date();
+
+  const posts = await Post.findAll({
+    where: {
+      user_id: userId,
+      created_at: {
+        [Op.gte]: startDate,
+        [Op.lte]: endDate
+      }
+    },
+    attributes: ['id', 'createdAt', 'like_count']
+  });
+
+  const comments = await Comment.findAll({
+    where: {
+      user_id: userId,
+      is_deleted: 0,
+      created_at: {
+        [Op.gte]: startDate,
+        [Op.lte]: endDate
+      }
+    },
+    attributes: ['id', 'createdAt']
+  });
+
+  const reservations = await RoomReservation.findAll({
+    where: {
+      user_id: userId,
+      status: 'ended',
+      end_time: {
+        [Op.gte]: startDate,
+        [Op.lte]: endDate
+      }
+    },
+    attributes: ['start_time', 'end_time']
+  });
+
+  const dailyMap = new Map<string, {
+    posts: number;
+    comments: number;
+    likes: number;
+    duration: number;
+  }>();
+
+  for (let i = 0; i < days; i += 1) {
+    const d = new Date();
+    d.setDate(d.getDate() - (days - 1 - i));
+    const dateKey = d.toISOString().split('T')[0];
+    dailyMap.set(dateKey, { posts: 0, comments: 0, likes: 0, duration: 0 });
+  }
+
+  posts.forEach((post) => {
+    const dateKey = new Date(post.createdAt).toISOString().split('T')[0];
+    const record = dailyMap.get(dateKey);
+    if (record) {
+      record.posts += 1;
+      record.likes += post.like_count || 0;
+    }
+  });
+
+  comments.forEach((comment) => {
+    const dateKey = new Date(comment.createdAt).toISOString().split('T')[0];
+    const record = dailyMap.get(dateKey);
+    if (record) {
+      record.comments += 1;
+    }
+  });
+
+  reservations.forEach((res: any) => {
+    const startTime = new Date(res.start_time);
+    const endTime = new Date(res.end_time);
+    const duration = Math.round((endTime.getTime() - startTime.getTime()) / 1000 / 60);
+    if (duration > 0) {
+      const dateKey = startTime.toISOString().split('T')[0];
+      const record = dailyMap.get(dateKey);
+      if (record) {
+        record.duration += duration;
+      }
+    }
+  });
+
+  const heatmapData: HeatmapData[] = [];
+  dailyMap.forEach((data, date) => {
+    const totalActivity = data.posts * 3 + data.comments * 2 + data.duration / 30;
+    
+    let level = 0;
+    if (totalActivity >= 15) level = 4;
+    else if (totalActivity >= 8) level = 3;
+    else if (totalActivity >= 3) level = 2;
+    else if (totalActivity >= 1) level = 1;
+
+    heatmapData.push({
+      date,
+      level,
+      count: Math.round(totalActivity),
+      details: {
+        posts: data.posts,
+        comments: data.comments,
+        likes: data.likes,
+        duration: data.duration
+      }
+    });
+  });
+
+  heatmapData.sort((a, b) => a.date.localeCompare(b.date));
+
+  return heatmapData;
+};
+
 export const getAllLearningStats = async (userId: number): Promise<LearningStatsCardData> => {
   const [
     studyDuration,
