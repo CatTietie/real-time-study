@@ -28,7 +28,6 @@ import {
 import { recordView, getUserTodayViews } from "../services/view-record.service";
 import { uploadFilesToOss } from "../middlewares/upload.middleware";
 import {
-  getLoginStreak,
   getStudyDuration,
   getContentQualityScore,
   getMultiDimTrendData,
@@ -2542,7 +2541,7 @@ export const getPointsOverviewPlus = async (req: Request, res: Response) => {
         totalPoints: user.points || 0,
         todayPoints: Number(todayPoints || 0),
         level: calculateLevel(user.points || 0),
-        streakDays: loginStreak.current,
+        streakDays: loginStreak,
         studyDuration: studyDuration.total,
         todayStudyDuration: studyDuration.today,
         qualityScore: qualityScore,
