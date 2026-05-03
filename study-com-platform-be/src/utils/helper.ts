@@ -59,6 +59,18 @@ export const getEndOfWeek = (): Date => {
 };
 
 /**
+ * 获取N天前开始时间
+ * @param days 天数
+ * @returns N天前的开始时间（00:00:00）
+ */
+export const getStartOfNDaysAgo = (days: number): Date => {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+/**
  * 格式化日期为 YYYY-MM-DD HH:mm:ss
  * @param date 日期对象
  * @returns 格式化后的字符串
