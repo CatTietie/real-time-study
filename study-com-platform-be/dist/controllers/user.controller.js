@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getMyPermissions = exports.updateUserPassword = exports.updateUserProfile = exports.getUserStudyStats = exports.getUserProfile = exports.updateUser = exports.getUser = exports.login = exports.register = void 0;
+exports.uploadAvatar = exports.getMyPermissions = exports.updateUserPassword = exports.updateUserProfile = exports.getUserStudyStats = exports.getUserProfile = exports.updateUser = exports.getUser = exports.login = exports.register = void 0;
 const user_model_1 = __importDefault(require("../models/user.model"));
 const user_role_model_1 = __importDefault(require("../models/user-role.model"));
 const role_permission_model_1 = __importDefault(require("../models/role-permission.model"));
@@ -15,9 +15,14 @@ const learning_goal_model_1 = require("../models/learning-goal.model");
 const sequelize_1 = require("sequelize");
 const password_1 = require("../utils/password");
 const auth_service_1 = require("../services/auth.service");
+const auth_service_2 = require("../services/auth.service");
 const permissions_1 = require("../constants/permissions");
 const helper_1 = require("../utils/helper");
 const hot_posts_service_1 = require("../services/hot-posts.service");
+const validator_1 = require("../utils/validator");
+const upload_middleware_1 = require("../middlewares/upload.middleware");
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCK_DURATION_MINUTES = 15;
 const register = async (req, res) => {
     try {
         const { username, password, nickname } = req.body;
@@ -25,6 +30,12 @@ const register = async (req, res) => {
             return res
                 .status(400)
                 .json({ success: false, message: "账号和密码不能为空" });
+        }
+        const passwordStrength = (0, validator_1.validatePasswordStrength)(password);
+        if (!passwordStrength.isValid) {
+            return res
+                .status(400)
+                .json({ success: false, message: passwordStrength.message });
         }
         const existing = await user_model_1.default.findOne({ where: { username } });
         if (existing) {
@@ -91,6 +102,14 @@ const login = async (req, res) => {
         if (user.status === 0) {
             return res.status(403).json({ success: false, message: "账户已被封禁" });
         }
+        // 检查账号是否被锁定
+        const lockStatus = (0, auth_service_2.checkAccountLock)(user);
+        if (lockStatus.isLocked) {
+            return res.status(403).json({
+                success: false,
+                message: `账号已被临时锁定，请 ${lockStatus.remainingMinutes} 分钟后重试`
+            });
+        }
         if (user.role !== "student") {
             return res
                 .status(403)
@@ -98,10 +117,22 @@ const login = async (req, res) => {
         }
         const ok = await (0, password_1.comparePassword)(password, user.password);
         if (!ok) {
+            const failedInfo = await (0, auth_service_2.recordFailedLogin)(user);
+            if (failedInfo.isLocked) {
+                return res.status(403).json({
+                    success: false,
+                    message: `登录失败次数过多，账号已被临时锁定 ${LOCK_DURATION_MINUTES} 分钟`
+                });
+            }
             return res
                 .status(401)
-                .json({ success: false, message: "账号或密码错误" });
+                .json({
+                success: false,
+                message: `账号或密码错误（剩余尝试次数：${failedInfo.remainingAttempts} 次）`
+            });
         }
+        // 登录成功，重置失败次数
+        await (0, auth_service_2.resetFailedLoginAttempts)(user);
         await user.update({ last_login: new Date() });
         const token = (0, auth_service_1.generateToken)({
             id: user.id,
@@ -345,10 +376,12 @@ const updateUserPassword = async (req, res) => {
                 message: '当前密码和新密码都不能为空'
             });
         }
-        if (newPassword.length < 6 || newPassword.length > 32) {
+        // 密码强度校验（与注册时的校验逻辑一致）
+        const passwordStrength = (0, validator_1.validatePasswordStrength)(newPassword);
+        if (!passwordStrength.isValid) {
             return res.status(400).json({
                 success: false,
-                message: '新密码长度必须在6-32位之间'
+                message: passwordStrength.message
             });
         }
         // 权限验证：只能修改自己的密码
@@ -442,4 +475,38 @@ const getMyPermissions = async (req, res) => {
     }
 };
 exports.getMyPermissions = getMyPermissions;
+/**
+ * 上传用户头像
+ */
+const uploadAvatar = async (req, res) => {
+    try {
+        if (!req.user) {
+            return res.status(401).json({ success: false, message: "未授权访问" });
+        }
+        const userId = req.user.id;
+        // 上传头像到 OSS
+        const avatarUrl = await (0, upload_middleware_1.uploadSingleFileToOss)(req);
+        if (!avatarUrl) {
+            return res.status(400).json({ success: false, message: "请选择要上传的头像" });
+        }
+        // 更新用户头像
+        const user = await user_model_1.default.findByPk(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: "用户不存在" });
+        }
+        await user.update({ avatar: avatarUrl });
+        res.json({
+            success: true,
+            message: "头像上传成功",
+            data: {
+                avatar: avatarUrl,
+            },
+        });
+    }
+    catch (error) {
+        const message = error instanceof Error ? error.message : "头像上传失败";
+        res.status(500).json({ success: false, message });
+    }
+};
+exports.uploadAvatar = uploadAvatar;
 //# sourceMappingURL=user.controller.js.map
