@@ -380,7 +380,7 @@ export const getDailyRecords = async (userId: number, days: number = 7): Promise
   }
 
   posts.forEach((post) => {
-    const dateKey = new Date(post.created_at).toISOString().split('T')[0];
+    const dateKey = new Date(post.createdAt).toISOString().split('T')[0];
     const record = dailyMap.get(dateKey);
     if (record) {
       record.posts += 1;
@@ -389,7 +389,7 @@ export const getDailyRecords = async (userId: number, days: number = 7): Promise
   });
 
   comments.forEach((comment) => {
-    const dateKey = new Date(comment.created_at).toISOString().split('T')[0];
+    const dateKey = new Date(comment.createdAt).toISOString().split('T')[0];
     const record = dailyMap.get(dateKey);
     if (record) {
       record.comments += 1;
