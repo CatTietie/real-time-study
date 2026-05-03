@@ -10,44 +10,64 @@ import {
   Button,
   Progress,
   message,
-  Spin
+  Spin,
+  Drawer,
+  List,
+  Tag,
+  Divider,
+  Tooltip
 } from "antd";
 import { SyncOutlined } from "@ant-design/icons";
 import * as echarts from 'echarts';
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import {
   BarChartOutlined,
   CalendarOutlined,
-  CheckCircleOutlined,
   TrophyOutlined,
   BookOutlined,
-  DownloadOutlined
+  DownloadOutlined,
+  ClockCircleOutlined,
+  FireOutlined,
+  StarOutlined,
+  LineChartOutlined,
+  CheckCircleOutlined
 } from "@ant-design/icons";
-import { useState } from "react";
 import { useAppSelector } from "../../app/hooks";
 import type { RootState } from "../../app/store";
 import CommunityFooter from "../../components/community/CommunityFooter";
 import api from "../../services/api";
+import {
+  fetchLearningStatsCards,
+  fetchStudyDurationDetail,
+  fetchLoginStreakDetail,
+  fetchContentQualityDetail,
+  fetchDailyStudyRecords,
+  type LearningStatsCardsData,
+  type DailyStudyRecord
+} from "../../services/communityPublic";
+import {
+  fetchCommunityProfileSummary,
+  fetchUserTodayStats
+} from "../../services/communityPublic";
 
-
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 const { RangePicker } = DatePicker;
 const { Option } = Select;
 
 // 学习统计数据类型定义
 interface StudyStat {
   date: string;
-  postsCount: number; // 发帖数量
-  todayPosts: number; // 今日发帖数量
-  viewCount: number; // 当日总浏览量
-  viewChange: number; // 相比前一天的变化量
-  viewChangePercent: number; // 相比前一天的变化百分比
-  viewChangeType: 'increase' | 'decrease' | 'no-change'; // 变化类型
-  communityPoints: number; // 社区积分
-  commentsMade: number; // 评论数
-  likesReceived: number; // 获得点赞数
+  postsCount: number;
+  todayPosts: number;
+  viewCount: number;
+  viewChange: number;
+  viewChangePercent: number;
+  viewChangeType: 'increase' | 'decrease' | 'no-change';
+  communityPoints: number;
+  commentsMade: number;
+  likesReceived: number;
 }
 
 // 趋势数据类型定义
@@ -56,17 +76,16 @@ interface TrendDataPoint {
   postsCount: number;
 }
 
-// 帖子数据类型定义（与接口返回字段匹配）
+// 帖子数据类型定义
 interface PostData {
   id: number;
   user_id: number;
   title: string;
   content: string;
-  created_at: string;   // 注意字段名为 created_at
-  view_count: number;   // 浏览量
-  like_count: number;   // 点赞数
-  comment_count: number; // 评论数
-  // 其他字段...
+  created_at: string;
+  view_count: number;
+  like_count: number;
+  comment_count: number;
   [key: string]: unknown;
 }
 
@@ -79,7 +98,6 @@ interface UserProfile {
   totalPosts?: number;
   points?: number;
   rank?: number;
-  // 可以根据实际API响应添加更多字段
   [key: string]: number | string | boolean | undefined;
 }
 
@@ -93,26 +111,25 @@ interface WeeklySummary {
   hotPostsCount: number;
 }
 
-// 从用户帖子数据生成趋势数据（修复字段名）
+// 抽屉详情类型
+type DrawerType = 'duration' | 'streak' | 'quality' | 'posts' | 'completion' | 'points' | null;
+
+// 从用户帖子数据生成趋势数据
 const generateTrendDataFromPosts = (posts: PostData[]): TrendDataPoint[] => {
   if (!posts || posts.length === 0) {
     return [];
   }
 
-  // 按日期聚合帖子数据
   const dateMap = new Map<string, number>();
 
   posts.forEach(post => {
     try {
-      // 使用 created_at 字段（接口实际返回的字段）
       const dateStr = post.created_at;
       if (!dateStr) {
-        console.warn('帖子缺少 created_at 字段:', post.id);
         return;
       }
       const postDate = new Date(dateStr);
       if (isNaN(postDate.getTime())) {
-        console.warn('无效的日期格式:', dateStr);
         return;
       }
       const date = postDate.toISOString().split('T')[0];
@@ -122,7 +139,6 @@ const generateTrendDataFromPosts = (posts: PostData[]): TrendDataPoint[] => {
     }
   });
 
-  // 生成最近30天的数据
   const trendData: TrendDataPoint[] = [];
   const today = new Date();
 
@@ -142,7 +158,6 @@ const generateTrendDataFromPosts = (posts: PostData[]): TrendDataPoint[] => {
 
 // 从学习统计数据生成趋势数据
 const generateTrendDataFromStudyData = (studyData: StudyStat[]): TrendDataPoint[] => {
-  // 取最近30天的数据用于趋势分析
   const recentData = studyData.slice(-30);
 
   return recentData.map(day => ({
@@ -151,19 +166,18 @@ const generateTrendDataFromStudyData = (studyData: StudyStat[]): TrendDataPoint[
   }));
 };
 
-// 备用：生成趋势数据（当没有真实数据时使用）
+// 备用：生成趋势数据
 const generateFallbackTrendData = (): TrendDataPoint[] => {
   const data: TrendDataPoint[] = [];
   const today = new Date();
 
-  // 对于新用户，所有数据都应该为0
-  for (let i = 29; i >= 0; i--) {
+  for (let i = 29; i >= 0; i -= 1) {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
     
     data.push({
       date: date.toISOString().split('T')[0],
-      postsCount: 0  // 新用户没有发帖记录，所以都为0
+      postsCount: 0
     });
   }
 
@@ -180,7 +194,6 @@ const TrendChart = ({ userPosts, fallbackStudyData }: TrendChartProps) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<echarts.ECharts | null>(null);
 
-  // 优先使用真实的用户帖子数据，否则使用备用数据
   let trendData: TrendDataPoint[] = [];
   try {
     trendData = userPosts && userPosts.length > 0
@@ -193,7 +206,7 @@ const TrendChart = ({ userPosts, fallbackStudyData }: TrendChartProps) => {
     trendData = generateFallbackTrendData();
   }
 
-  const filteredData = trendData.slice(-7); // 近7天
+  const filteredData = trendData.slice(-7);
 
   const dates = filteredData.map(point =>
       new Date(point.date).toLocaleDateString('zh-CN', {
@@ -336,7 +349,6 @@ const generateStudyDataFromApi = (posts: PostData[]): StudyStat[] => {
     return [];
   }
 
-  // 按日期聚合数据
   const dateMap = new Map<string, {
     postsCount: number;
     viewCount: number;
@@ -374,9 +386,8 @@ const generateStudyDataFromApi = (posts: PostData[]): StudyStat[] => {
 
   const result: StudyStat[] = [];
 
-  // 生成最近30天的数据
   const today = new Date();
-  for (let i = 29; i >= 0; i--) {
+  for (let i = 29; i >= 0; i -= 1) {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
     const dateStr = date.toISOString().split('T')[0];
@@ -399,7 +410,6 @@ const generateStudyDataFromApi = (posts: PostData[]): StudyStat[] => {
           : (viewChange > 0 ? 100 : 0);
         viewChangeType = viewChange > 0 ? 'increase' : viewChange < 0 ? 'decrease' : 'no-change';
       } else {
-        // 昨天没有数据，今天有数据则视为增长
         viewChange = currentData.viewCount;
         viewChangePercent = 100;
         viewChangeType = 'increase';
@@ -414,7 +424,7 @@ const generateStudyDataFromApi = (posts: PostData[]): StudyStat[] => {
       viewChange,
       viewChangePercent,
       viewChangeType,
-      communityPoints: 0, // 社区积分从用户资料获取
+      communityPoints: 0,
       commentsMade: currentData?.commentsMade || 0,
       likesReceived: currentData?.likesReceived || 0
     });
@@ -428,13 +438,11 @@ const generateWeeklySummary = (data: StudyStat[], userProfile: UserProfile | nul
   const todayPosts = userProfile?.todayPosts || 0;
   const totalCommunityPoints = userProfile?.points || 0;
   
-  // 基于学习目标计算任务完成率
   const goalPosts = learningGoals?.goal_posts || 3;
   const goalComments = learningGoals?.goal_comments || 20;
   const goalHotPosts = learningGoals?.goal_hot_posts || 1;
   const goalPoints = learningGoals?.goal_points || 500;
   
-  // 计算各项任务完成度
   const postsCompletion = Math.min(100, Math.round((todayPosts / goalPosts) * 100));
   const commentsCompletion = userProfile?.todayComments !== undefined 
     ? Math.min(100, Math.round((userProfile.todayComments / goalComments) * 100))
@@ -446,10 +454,8 @@ const generateWeeklySummary = (data: StudyStat[], userProfile: UserProfile | nul
     ? Math.min(100, Math.round((totalCommunityPoints / goalPoints) * 100))
     : 0;
   
-  // 综合任务完成率（平均值）
   const taskCompletionRate = Math.round((postsCompletion + commentsCompletion + hotPostsCompletion + pointsCompletion) / 4);
   
-  // 计算已完成的任务数（达到80%以上算完成）
   const completedTasks = [
     postsCompletion >= 80 ? 1 : 0,
     commentsCompletion >= 80 ? 1 : 0,
@@ -468,6 +474,151 @@ const generateWeeklySummary = (data: StudyStat[], userProfile: UserProfile | nul
   };
 };
 
+// 数字跳动动画 Hook
+const useCountUp = (end: number, duration: number = 1000, start: boolean = true) => {
+  const [count, setCount] = useState(0);
+  
+  useEffect(() => {
+    if (!start) {
+      setCount(0);
+      return;
+    }
+    
+    let startTime: number | null = null;
+    let animationFrame: number;
+    
+    const animate = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min((timestamp - startTime) / duration, 1);
+      setCount(Math.floor(progress * end));
+      
+      if (progress < 1) {
+        animationFrame = requestAnimationFrame(animate);
+      }
+    };
+    
+    animationFrame = requestAnimationFrame(animate);
+    
+    return () => cancelAnimationFrame(animationFrame);
+  }, [end, duration, start]);
+  
+  return count;
+};
+
+// 统计卡片组件
+interface StatCardProps {
+  title: string;
+  icon: React.ReactNode;
+  gradient: string;
+  value: number | string;
+  suffix?: string;
+  subtitle?: string;
+  onClick?: () => void;
+  isActive?: boolean;
+  showCountUp?: boolean;
+}
+
+const StatCard: React.FC<StatCardProps> = ({
+  title,
+  icon,
+  gradient,
+  value,
+  suffix,
+  subtitle,
+  onClick,
+  isActive = true,
+  showCountUp = false
+}) => {
+  const animatedValue = useCountUp(
+    typeof value === 'number' ? value : 0,
+    1500,
+    showCountUp && typeof value === 'number'
+  );
+  
+  const displayValue = showCountUp && typeof value === 'number' ? animatedValue : value;
+
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        cursor: onClick ? 'pointer' : 'default',
+        transition: 'all 0.3s ease',
+        borderRadius: 16,
+        position: 'relative',
+        overflow: 'hidden',
+        backdropFilter: 'blur(10px)',
+        background: gradient,
+        opacity: isActive ? 1 : 0.6,
+        boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)',
+        height: '100%'
+      }}
+      onMouseEnter={(e) => {
+        if (onClick) {
+          e.currentTarget.style.transform = 'translateY(-8px)';
+          e.currentTarget.style.boxShadow = '0 12px 30px rgba(0, 0, 0, 0.2)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'translateY(0)';
+        e.currentTarget.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.1)';
+      }}
+    >
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(255, 255, 255, 0.1)',
+        pointerEvents: 'none'
+      }} />
+      <div style={{
+        position: 'relative',
+        zIndex: 1,
+        padding: 24,
+        textAlign: 'center',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center'
+      }}>
+        <div style={{
+          fontSize: 32,
+          marginBottom: 12,
+          color: isActive ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.5)'
+        }}>
+          {icon}
+        </div>
+        <Title level={5} style={{
+          color: isActive ? 'white' : 'rgba(255, 255, 255, 0.6)',
+          marginBottom: 8,
+          fontSize: 14,
+          fontWeight: 500
+        }}>
+          {title}
+        </Title>
+        <div style={{
+          color: isActive ? 'white' : 'rgba(255, 255, 255, 0.6)',
+          fontSize: 28,
+          fontWeight: 'bold',
+          marginBottom: 4
+        }}>
+          {displayValue}
+          {suffix && <span style={{ fontSize: 14, fontWeight: 'normal', marginLeft: 4 }}>{suffix}</span>}
+        </div>
+        {subtitle && (
+          <Text style={{
+            color: isActive ? 'rgba(255, 255, 255, 0.8)' : 'rgba(255, 255, 255, 0.4)',
+            fontSize: 13
+          }}>
+            {subtitle}
+          </Text>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export default function LearningAnalytics() {
   const authState = useAppSelector((state: RootState) => state.auth);
   const { userId } = authState;
@@ -477,11 +628,19 @@ export default function LearningAnalytics() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userPosts, setUserPosts] = useState<PostData[]>([]);
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'custom'>('week');
+  
+  // 新的学习统计数据
+  const [learningStats, setLearningStats] = useState<LearningStatsCardsData | null>(null);
+  const [dailyRecords, setDailyRecords] = useState<DailyStudyRecord[]>([]);
+  
+  // 抽屉状态
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [drawerType, setDrawerType] = useState<DrawerType>(null);
+  const [drawerLoading, setDrawerLoading] = useState(false);
 
   // 导出统计数据到Excel
   const exportToExcel = () => {
     try {
-      // 准备详细数据
       const exportData = studyData.map(day => ({
         '日期': new Date(day.date).toLocaleDateString('zh-CN'),
         '发帖数量': day.postsCount,
@@ -492,14 +651,11 @@ export default function LearningAnalytics() {
         '获赞数': day.likesReceived
       }));
 
-      // 创建工作簿
       const wb = XLSX.utils.book_new();
       
-      // 添加详细数据表
       const ws1 = XLSX.utils.json_to_sheet(exportData);
       XLSX.utils.book_append_sheet(wb, ws1, '详细参与记录');
 
-      // 添加汇总数据表
       const summaryData = [{
         '统计项目': '累计发帖',
         '数值': weeklySummary?.totalPosts || 0,
@@ -521,7 +677,6 @@ export default function LearningAnalytics() {
       const ws2 = XLSX.utils.json_to_sheet(summaryData);
       XLSX.utils.book_append_sheet(wb, ws2, '数据汇总');
 
-      // 生成文件并下载
       const fileName = `学习统计_${new Date().toISOString().split('T')[0]}.xlsx`;
       const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
       const blob = new Blob([wbout], { type: 'application/octet-stream' });
@@ -559,10 +714,11 @@ export default function LearningAnalytics() {
       console.log('开始加载学习统计数据，userId:', userId);
 
       if (userId) {
-        // 并行获取用户资料和学习目标
-        const [profileResponse, goalsData] = await Promise.all([
+        // 并行获取所有数据
+        const [profileResponse, goalsData, learningStatsResponse] = await Promise.all([
           api.get(`/user/profile/${userId}`),
-          fetchLearningGoals()
+          fetchLearningGoals(),
+          fetchLearningStatsCards()
         ]);
         
         // 获取用户所有帖子数据
@@ -575,7 +731,7 @@ export default function LearningAnalytics() {
           console.log('用户帖子数据:', userPostsData);
           setUserPosts(userPostsData);
 
-          // 设置用户资料（使用真实的后端数据）
+          // 设置用户资料
           if (profileResponse.data.success) {
             const profileData = profileResponse.data.data;
             const userProfileData: UserProfile = {
@@ -591,16 +747,16 @@ export default function LearningAnalytics() {
             setUserProfile(userProfileData);
             
             // 从帖子数据生成学习统计数据
-            const studyDataFromApi = generateStudyDataFromApi(userPostsData, userProfileData);
+            const studyDataFromApi = generateStudyDataFromApi(userPostsData);
             setStudyData(studyDataFromApi);
             
             // 生成汇总数据
             const summary = generateWeeklySummary(studyDataFromApi, userProfileData, goalsData);
             setWeeklySummary(summary);
-                      
-            // 显示学习目标信息
-            if (goalsData) {
-              console.log('学习目标数据:', goalsData);
+            
+            // 设置新的学习统计数据
+            if (learningStatsResponse.success && learningStatsResponse.data) {
+              setLearningStats(learningStatsResponse.data);
             }
           }
           
@@ -610,7 +766,7 @@ export default function LearningAnalytics() {
         }
       } else {
         console.warn('未找到用户ID，使用默认数据');
-        const mockData = generateStudyDataFromApi([], null);
+        const mockData = generateStudyDataFromApi([]);
         setStudyData(mockData);
         setUserPosts([]);
         const defaultSummary = generateWeeklySummary(mockData, null, null);
@@ -619,7 +775,7 @@ export default function LearningAnalytics() {
     } catch (error) {
       console.error('数据加载失败:', error);
       message.error('数据加载失败，使用默认数据');
-      const mockData = generateStudyDataFromApi([], null);
+      const mockData = generateStudyDataFromApi([]);
       setStudyData(mockData);
       setUserPosts([]);
       const errorSummary = generateWeeklySummary(mockData, null, null);
@@ -629,7 +785,71 @@ export default function LearningAnalytics() {
     }
   };
 
+  // 打开抽屉
+  const openDrawer = async (type: DrawerType) => {
+    setDrawerType(type);
+    setDrawerVisible(true);
+    setDrawerLoading(true);
+    
+    try {
+      if (type === 'duration') {
+        const res = await fetchStudyDurationDetail();
+        if (res.success && res.data) {
+          // 可以在这里处理数据
+        }
+      } else if (type === 'streak') {
+        const res = await fetchLoginStreakDetail();
+        if (res.success && res.data) {
+          // 可以在这里处理数据
+        }
+      } else if (type === 'quality') {
+        const res = await fetchContentQualityDetail();
+        if (res.success && res.data) {
+          // 可以在这里处理数据
+        }
+      } else if (type === 'posts' || type === 'completion' || type === 'points') {
+        const res = await fetchDailyStudyRecords(7);
+        if (res.success && res.data) {
+          setDailyRecords(res.data);
+        }
+      }
+    } catch (error) {
+      console.error('获取详情失败:', error);
+    } finally {
+      setDrawerLoading(false);
+    }
+  };
+
+  // 关闭抽屉
+  const closeDrawer = () => {
+    setDrawerVisible(false);
+    setDrawerType(null);
+  };
+
+  // 获取抽屉标题
+  const getDrawerTitle = () => {
+    switch (drawerType) {
+      case 'duration': return '学习时长详情';
+      case 'streak': return '连续活跃天数';
+      case 'quality': return '内容质量分析';
+      case 'posts': return '发帖统计详情';
+      case 'completion': return '任务完成详情';
+      case 'points': return '社区积分详情';
+      default: return '详情';
+    }
+  };
+
   const filteredData = studyData.slice(-7);
+
+  // 卡片渐变配置
+  const cardGradients = {
+    blue: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    orange: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+    purple: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+    cyan: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+    pink: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+    green: 'linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%)'
+  };
 
   return (
       <div
@@ -730,64 +950,145 @@ export default function LearningAnalytics() {
 
           <Spin spinning={loading}>
             <div>
-              <Row gutter={[24, 24]} style={{ marginBottom: 24 }}>
-                <Col xs={24} sm={12} md={8} lg={8}>
-                  <Card style={{
-                    borderRadius: 16,
-                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                    color: "white",
-                    height: "100%"
-                  }}>
-                    <div style={{ textAlign: "center", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                      <BookOutlined style={{ fontSize: 32, marginBottom: 12, color: "white" }} />
-                      <Title level={4} style={{ color: "white", marginBottom: 8 }}>累计发帖</Title>
-                      <Statistic value={weeklySummary?.totalPosts || 0} suffix="篇"
-                                 valueStyle={{ color: "white", fontSize: 24, fontWeight: "bold" }} />
-                      <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 14 }}>
-                        热榜 {weeklySummary?.hotPostsCount || userProfile?.hotPostsCount || 0} 篇
-                      </Text>
-                    </div>
-                  </Card>
+              {/* 统计卡片区域 - 6个指标 */}
+              <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+                {/* 1. 学习时长 */}
+                <Col xs={24} sm={12} md={8} lg={4}>
+                  <StatCard
+                    title="学习时长"
+                    icon={<ClockCircleOutlined />}
+                    gradient={cardGradients.blue}
+                    value={learningStats?.studyDuration?.today || 0}
+                    suffix="分钟"
+                    subtitle={`累计 ${learningStats?.studyDuration?.total || 0} 分钟`}
+                    onClick={() => openDrawer('duration')}
+                    showCountUp
+                  />
                 </Col>
-                <Col xs={24} sm={12} md={8} lg={8}>
-                  <Card style={{
-                    borderRadius: 16,
-                    background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-                    color: "white",
-                    height: "100%"
-                  }}>
-                    <div style={{ textAlign: "center", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                      <CheckCircleOutlined style={{ fontSize: 32, marginBottom: 12, color: "white" }} />
-                      <Title level={4} style={{ color: "white", marginBottom: 8 }}>任务完成率</Title>
-                      <Statistic value={weeklySummary?.taskCompletionRate || 0} suffix="%"
-                                 valueStyle={{ color: "white", fontSize: 24, fontWeight: "bold" }} />
-                      <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 14, marginBottom: 8 }}>
-                        已完成 {weeklySummary?.completedTasks || 0}/4 项任务
-                      </Text>
-                      <Progress percent={weeklySummary?.taskCompletionRate || 0} showInfo={false}
-                                strokeColor="white" trailColor="rgba(255,255,255,0.3)" />
-                    </div>
-                  </Card>
+
+                {/* 2. 连续活跃天数 */}
+                <Col xs={24} sm={12} md={8} lg={4}>
+                  <StatCard
+                    title="连续活跃"
+                    icon={
+                      <Tooltip title={learningStats?.loginStreak?.isActive ? "持续活跃中！" : "已中断，快回来继续学习吧"}>
+                        <FireOutlined style={{ 
+                          color: learningStats?.loginStreak?.isActive ? '#ff6b6b' : '#999',
+                          filter: learningStats?.loginStreak?.isActive ? 'drop-shadow(0 0 8px rgba(255, 107, 107, 0.6))' : 'none'
+                        }} />
+                      </Tooltip>
+                    }
+                    gradient={cardGradients.orange}
+                    value={learningStats?.loginStreak?.current || 0}
+                    suffix="天"
+                    subtitle={learningStats?.loginStreak?.isActive ? "🔥 持续活跃中" : "💔 已中断"}
+                    onClick={() => openDrawer('streak')}
+                    isActive={learningStats?.loginStreak?.isActive !== false}
+                    showCountUp
+                  />
                 </Col>
-                <Col xs={24} sm={12} md={8} lg={8}>
-                  <Card style={{
-                    borderRadius: 16,
-                    background: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
-                    color: "white",
-                    height: "100%"
-                  }}>
-                    <div style={{ textAlign: "center", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                      <TrophyOutlined style={{ fontSize: 32, marginBottom: 12, color: "white" }} />
-                      <Title level={4} style={{ color: "white", marginBottom: 8 }}>社区积分</Title>
-                      <Statistic value={weeklySummary?.totalCommunityPoints || 0} suffix="分"
-                                 valueStyle={{ color: "white", fontSize: 24, fontWeight: "bold" }} />
-                      <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 14 }}>
-                        当前排名 第{weeklySummary?.rank || 0}名
-                      </Text>
-                    </div>
-                  </Card>
+
+                {/* 3. 内容质量分 */}
+                <Col xs={24} sm={12} md={8} lg={4}>
+                  <StatCard
+                    title="内容质量分"
+                    icon={<StarOutlined />}
+                    gradient={cardGradients.purple}
+                    value={learningStats?.contentQuality?.score || 0}
+                    subtitle={`点赞 ${learningStats?.contentQuality?.totalLikes || 0} 次，评论 ${learningStats?.contentQuality?.totalComments || 0} 条`}
+                    onClick={() => openDrawer('quality')}
+                    showCountUp
+                  />
+                </Col>
+
+                {/* 4. 发帖统计 */}
+                <Col xs={24} sm={12} md={8} lg={4}>
+                  <StatCard
+                    title="发帖统计"
+                    icon={<BookOutlined />}
+                    gradient={cardGradients.cyan}
+                    value={learningStats?.postsStats?.today || 0}
+                    suffix="篇"
+                    subtitle={`累计 ${learningStats?.postsStats?.total || 0} 篇，热榜 ${learningStats?.postsStats?.hotPosts || 0} 篇`}
+                    onClick={() => openDrawer('posts')}
+                    showCountUp
+                  />
+                </Col>
+
+                {/* 5. 任务完成率 */}
+                <Col xs={24} sm={12} md={8} lg={4}>
+                  <StatCard
+                    title="任务完成率"
+                    icon={<CheckCircleOutlined />}
+                    gradient={cardGradients.pink}
+                    value={learningStats?.taskCompletion?.rate || 0}
+                    suffix="%"
+                    subtitle={`已完成 ${learningStats?.taskCompletion?.completedTasks || 0}/${learningStats?.taskCompletion?.totalTasks || 4} 项`}
+                    onClick={() => openDrawer('completion')}
+                    showCountUp
+                  />
+                </Col>
+
+                {/* 6. 社区积分 */}
+                <Col xs={24} sm={12} md={8} lg={4}>
+                  <StatCard
+                    title="社区积分"
+                    icon={<TrophyOutlined />}
+                    gradient={cardGradients.green}
+                    value={learningStats?.communityPoints?.total || 0}
+                    suffix="分"
+                    subtitle={`当前排名 第${learningStats?.communityPoints?.rank || 0}名`}
+                    onClick={() => openDrawer('points')}
+                    showCountUp
+                  />
                 </Col>
               </Row>
+
+              {/* 任务完成进度条 */}
+              {learningStats?.taskCompletion && (
+                <Card style={{ 
+                  marginBottom: 24, 
+                  borderRadius: 16,
+                  backdropFilter: 'blur(10px)',
+                  background: 'rgba(255, 255, 255, 0.95)'
+                }}>
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    <Title level={5}>今日任务进度</Title>
+                    <Row gutter={[16, 16]}>
+                      <Col xs={24} sm={12}>
+                        <div style={{ marginBottom: 8 }}>
+                          <Space>
+                            <Text strong>发帖目标</Text>
+                            <Tag color={learningStats.postsStats.today >= 3 ? 'success' : 'processing'}>
+                              {learningStats.postsStats.today}/3 篇
+                            </Tag>
+                          </Space>
+                        </div>
+                        <Progress 
+                          percent={Math.min(100, (learningStats.postsStats.today / 3) * 100)} 
+                          strokeColor="#667eea"
+                          size="small"
+                        />
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <div style={{ marginBottom: 8 }}>
+                          <Space>
+                            <Text strong>积分目标</Text>
+                            <Tag color={learningStats.communityPoints.total >= 500 ? 'success' : 'processing'}>
+                              {learningStats.communityPoints.total}/500 分
+                            </Tag>
+                          </Space>
+                        </div>
+                        <Progress 
+                          percent={Math.min(100, (learningStats.communityPoints.total / 500) * 100)} 
+                          strokeColor="#52c41a"
+                          size="small"
+                        />
+                      </Col>
+                    </Row>
+                  </Space>
+                </Card>
+              )}
 
               <Card
                   title={<Space><BarChartOutlined /><span>社区参与趋势</span></Space>}
@@ -801,12 +1102,24 @@ export default function LearningAnalytics() {
                       {timeRange === 'custom' && <RangePicker />}
                     </Space>
                   }
-                  style={{ marginBottom: 24, borderRadius: 16 }}
+                  style={{ 
+                    marginBottom: 24, 
+                    borderRadius: 16,
+                    backdropFilter: 'blur(10px)',
+                    background: 'rgba(255, 255, 255, 0.95)'
+                  }}
               >
                 <TrendChart userPosts={userPosts} fallbackStudyData={studyData} />
               </Card>
 
-              <Card title={<Space><CalendarOutlined /><span>详细参与记录</span></Space>} style={{ borderRadius: 16 }}>
+              <Card 
+                title={<Space><CalendarOutlined /><span>详细参与记录</span></Space>} 
+                style={{ 
+                  borderRadius: 16,
+                  backdropFilter: 'blur(10px)',
+                  background: 'rgba(255, 255, 255, 0.95)'
+                }}
+              >
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
@@ -876,6 +1189,192 @@ export default function LearningAnalytics() {
           padding: 24,
           border: "1px solid rgba(255, 255, 255, 0.2)"
         }} />
+
+        {/* 抽屉组件 */}
+        <Drawer
+          title={getDrawerTitle()}
+          placement="right"
+          onClose={closeDrawer}
+          open={drawerVisible}
+          width={400}
+          maskClosable={true}
+        >
+          <Spin spinning={drawerLoading}>
+            {drawerType === 'duration' && learningStats?.studyDuration && (
+              <div>
+                <Title level={5}>学习时长统计</Title>
+                <Statistic 
+                  title="今日学习时长" 
+                  value={learningStats.studyDuration.today} 
+                  suffix="分钟"
+                  valueStyle={{ color: '#667eea' }}
+                />
+                <Divider />
+                <Statistic 
+                  title="累计学习时长" 
+                  value={learningStats.studyDuration.total} 
+                  suffix="分钟"
+                  valueStyle={{ color: '#52c41a' }}
+                />
+                <Divider />
+                <Title level={5}>近30天记录</Title>
+                <List
+                  dataSource={learningStats.studyDuration.dailyRecords?.slice(-10) || []}
+                  renderItem={(item: any) => (
+                    <List.Item>
+                      <Space>
+                        <Text>{item.date}</Text>
+                        <Tag color={item.duration > 0 ? 'blue' : 'default'}>
+                          {item.duration > 0 ? `${item.duration} 分钟` : '无记录'}
+                        </Tag>
+                      </Space>
+                    </List.Item>
+                  )}
+                />
+              </div>
+            )}
+
+            {drawerType === 'streak' && learningStats?.loginStreak && (
+              <div>
+                <Title level={5}>连续活跃天数</Title>
+                <div style={{ textAlign: 'center', marginBottom: 24 }}>
+                  <FireOutlined style={{ 
+                    fontSize: 64, 
+                    color: learningStats.loginStreak.isActive ? '#ff6b6b' : '#999',
+                    filter: learningStats.loginStreak.isActive ? 'drop-shadow(0 0 12px rgba(255, 107, 107, 0.8))' : 'none'
+                  }} />
+                  <div style={{ marginTop: 16 }}>
+                    <Statistic 
+                      value={learningStats.loginStreak.current} 
+                      suffix="天"
+                      valueStyle={{ 
+                        color: learningStats.loginStreak.isActive ? '#ff6b6b' : '#999',
+                        fontSize: 48 
+                      }}
+                    />
+                  </div>
+                  <Tag 
+                    color={learningStats.loginStreak.isActive ? 'success' : 'default'}
+                    style={{ fontSize: 16, padding: '8px 16px', marginTop: 16 }}
+                  >
+                    {learningStats.loginStreak.isActive ? '🔥 持续活跃中！继续保持！' : '💔 已中断，快回来继续学习吧'}
+                  </Tag>
+                </div>
+                <Divider />
+                <Title level={5}>近7天记录</Title>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  {learningStats.loginStreak.history?.slice(-7).map((item: any, index: number) => (
+                    <Tooltip 
+                      key={index} 
+                      title={item.loggedIn ? '当天已登录' : '当天未登录'}
+                    >
+                      <div style={{ 
+                        width: 40, 
+                        height: 40, 
+                        borderRadius: 8,
+                        background: item.loggedIn 
+                          ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                          : '#f0f0f0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: item.loggedIn ? 'white' : '#999',
+                        fontWeight: 'bold'
+                      }}>
+                        {new Date(item.date).getDate()}
+                      </div>
+                    </Tooltip>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {drawerType === 'quality' && learningStats?.contentQuality && (
+              <div>
+                <Title level={5}>内容质量分析</Title>
+                <Statistic 
+                  title="综合质量分" 
+                  value={learningStats.contentQuality.score} 
+                  valueStyle={{ color: '#a8edea' }}
+                />
+                <Divider />
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Statistic 
+                      title="获赞总数" 
+                      value={learningStats.contentQuality.totalLikes}
+                      valueStyle={{ color: '#52c41a' }}
+                    />
+                  </Col>
+                  <Col span={12}>
+                    <Statistic 
+                      title="评论总数" 
+                      value={learningStats.contentQuality.totalComments}
+                      valueStyle={{ color: '#1890ff' }}
+                    />
+                  </Col>
+                </Row>
+                <Divider />
+                <Statistic 
+                  title="热榜帖子" 
+                  value={learningStats.contentQuality.hotPostsCount}
+                  suffix="篇"
+                  valueStyle={{ color: '#faad14' }}
+                />
+                <Divider />
+                <Title level={5}>分类质量分布</Title>
+                <List
+                  dataSource={learningStats.contentQuality.qualityBreakdown || []}
+                  renderItem={(item: any) => (
+                    <List.Item>
+                      <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                        <Tag color="blue">{item.category}</Tag>
+                        <Space>
+                          <Text>质量分: <Text strong>{item.score}</Text></Text>
+                          <Text type="secondary">({item.count} 篇)</Text>
+                        </Space>
+                      </Space>
+                    </List.Item>
+                  )}
+                />
+              </div>
+            )}
+
+            {(drawerType === 'posts' || drawerType === 'completion' || drawerType === 'points') && (
+              <div>
+                <Title level={5}>
+                  {drawerType === 'posts' && '发帖统计详情'}
+                  {drawerType === 'completion' && '任务完成详情'}
+                  {drawerType === 'points' && '社区积分详情'}
+                </Title>
+                <List
+                  dataSource={dailyRecords || []}
+                  renderItem={(item) => (
+                    <List.Item>
+                      <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                        <Text strong>{item.date}</Text>
+                        <Space>
+                          {drawerType === 'posts' && (
+                            <Tag color="blue">发帖 {item.posts} 篇</Tag>
+                          )}
+                          {drawerType === 'completion' && (
+                            <Space>
+                              <Tag color="blue">发帖 {item.posts}</Tag>
+                              <Tag color="green">评论 {item.comments}</Tag>
+                            </Space>
+                          )}
+                          {drawerType === 'points' && (
+                            <Tag color="orange">学习时长 {item.studyDuration} 分钟</Tag>
+                          )}
+                        </Space>
+                      </Space>
+                    </List.Item>
+                  )}
+                />
+              </div>
+            )}
+          </Spin>
+        </Drawer>
       </div>
   );
 }
