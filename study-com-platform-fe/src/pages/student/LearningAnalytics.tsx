@@ -25,6 +25,7 @@ import {
 import { SyncOutlined } from "@ant-design/icons";
 import * as echarts from 'echarts';
 import { useRef, useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import {
@@ -818,6 +819,7 @@ const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({ data, hasData }) => {
 export default function LearningAnalytics() {
   const authState = useAppSelector((state: RootState) => state.auth);
   const { userId } = authState;
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [studyData, setStudyData] = useState<StudyStat[]>([]);
   const [weeklySummary, setWeeklySummary] = useState<WeeklySummary | null>(null);
@@ -1200,30 +1202,67 @@ export default function LearningAnalytics() {
   };
 
   const handleCreatePost = () => {
-    message.info('正在跳转到发帖页面...');
+    navigate('/community/publish');
   };
 
   const handleStartLearning = () => {
-    message.info('正在跳转到自习室...');
+    navigate('/student/study-rooms');
   };
 
   const handleTaskAction = async (task: ActionTask) => {
     if (task.isCompleted || taskCompletedStates[task.id]) {
+      switch (task.actionType) {
+        case 'create_post':
+          navigate('/community/publish');
+          break;
+        case 'start_learning':
+          navigate('/student/study-rooms');
+          break;
+        case 'earn_points':
+          navigate('/community/points');
+          break;
+        case 'check_in':
+          message.info('签到功能开发中...');
+          break;
+        default:
+          break;
+      }
       return;
     }
 
     setTaskLoadingStates(prev => ({ ...prev, [task.id]: true }));
 
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     setTaskLoadingStates(prev => ({ ...prev, [task.id]: false }));
     setTaskCompletedStates(prev => ({ ...prev, [task.id]: true }));
 
-    message.success(`任务"${task.title}"进度已更新！`);
-
-    setTimeout(() => {
-      loadData();
-    }, 1000);
+    switch (task.actionType) {
+      case 'create_post':
+        message.info('正在跳转到发帖页面...');
+        setTimeout(() => navigate('/community/publish'), 500);
+        break;
+      case 'start_learning':
+        message.info('正在跳转到自习室...');
+        setTimeout(() => navigate('/student/study-rooms'), 500);
+        break;
+      case 'earn_points':
+        message.info('正在跳转到积分中心...');
+        setTimeout(() => navigate('/community/points'), 500);
+        break;
+      case 'check_in':
+        message.success('签到成功！');
+        setTimeout(() => {
+          loadData();
+        }, 1000);
+        break;
+      default:
+        message.success(`任务"${task.title}"进度已更新！`);
+        setTimeout(() => {
+          loadData();
+        }, 1000);
+        break;
+    }
   };
 
   return (
@@ -1686,6 +1725,7 @@ export default function LearningAnalytics() {
                           type="primary"
                           block
                           icon={<TrophyOutlined />}
+                          onClick={() => navigate('/community/leaderboard')}
                           style={{
                             borderRadius: 20,
                             background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
