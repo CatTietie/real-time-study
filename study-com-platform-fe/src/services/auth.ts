@@ -48,3 +48,23 @@ export const registerStudent = async (payload: {
   const response = await api.post<RegisterResponse>("/user/register", payload);
   return response.data;
 };
+
+interface UploadAvatarResponse {
+  success: boolean;
+  message: string;
+  data?: {
+    avatar: string;
+  };
+}
+
+export const uploadAvatar = async (file: File) => {
+  const formData = new FormData();
+  formData.append("avatar", file);
+  
+  const response = await api.post<UploadAvatarResponse>("/user/avatar", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return response.data;
+};
