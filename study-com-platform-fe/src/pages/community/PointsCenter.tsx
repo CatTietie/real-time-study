@@ -425,12 +425,12 @@ export default function PointsCenter() {
                         <Progress
                           percent={animateProgress}
                           strokeColor={{
-                            "0%": "#f093fb,
+                            "0%": "#f093fb",
                             "100%": "#f5576c",
                           }}
                           trailColor="rgba(255,255,255,0.2)"
                           showInfo={false}
-                          style={{ width: "100%", width: 200 }}
+                          style={{ width: 200 }}
                         />
                       </Col>
                       <Col flex="none">
