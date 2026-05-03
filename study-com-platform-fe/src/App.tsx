@@ -1,4 +1,9 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
+
+const PostDetailRedirect = () => {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/community?postId=${id}`} replace />;
+};
 import AdminLayout from "./components/admin/AdminLayout";
 import RequireAuth from "./components/admin/RequireAuth";
 import StudentLayout from "./components/student/StudentLayout";
@@ -14,12 +19,12 @@ import RBACPermissions from "./pages/admin/RBACPermissions";
 import Admins from "./pages/admin/Admins";
 import CommunityLanding from "./pages/community/CommunityLanding";
 import PostsList from "./pages/community/PostsList";
-import PostDetail from "./pages/community/PostDetail";
 import PublishPost from "./pages/community/PublishPost";
 import Leaderboard from "./pages/community/Leaderboard";
 import Favorites from "./pages/community/Favorites";
 import PointsCenter from "./pages/community/PointsCenter";
 import MyLikes from "./pages/community/MyLikes";
+import UserProfile from "./pages/community/UserProfile";
 import StudentDashboard from "./pages/student/Dashboard";
 import LearningAnalytics from "./pages/student/LearningAnalytics";
 import ProfileEdit from "./pages/student/ProfileEdit";
@@ -60,8 +65,9 @@ function App() {
         <Route path="/community" element={<CommunityLanding />} />
         <Route path="/community/posts" element={<PostsList />} />
         <Route path="/community/publish" element={<PublishPost />} />
-        <Route path="/community/posts/:id" element={<PostDetail />} />
+        <Route path="/community/posts/:id" element={<PostDetailRedirect />} />
         <Route path="/community/leaderboard" element={<Leaderboard />} />
+        <Route path="/community/user/:userId" element={<UserProfile />} />
         <Route path="/community/favorites" element={<Favorites />} />
         <Route path="/community/likes" element={<MyLikes />} />
         <Route path="/community/points" element={<PointsCenter />} />
