@@ -154,6 +154,7 @@ export const calculateLevelDetail = (points: number): LevelDetail => {
 };
 
 export type BadgeNewCategory = "learning" | "community" | "challenge";
+export type BadgeRarity = "common" | "rare" | "epic";
 
 export interface BadgeDefinition {
   id: string;
@@ -165,7 +166,34 @@ export interface BadgeDefinition {
   target: number;
   requirement: string;
   sortOrder: number;
+  rarity: BadgeRarity;
 }
+
+export const BADGE_RARITY_CONFIG: Record<BadgeRarity, {
+  name: string;
+  color: string;
+  bgColor: string;
+  icon: string;
+}> = {
+  common: {
+    name: "普通",
+    color: "#8c8c8c",
+    bgColor: "#f0f0f0",
+    icon: "StarOutlined",
+  },
+  rare: {
+    name: "稀有",
+    color: "#1890ff",
+    bgColor: "#e6f7ff",
+    icon: "RocketOutlined",
+  },
+  epic: {
+    name: "史诗",
+    color: "#722ed1",
+    bgColor: "#f9f0ff",
+    icon: "TrophyOutlined",
+  },
+};
 
 export interface UserBadgeProgress {
   badge: BadgeDefinition;
@@ -186,6 +214,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     target: 1,
     requirement: "累计发帖 ≥ 1",
     sortOrder: 1,
+    rarity: "common",
   },
   {
     id: "regular_poster",
@@ -197,6 +226,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     target: 10,
     requirement: "累计发帖 ≥ 10",
     sortOrder: 2,
+    rarity: "rare",
   },
   {
     id: "content_master",
@@ -208,6 +238,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     target: 50,
     requirement: "累计发帖 ≥ 50",
     sortOrder: 3,
+    rarity: "epic",
   },
   {
     id: "first_comment",
@@ -219,6 +250,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     target: 1,
     requirement: "累计评论 ≥ 1",
     sortOrder: 4,
+    rarity: "common",
   },
   {
     id: "social_butterfly",
@@ -230,6 +262,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     target: 30,
     requirement: "累计评论 ≥ 30",
     sortOrder: 5,
+    rarity: "rare",
   },
   {
     id: "streak_3",
@@ -241,6 +274,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     target: 3,
     requirement: "连续3天有积分记录",
     sortOrder: 6,
+    rarity: "common",
   },
   {
     id: "streak_7",
@@ -252,6 +286,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     target: 7,
     requirement: "连续7天有积分记录",
     sortOrder: 7,
+    rarity: "rare",
   },
   {
     id: "streak_30",
@@ -263,6 +298,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     target: 30,
     requirement: "连续30天有积分记录",
     sortOrder: 8,
+    rarity: "epic",
   },
   {
     id: "daily_high",
@@ -274,6 +310,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     target: 20,
     requirement: "单日积分 ≥ 20",
     sortOrder: 9,
+    rarity: "rare",
   },
   {
     id: "centurion",
@@ -285,6 +322,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     target: 100,
     requirement: "累计积分 ≥ 100",
     sortOrder: 10,
+    rarity: "rare",
   },
   {
     id: "thousandaire",
@@ -296,6 +334,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     target: 1000,
     requirement: "累计积分 ≥ 1000",
     sortOrder: 11,
+    rarity: "epic",
   },
   {
     id: "first_like_received",
@@ -307,6 +346,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     target: 1,
     requirement: "获得点赞 ≥ 1",
     sortOrder: 12,
+    rarity: "common",
   },
   {
     id: "popular_author",
@@ -318,6 +358,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     target: 50,
     requirement: "获得点赞 ≥ 50",
     sortOrder: 13,
+    rarity: "epic",
   },
 ];
 
@@ -372,6 +413,7 @@ export interface BadgeProgress {
   isUnlocked: boolean;
   requirement: string;
   sortOrder: number;
+  rarity: BadgeRarity;
 }
 
 export interface BadgeCategoryGroup {
@@ -391,6 +433,7 @@ export interface BadgesOverview {
     completionRate: number;
   };
   categories: BadgeCategoryGroup[];
+  recommendedBadges: BadgeProgress[];
 }
 
 export const BADGE_CATEGORY_CONFIG: Record<BadgeNewCategory, {

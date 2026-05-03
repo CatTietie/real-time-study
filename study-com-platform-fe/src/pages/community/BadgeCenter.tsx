@@ -10,6 +10,9 @@ import {
     Progress,
     Space,
     Button,
+    Radio,
+    Divider,
+    Empty,
 } from "antd";
 import {
     TrophyOutlined,
@@ -28,22 +31,27 @@ import {
     HomeOutlined,
     LockOutlined,
     UnlockOutlined,
+    ThunderboltOutlined,
+    BulbOutlined,
+    FilterOutlined,
 } from "@ant-design/icons";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchBadgesOverview } from "../../services/communityPublic";
+import { fetchBadgesOverview, BADGE_RARITY_CONFIG } from "../../services/communityPublic";
 import type {
     BadgeProgress,
     BadgeCategoryGroup,
     BadgesOverviewSummary,
+    BadgeRarity,
 } from "../../services/communityPublic";
 import CommunityFooter from "../../components/community/CommunityFooter";
 
 const { Title, Text } = Typography;
 
-const getBadgeIcon = (iconName: string, isUnlocked: boolean): React.ReactNode => {
+const getBadgeIcon = (iconName: string): React.ReactNode => {
     const iconMap: Record<string, React.ReactNode> = {
         EditOutlined: <EditOutlined />,
+        EditFilled: <EditOutlined />,
         MessageOutlined: <MessageOutlined />,
         TeamOutlined: <TeamOutlined />,
         FireOutlined: <FireOutlined />,
@@ -84,6 +92,18 @@ const getCategoryBg = (category: string): string => {
         challenge: "#f9f0ff",
     };
     return bgMap[category] || "#e6f7ff";
+};
+
+const getRarityGradient = (rarity: BadgeRarity, isUnlocked: boolean): string => {
+    if (!isUnlocked) {
+        return "linear-gradient(135deg, #d9d9d9 0%, #bfbfbf 100%)";
+    }
+    const gradientMap: Record<BadgeRarity, string> = {
+        common: "linear-gradient(135deg, #8c8c8c 0%, #bfbfbf 100%)",
+        rare: "linear-gradient(135deg, #1890ff 0%, #69c0ff 100%)",
+        epic: "linear-gradient(135deg, #722ed1 0%, #b37feb 100%)",
+    };
+    return gradientMap[rarity];
 };
 
 const CircularProgress = ({ percent, size = 200, strokeWidth = 12 }: { percent: number; size?: number; strokeWidth?: number }) => {
@@ -128,12 +148,16 @@ const CircularProgress = ({ percent, size = 200, strokeWidth = 12 }: { percent: 
     );
 };
 
+type FilterType = "all" | "unlocked" | "locked";
+
 export default function BadgeCenter() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [summary, setSummary] = useState<BadgesOverviewSummary | null>(null);
     const [categories, setCategories] = useState<BadgeCategoryGroup[]>([]);
+    const [recommendedBadges, setRecommendedBadges] = useState<BadgeProgress[]>([]);
     const [animatePercent, setAnimatePercent] = useState(0);
+    const [filterType, setFilterType] = useState<FilterType>("all");
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -142,6 +166,7 @@ export default function BadgeCenter() {
             if (res?.data) {
                 setSummary(res.data.summary);
                 setCategories(res.data.categories);
+                setRecommendedBadges(res.data.recommendedBadges || []);
                 setTimeout(() => setAnimatePercent(res.data.summary.completionRate), 300);
             }
         } catch (err) {
@@ -154,6 +179,17 @@ export default function BadgeCenter() {
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    const filteredCategories = useMemo(() => {
+        if (filterType === "all") return categories;
+
+        return categories.map((cat) => ({
+            ...cat,
+            badges: cat.badges.filter((b) =>
+                filterType === "unlocked" ? b.isUnlocked : !b.isUnlocked
+            ),
+        })).filter((cat) => cat.badges.length > 0);
+    }, [categories, filterType]);
 
     const renderHeader = () => {
         if (!summary) return null;
@@ -290,21 +326,197 @@ export default function BadgeCenter() {
         );
     };
 
+    const renderRecommendedSection = () => {
+        if (recommendedBadges.length === 0) return null;
+
+        return (
+            <Card
+                loading={loading}
+                style={{ marginBottom: 24, borderRadius: 16, border: "none", background: "linear-gradient(135deg, #fff7e6 0%, #ffe7ba 100%)" }}
+                title={
+                    <Space size={12}>
+                        <div
+                            style={{
+                                width: 40,
+                                height: 40,
+                                borderRadius: 10,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                background: "linear-gradient(135deg, #fa8c16 0%, #ffa940 100%)",
+                                color: "white",
+                                fontSize: 20,
+                            }}
+                        >
+                            <ThunderboltOutlined />
+                        </div>
+                        <div>
+                            <Text strong style={{ fontSize: 16, color: "#fa8c16" }}>
+                                推荐挑战
+                            </Text>
+                            <br />
+                            <Text style={{ fontSize: 12, color: "#faad14" }}>
+                                以下成就最容易达成，优先挑战！
+                            </Text>
+                        </div>
+                    </Space>
+                }
+                headStyle={{ background: "transparent", borderBottom: "1px solid #ffd591", padding: "16px 24px" }}
+                bodyStyle={{ padding: "20px 24px" }}
+            >
+                <Row gutter={[16, 16]}>
+                    {recommendedBadges.map((badge, index) => (
+                        <Col xs={24} sm={8} key={badge.id}>
+                            <Card
+                                size="small"
+                                hoverable
+                                style={{
+                                    background: "white",
+                                    borderRadius: 12,
+                                    border: "2px solid #ffd591",
+                                    boxShadow: "0 4px 12px rgba(250, 173, 20, 0.15)",
+                                }}
+                                bodyStyle={{ padding: "16px" }}
+                            >
+                                <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                        <div
+                                            style={{
+                                                width: 48,
+                                                height: 48,
+                                                borderRadius: "50%",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                background: getRarityGradient(badge.rarity, badge.isUnlocked),
+                                                color: "white",
+                                                fontSize: 24,
+                                                flexShrink: 0,
+                                            }}
+                                        >
+                                            {getBadgeIcon(badge.icon)}
+                                        </div>
+                                        <div style={{ flex: 1 }}>
+                                            <Space>
+                                                <Text strong style={{ fontSize: 14 }}>
+                                                    {badge.name}
+                                                </Text>
+                                                <Tag
+                                                    color={BADGE_RARITY_CONFIG[badge.rarity].color}
+                                                    style={{ margin: 0 }}
+                                                >
+                                                    {BADGE_RARITY_CONFIG[badge.rarity].name}
+                                                </Tag>
+                                            </Space>
+                                            <div>
+                                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                                    {badge.requirement}
+                                                </Text>
+                                            </div>
+                                        </div>
+                                        <div
+                                            style={{
+                                                width: 32,
+                                                height: 32,
+                                                borderRadius: "50%",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                background: "#fff7e6",
+                                                border: "2px solid #ffd591",
+                                                color: "#fa8c16",
+                                                fontWeight: "bold",
+                                                fontSize: 14,
+                                            }}
+                                        >
+                                            {index + 1}
+                                        </div>
+                                    </div>
+                                    <Progress
+                                        percent={badge.progress}
+                                        size="small"
+                                        strokeColor="#fa8c16"
+                                        trailColor="#fff1e0"
+                                        format={() => (
+                                            <Text style={{ color: "#fa8c16", fontWeight: 500 }}>
+                                                {badge.current}/{badge.threshold}
+                                            </Text>
+                                        )}
+                                    />
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            gap: 6,
+                                            color: "#fa8c16",
+                                            fontSize: 12,
+                                        }}
+                                    >
+                                        <BulbOutlined />
+                                        <Text>还需 {badge.threshold - badge.current} 即可达成</Text>
+                                    </div>
+                                </Space>
+                            </Card>
+                        </Col>
+                    ))}
+                </Row>
+            </Card>
+        );
+    };
+
+    const renderFilterSection = () => {
+        return (
+            <Card
+                style={{ marginBottom: 24, borderRadius: 16, border: "none", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
+                bodyStyle={{ padding: "16px 24px" }}
+            >
+                <Row align="middle" justify="space-between">
+                    <Col>
+                        <Space size={12}>
+                            <FilterOutlined style={{ color: "#8c8c8c" }} />
+                            <Text type="secondary">筛选：</Text>
+                            <Radio.Group value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+                                <Radio.Button value="all">全部</Radio.Button>
+                                <Radio.Button value="unlocked">已解锁</Radio.Button>
+                                <Radio.Button value="locked">未解锁</Radio.Button>
+                            </Radio.Group>
+                        </Space>
+                    </Col>
+                    <Col>
+                        <Space>
+                            <Tag color="default">普通</Tag>
+                            <Tag color="blue">稀有</Tag>
+                            <Tag color="purple">史诗</Tag>
+                        </Space>
+                    </Col>
+                </Row>
+            </Card>
+        );
+    };
+
     const renderBadgeCard = (badge: BadgeProgress, category: string) => {
+        const rarityConfig = BADGE_RARITY_CONFIG[badge.rarity];
+
         return (
             <Tooltip
                 key={badge.id}
                 title={
                     <div style={{ padding: 8, maxWidth: 280 }}>
-                        <div style={{ fontWeight: "bold", marginBottom: 6, fontSize: 14 }}>
-                            {badge.name}
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                            <Text strong style={{ fontSize: 14 }}>
+                                {badge.name}
+                            </Text>
+                            <Tag color={rarityConfig.color}>
+                                {rarityConfig.name}
+                            </Tag>
                         </div>
                         <div style={{ color: "#999", marginBottom: 8, fontSize: 12 }}>
                             {badge.description}
                         </div>
                         {badge.isUnlocked ? (
-                            <Tag color="green">
-                                <UnlockOutlined /> 已解锁
+                            <Tag color="green" icon={<UnlockOutlined />}>
+                                已解锁
                             </Tag>
                         ) : (
                             <>
@@ -322,9 +534,9 @@ export default function BadgeCenter() {
                     hoverable
                     style={{
                         background: badge.isUnlocked ? "white" : "#fafafa",
-                        opacity: badge.isUnlocked ? 1 : 0.7,
+                        opacity: badge.isUnlocked ? 1 : 0.8,
                         border: badge.isUnlocked
-                            ? `2px solid ${category === "learning" ? "#1890ff" : category === "community" ? "#52c41a" : "#722ed1"}`
+                            ? `2px solid ${rarityConfig.color}`
                             : "2px solid #e8e8e8",
                         borderRadius: 16,
                         transition: "all 0.3s ease",
@@ -341,24 +553,22 @@ export default function BadgeCenter() {
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                background: badge.isUnlocked
-                                    ? getCategoryGradient(category)
-                                    : "#e8e8e8",
+                                background: getRarityGradient(badge.rarity, badge.isUnlocked),
                                 boxShadow: badge.isUnlocked
-                                    ? `0 4px 16px ${category === "learning" ? "rgba(24, 144, 255, 0.3)" : category === "community" ? "rgba(82, 196, 26, 0.3)" : "rgba(114, 46, 209, 0.3)"}`
+                                    ? `0 4px 16px ${rarityConfig.color}33`
                                     : "none",
                                 fontSize: 32,
                                 color: badge.isUnlocked ? "white" : "#aaa",
                                 transition: "all 0.3s ease",
                             }}
                         >
-                            {getBadgeIcon(badge.icon, badge.isUnlocked)}
+                            {getBadgeIcon(badge.icon)}
                         </div>
 
                         <div
                             style={{
                                 fontWeight: "bold",
-                                marginBottom: 6,
+                                marginBottom: 4,
                                 fontSize: 14,
                                 color: badge.isUnlocked ? "#333" : "#999",
                             }}
@@ -374,12 +584,18 @@ export default function BadgeCenter() {
                                 marginBottom: 12,
                             }}
                         >
+                            <Tag
+                                color={badge.isUnlocked ? rarityConfig.color : "default"}
+                                style={{ fontSize: 11 }}
+                            >
+                                {rarityConfig.name}
+                            </Tag>
                             {badge.isUnlocked ? (
-                                <Tag color="green" icon={<UnlockOutlined />}>
+                                <Tag color="green" icon={<UnlockOutlined />} style={{ fontSize: 11 }}>
                                     已解锁
                                 </Tag>
                             ) : (
-                                <Tag color="default" icon={<LockOutlined />}>
+                                <Tag color="default" icon={<LockOutlined />} style={{ fontSize: 11 }}>
                                     未解锁
                                 </Tag>
                             )}
@@ -466,7 +682,7 @@ export default function BadgeCenter() {
             >
                 <Row gutter={[16, 16]}>
                     {category.badges.map((badge) => (
-                        <Col xs={12} sm={8} md={6} lg={4} key={badge.id}>
+                        <Col xs={12} sm={8} md={6} lg={4} xl={3} key={badge.id}>
                             {renderBadgeCard(badge, category.category)}
                         </Col>
                     ))}
@@ -483,10 +699,30 @@ export default function BadgeCenter() {
     };
 
     return (
-        <div className="page-container" style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 16px" }}>
+        <div className="page-container" style={{ maxWidth: 1400, margin: "0 auto", padding: "24px 16px" }}>
             {renderHeader()}
 
-            {categories.map(renderCategorySection)}
+            {recommendedBadges.length > 0 && renderRecommendedSection()}
+
+            {renderFilterSection()}
+
+            {filteredCategories.length > 0 ? (
+                filteredCategories.map(renderCategorySection)
+            ) : (
+                <Card style={{ borderRadius: 16, textAlign: "center", padding: "40px 0" }}>
+                    <Empty
+                        description={
+                            filterType === "unlocked"
+                                ? "暂无已解锁的徽章，继续努力！"
+                                : filterType === "locked"
+                                ? "所有徽章已解锁，太棒了！"
+                                : "暂无徽章"
+                        }
+                    />
+                </Card>
+            )}
+
+            <Divider style={{ margin: "32px 0 16px 0" }} />
 
             <CommunityFooter />
         </div>

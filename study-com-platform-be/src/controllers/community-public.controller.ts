@@ -3060,11 +3060,24 @@ export const getBadgesOverview = async (req: Request, res: Response) => {
         isUnlocked,
         requirement: badge.requirement,
         sortOrder: badge.sortOrder,
+        rarity: badge.rarity,
       };
     });
 
     const unlockedCount = badgesWithProgress.filter((b) => b.isUnlocked).length;
     const totalBadges = badgesWithProgress.length;
+
+    const recommendedBadges = badgesWithProgress
+      .filter((b) => !b.isUnlocked)
+      .sort((a, b) => {
+        const remA = a.threshold - a.current;
+        const remB = b.threshold - b.current;
+        if (a.progress === b.progress) {
+          return remA - remB;
+        }
+        return b.progress - a.progress;
+      })
+      .slice(0, 3);
 
     const categoryOrder: BadgeNewCategory[] = ["learning", "community", "challenge"];
     const categories = categoryOrder.map((cat) => {
@@ -3095,6 +3108,7 @@ export const getBadgesOverview = async (req: Request, res: Response) => {
           completionRate: totalBadges > 0 ? Math.round((unlockedCount / totalBadges) * 100) : 0,
         },
         categories,
+        recommendedBadges,
       },
     });
   } catch (error) {

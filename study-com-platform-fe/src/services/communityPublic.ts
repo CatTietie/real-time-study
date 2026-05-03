@@ -441,6 +441,29 @@ export const fetchRankingSnapshot = async (): Promise<{ success: boolean; data: 
 };
 
 export type BadgeNewCategory = "learning" | "community" | "challenge";
+export type BadgeRarity = "common" | "rare" | "epic";
+
+export const BADGE_RARITY_CONFIG: Record<BadgeRarity, {
+  name: string;
+  color: string;
+  bgColor: string;
+}> = {
+  common: {
+    name: "普通",
+    color: "#8c8c8c",
+    bgColor: "#f0f0f0",
+  },
+  rare: {
+    name: "稀有",
+    color: "#1890ff",
+    bgColor: "#e6f7ff",
+  },
+  epic: {
+    name: "史诗",
+    color: "#722ed1",
+    bgColor: "#f9f0ff",
+  },
+};
 
 export interface BadgeProgress {
   id: string;
@@ -454,6 +477,7 @@ export interface BadgeProgress {
   isUnlocked: boolean;
   requirement: string;
   sortOrder: number;
+  rarity: BadgeRarity;
 }
 
 export interface BadgeCategoryGroup {
@@ -475,6 +499,7 @@ export interface BadgesOverviewSummary {
 export interface BadgesOverviewData {
   summary: BadgesOverviewSummary;
   categories: BadgeCategoryGroup[];
+  recommendedBadges: BadgeProgress[];
 }
 
 export const fetchBadgesOverview = async (): Promise<{ success: boolean; data: BadgesOverviewData }> => {
