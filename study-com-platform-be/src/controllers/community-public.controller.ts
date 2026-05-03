@@ -18,7 +18,11 @@ import { verifyToken } from "../services/auth.service";
 import {
   addPoints,
   calculateLevel,
+  calculateLevelDetail,
   getStartOfDay,
+  BADGE_DEFINITIONS,
+  getGrowthTip,
+  LevelDetail,
 } from "../services/points.service";
 import {
   addCommunityClient,
@@ -2526,6 +2530,39 @@ export const getPointsOverviewPlus = async (req: Request, res: Response) => {
       },
     });
 
+    const totalComments = await PointsLog.count({
+      where: {
+        user_id: userId,
+        source_type: "comment",
+      },
+    });
+
+    const totalPostPointsLogs = await PointsLog.count({
+      where: {
+        user_id: userId,
+        source_type: "post",
+      },
+    });
+
+    const allLogs = await PointsLog.findAll({
+      where: { user_id: userId },
+      attributes: ["change", "created_at", "source_type", "reason"],
+      order: [[Sequelize.col("created_at"), "DESC"]],
+      raw: true,
+    });
+
+    const dailyPoints: Record<string, number> = {};
+    allLogs.forEach((log: any) => {
+      const date = log.created_at.toISOString().split("T")[0];
+      dailyPoints[date] = (dailyPoints[date] || 0) + (log.change > 0 ? log.change : 0);
+    });
+
+    const maxDailyPoints = Math.max(0, ...Object.values(dailyPoints));
+
+    const totalPoints = user.points || 0;
+    const levelDetail = calculateLevelDetail(totalPoints);
+
+    let qualityScore = 0;
     const totalViewsResult = await Post.sum('view_count', {
       where: {
         user_id: userId,
@@ -2535,7 +2572,6 @@ export const getPointsOverviewPlus = async (req: Request, res: Response) => {
     });
     const totalViews = Number(totalViewsResult || 0);
 
-    let qualityScore = 0;
     if (totalPosts > 0 && totalViews > 0) {
       const likeViewRatio = totalLikes / Math.max(totalViews, 1);
       qualityScore = Math.round(likeViewRatio * 1000);
@@ -2543,24 +2579,80 @@ export const getPointsOverviewPlus = async (req: Request, res: Response) => {
       qualityScore = totalLikes * 10;
     }
 
+    const unlockedCount = calculateUnlockedBadgeCount({
+      totalPoints,
+      totalPosts: totalPostPointsLogs,
+      totalComments,
+      totalLikes,
+      currentStreak: loginStreak,
+      maxDailyPoints,
+    });
+
+    const totalBadges = BADGE_DEFINITIONS.length;
+    const achievementProgress = Math.round((unlockedCount / totalBadges) * 100);
+
+    const growthTip = getGrowthTip(
+      levelDetail,
+      Number(todayPoints || 0),
+      totalPostPointsLogs,
+      totalComments,
+      loginStreak,
+      totalPoints
+    );
+
     res.json({
       success: true,
       message: "获取成功",
       data: {
-        totalPoints: user.points || 0,
+        totalPoints,
         todayPoints: Number(todayPoints || 0),
-        level: calculateLevel(user.points || 0),
+        level: levelDetail.currentLevel,
+        levelDetail: {
+          ...levelDetail,
+        },
         streakDays: loginStreak,
         studyDuration: studyDuration.total,
         todayStudyDuration: studyDuration.today,
-        qualityScore: qualityScore,
+        qualityScore,
+        achievementProgress,
+        unlockedCount,
+        totalBadges,
+        growthTip,
         trendData,
       },
     });
   } catch (error) {
+    console.error("getPointsOverviewPlus error:", error);
     const message = error instanceof Error ? error.message : "获取失败";
     res.status(500).json({ success: false, message });
   }
+};
+
+const calculateUnlockedBadgeCount = (stats: {
+  totalPoints: number;
+  totalPosts: number;
+  totalComments: number;
+  totalLikes: number;
+  currentStreak: number;
+  maxDailyPoints: number;
+}): number => {
+  let count = 0;
+
+  if (stats.totalPosts >= 1) count++;
+  if (stats.totalPosts >= 10) count++;
+  if (stats.totalPosts >= 50) count++;
+  if (stats.totalComments >= 1) count++;
+  if (stats.totalComments >= 30) count++;
+  if (stats.currentStreak >= 3) count++;
+  if (stats.currentStreak >= 7) count++;
+  if (stats.currentStreak >= 30) count++;
+  if (stats.maxDailyPoints >= 20) count++;
+  if (stats.totalPoints >= 100) count++;
+  if (stats.totalPoints >= 1000) count++;
+  if (stats.totalLikes >= 1) count++;
+  if (stats.totalLikes >= 50) count++;
+
+  return count;
 };
 
 export const getPointsActions = async (req: Request, res: Response) => {
@@ -2661,6 +2753,168 @@ export const getPointsActions = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
+    const message = error instanceof Error ? error.message : "获取失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+export const getPointsBadges = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const userId = req.user.id;
+
+    const [user, loginStreak, contentQuality] = await Promise.all([
+      User.findByPk(userId),
+      getLoginStreak(userId),
+      getContentQualityScore(userId),
+    ]);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "用户不存在" });
+    }
+
+    const totalPoints = user.points || 0;
+    const totalLikes = contentQuality.totalLikes || 0;
+
+    const [totalPostLogs, totalCommentLogs] = await Promise.all([
+      PointsLog.count({
+        where: { user_id: userId, source_type: "post" },
+      }),
+      PointsLog.count({
+        where: { user_id: userId, source_type: "comment" },
+      }),
+    ]);
+
+    const allLogs = await PointsLog.findAll({
+      where: { user_id: userId },
+      attributes: ["change", "created_at"],
+      order: [[Sequelize.col("created_at"), "DESC"]],
+      raw: true,
+    });
+
+    const dailyPoints: Record<string, number> = {};
+    allLogs.forEach((log: any) => {
+      const date = log.created_at.toISOString().split("T")[0];
+      dailyPoints[date] = (dailyPoints[date] || 0) + (log.change > 0 ? log.change : 0);
+    });
+
+    const maxDailyPoints = Math.max(0, ...Object.values(dailyPoints));
+
+    const levelDetail = calculateLevelDetail(totalPoints);
+
+    const badgesWithProgress = BADGE_DEFINITIONS.map((badge) => {
+      let current = 0;
+      let isUnlocked = false;
+
+      switch (badge.id) {
+        case "first_post":
+          current = totalPostLogs;
+          isUnlocked = totalPostLogs >= 1;
+          break;
+        case "regular_poster":
+          current = totalPostLogs;
+          isUnlocked = totalPostLogs >= 10;
+          break;
+        case "content_master":
+          current = totalPostLogs;
+          isUnlocked = totalPostLogs >= 50;
+          break;
+        case "first_comment":
+          current = totalCommentLogs;
+          isUnlocked = totalCommentLogs >= 1;
+          break;
+        case "social_butterfly":
+          current = totalCommentLogs;
+          isUnlocked = totalCommentLogs >= 30;
+          break;
+        case "streak_3":
+          current = loginStreak;
+          isUnlocked = loginStreak >= 3;
+          break;
+        case "streak_7":
+          current = loginStreak;
+          isUnlocked = loginStreak >= 7;
+          break;
+        case "streak_30":
+          current = loginStreak;
+          isUnlocked = loginStreak >= 30;
+          break;
+        case "daily_high":
+          current = maxDailyPoints;
+          isUnlocked = maxDailyPoints >= 20;
+          break;
+        case "centurion":
+          current = totalPoints;
+          isUnlocked = totalPoints >= 100;
+          break;
+        case "thousandaire":
+          current = totalPoints;
+          isUnlocked = totalPoints >= 1000;
+          break;
+        case "first_like_received":
+          current = totalLikes;
+          isUnlocked = totalLikes >= 1;
+          break;
+        case "popular_author":
+          current = totalLikes;
+          isUnlocked = totalLikes >= 50;
+          break;
+        default:
+          current = 0;
+          isUnlocked = false;
+      }
+
+      const progress = badge.target > 0 ? Math.min(100, Math.round((current / badge.target) * 100)) : 0;
+
+      return {
+        ...badge,
+        current,
+        isUnlocked,
+        progress,
+      };
+    });
+
+    const unlockedCount = badgesWithProgress.filter((b) => b.isUnlocked).length;
+    const totalBadges = badgesWithProgress.length;
+
+    const growthTip = getGrowthTip(
+      levelDetail,
+      0,
+      totalPostLogs,
+      totalCommentLogs,
+      loginStreak,
+      totalPoints
+    );
+
+    const badgesByCategory: Record<string, typeof badgesWithProgress> = {
+      achievement: badgesWithProgress.filter((b) => b.category === "achievement"),
+      activity: badgesWithProgress.filter((b) => b.category === "activity"),
+      quality: badgesWithProgress.filter((b) => b.category === "quality"),
+      special: badgesWithProgress.filter((b) => b.category === "special"),
+    };
+
+    res.json({
+      success: true,
+      message: "获取成功",
+      data: {
+        badges: badgesWithProgress,
+        badgesByCategory,
+        unlockedCount,
+        totalBadges,
+        achievementProgress: Math.round((unlockedCount / totalBadges) * 100),
+        growthTip,
+        currentLevel: levelDetail.currentLevel,
+        currentLevelName: levelDetail.currentLevelName,
+        nextLevelPoints: levelDetail.nextLevelPoints,
+        pointsToNext: levelDetail.pointsToNext,
+        levelProgress: levelDetail.progress,
+      },
+    });
+  } catch (error) {
+    console.error("getPointsBadges error:", error);
     const message = error instanceof Error ? error.message : "获取失败";
     res.status(500).json({ success: false, message });
   }

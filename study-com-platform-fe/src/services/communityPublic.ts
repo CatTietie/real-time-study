@@ -168,6 +168,11 @@ export const fetchPointsActions = async () => {
   return response.data;
 };
 
+export const fetchPointsBadges = async () => {
+  const response = await api.get("/community/points/badges");
+  return response.data;
+};
+
 export const fetchCommunityProfileSummary = async () => {
   const response = await api.get("/community/profile/summary");
   return response.data;

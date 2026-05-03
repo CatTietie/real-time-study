@@ -33,6 +33,7 @@ import {
   getPointsLogs,
   getPointsOverviewPlus,
   getPointsActions,
+  getPointsBadges,
   getCommunityProfileSummary,
   getCommunityTagSuggestions,
   streamCommunityEvents,
@@ -102,6 +103,7 @@ router.get("/points/summary", authMiddleware, getPointsSummary);
 router.get("/points/logs", authMiddleware, getPointsLogs);
 router.get("/points/overview-plus", authMiddleware, getPointsOverviewPlus);
 router.get("/points/actions", authMiddleware, getPointsActions);
+router.get("/points/badges", authMiddleware, getPointsBadges);
 
 // 个人信息汇总
 router.get("/profile/summary", authMiddleware, getCommunityProfileSummary);
