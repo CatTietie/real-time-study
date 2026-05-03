@@ -480,6 +480,14 @@ export interface BadgeProgress {
   rarity: BadgeRarity;
 }
 
+export interface MultiDimTrendData {
+  date: string;
+  points: number;
+  duration: number;
+  posts: number;
+  views: number;
+}
+
 export interface BadgeCategoryGroup {
   category: BadgeNewCategory;
   categoryName: string;
@@ -500,6 +508,7 @@ export interface BadgesOverviewData {
   summary: BadgesOverviewSummary;
   categories: BadgeCategoryGroup[];
   recommendedBadges: BadgeProgress[];
+  justUnlocked: BadgeProgress[];
 }
 
 export const fetchBadgesOverview = async (): Promise<{ success: boolean; data: BadgesOverviewData }> => {

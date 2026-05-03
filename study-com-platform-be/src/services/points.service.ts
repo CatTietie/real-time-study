@@ -360,6 +360,42 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     sortOrder: 13,
     rarity: "epic",
   },
+  {
+    id: "quality_beginner",
+    name: "质量入门",
+    description: "内容质量分达到 50",
+    icon: "StarOutlined",
+    category: "quality",
+    newCategory: "community",
+    target: 50,
+    requirement: "质量分 ≥ 50",
+    sortOrder: 14,
+    rarity: "common",
+  },
+  {
+    id: "quality_skilled",
+    name: "质量达人",
+    description: "内容质量分达到 200",
+    icon: "ThunderboltOutlined",
+    category: "quality",
+    newCategory: "community",
+    target: 200,
+    requirement: "质量分 ≥ 200",
+    sortOrder: 15,
+    rarity: "rare",
+  },
+  {
+    id: "quality_master",
+    name: "质量大师",
+    description: "内容质量分达到 500",
+    icon: "CrownOutlined",
+    category: "quality",
+    newCategory: "community",
+    target: 500,
+    requirement: "质量分 ≥ 500",
+    sortOrder: 16,
+    rarity: "epic",
+  },
 ];
 
 export const getGrowthTip = (
@@ -434,6 +470,7 @@ export interface BadgesOverview {
   };
   categories: BadgeCategoryGroup[];
   recommendedBadges: BadgeProgress[];
+  justUnlocked: BadgeProgress[];
 }
 
 export const BADGE_CATEGORY_CONFIG: Record<BadgeNewCategory, {
@@ -456,4 +493,42 @@ export const BADGE_CATEGORY_CONFIG: Record<BadgeNewCategory, {
     icon: "TrophyOutlined",
     color: "#722ed1",
   },
+};
+
+interface BadgeCacheEntry {
+  unlockedBadgeIds: string[];
+  timestamp: number;
+}
+
+const badgeCache = new Map<number, BadgeCacheEntry>();
+const CACHE_TTL = 5 * 60 * 1000;
+
+export const getAndUpdateBadgeCache = (
+  userId: number,
+  currentUnlockedIds: string[]
+): { justUnlockedIds: string[]; isFirstTime: boolean } => {
+  const now = Date.now();
+  const cached = badgeCache.get(userId);
+  const isFirstTime = !cached;
+
+  if (isFirstTime || now - cached.timestamp > CACHE_TTL) {
+    badgeCache.set(userId, {
+      unlockedBadgeIds: currentUnlockedIds,
+      timestamp: now,
+    });
+    return { justUnlockedIds: [], isFirstTime };
+  }
+
+  const justUnlockedIds = currentUnlockedIds.filter(
+    (id) => !cached.unlockedBadgeIds.includes(id)
+  );
+
+  if (justUnlockedIds.length > 0) {
+    badgeCache.set(userId, {
+      unlockedBadgeIds: currentUnlockedIds,
+      timestamp: now,
+    });
+  }
+
+  return { justUnlockedIds, isFirstTime };
 };

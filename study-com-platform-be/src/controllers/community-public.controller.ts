@@ -25,6 +25,7 @@ import {
   LevelDetail,
   BADGE_CATEGORY_CONFIG,
   BadgeNewCategory,
+  getAndUpdateBadgeCache,
 } from "../services/points.service";
 import {
   addCommunityClient,
@@ -2793,6 +2794,7 @@ export const getPointsBadges = async (req: Request, res: Response) => {
 
     const totalPoints = user.points || 0;
     const totalLikes = contentQuality.totalLikes || 0;
+    const qualityScore = contentQuality.score || 0;
 
     const [totalPostLogs, totalCommentLogs] = await Promise.all([
       PointsLog.count({
@@ -2879,6 +2881,18 @@ export const getPointsBadges = async (req: Request, res: Response) => {
           current = totalLikes;
           isUnlocked = totalLikes >= 50;
           break;
+        case "quality_beginner":
+          current = qualityScore;
+          isUnlocked = qualityScore >= 50;
+          break;
+        case "quality_skilled":
+          current = qualityScore;
+          isUnlocked = qualityScore >= 200;
+          break;
+        case "quality_master":
+          current = qualityScore;
+          isUnlocked = qualityScore >= 500;
+          break;
         default:
           current = 0;
           isUnlocked = false;
@@ -2957,6 +2971,7 @@ export const getBadgesOverview = async (req: Request, res: Response) => {
 
     const totalPoints = user.points || 0;
     const totalLikes = contentQuality.totalLikes || 0;
+    const qualityScore = contentQuality.score || 0;
 
     const [totalPostLogs, totalCommentLogs] = await Promise.all([
       PointsLog.count({
@@ -3041,6 +3056,18 @@ export const getBadgesOverview = async (req: Request, res: Response) => {
           current = totalLikes;
           isUnlocked = totalLikes >= 50;
           break;
+        case "quality_beginner":
+          current = qualityScore;
+          isUnlocked = qualityScore >= 50;
+          break;
+        case "quality_skilled":
+          current = qualityScore;
+          isUnlocked = qualityScore >= 200;
+          break;
+        case "quality_master":
+          current = qualityScore;
+          isUnlocked = qualityScore >= 500;
+          break;
         default:
           current = 0;
           isUnlocked = false;
@@ -3098,6 +3125,16 @@ export const getBadgesOverview = async (req: Request, res: Response) => {
       };
     });
 
+    const currentUnlockedIds = badgesWithProgress
+      .filter((b) => b.isUnlocked)
+      .map((b) => b.id);
+
+    const { justUnlockedIds } = getAndUpdateBadgeCache(userId, currentUnlockedIds);
+
+    const justUnlocked = badgesWithProgress.filter((b) =>
+      justUnlockedIds.includes(b.id)
+    );
+
     res.json({
       success: true,
       message: "获取成功",
@@ -3109,6 +3146,7 @@ export const getBadgesOverview = async (req: Request, res: Response) => {
         },
         categories,
         recommendedBadges,
+        justUnlocked,
       },
     });
   } catch (error) {
