@@ -37,6 +37,17 @@ import {
   getMultiDimTrendData,
 } from "../services/learning-stats.service";
 
+const safeToDateString = (value: any): string => {
+  if (!value) return "";
+  if (value instanceof Date) {
+    return value.toISOString().split("T")[0];
+  }
+  if (typeof value === "string") {
+    return value.split("T")[0];
+  }
+  return String(value).split("T")[0];
+};
+
 const parseTags = (tags?: string[] | string) => {
   const parsed = Array.isArray(tags)
     ? tags
@@ -2553,8 +2564,10 @@ export const getPointsOverviewPlus = async (req: Request, res: Response) => {
 
     const dailyPoints: Record<string, number> = {};
     allLogs.forEach((log: any) => {
-      const date = log.created_at.toISOString().split("T")[0];
-      dailyPoints[date] = (dailyPoints[date] || 0) + (log.change > 0 ? log.change : 0);
+      const date = safeToDateString(log.created_at);
+      if (date) {
+        dailyPoints[date] = (dailyPoints[date] || 0) + (log.change > 0 ? log.change : 0);
+      }
     });
 
     const maxDailyPoints = Math.max(0, ...Object.values(dailyPoints));
@@ -2797,8 +2810,10 @@ export const getPointsBadges = async (req: Request, res: Response) => {
 
     const dailyPoints: Record<string, number> = {};
     allLogs.forEach((log: any) => {
-      const date = log.created_at.toISOString().split("T")[0];
-      dailyPoints[date] = (dailyPoints[date] || 0) + (log.change > 0 ? log.change : 0);
+      const date = safeToDateString(log.created_at);
+      if (date) {
+        dailyPoints[date] = (dailyPoints[date] || 0) + (log.change > 0 ? log.change : 0);
+      }
     });
 
     const maxDailyPoints = Math.max(0, ...Object.values(dailyPoints));
