@@ -79,6 +79,7 @@ const getBadgeIcon = (iconName: string): React.ReactNode => {
         LikeOutlined: <LikeOutlined />,
         HeartOutlined: <HeartOutlined />,
         BookOutlined: <BookOutlined />,
+        ThunderboltOutlined: <ThunderboltOutlined />,
     };
     return iconMap[iconName] || <TrophyOutlined />;
 };
@@ -174,6 +175,8 @@ export default function BadgeCenter() {
     const [recommendedBadges, setRecommendedBadges] = useState<BadgeProgress[]>([]);
     const [animatePercent, setAnimatePercent] = useState(0);
     const [filterType, setFilterType] = useState<FilterType>("all");
+    const [newlyUnlockedIds, setNewlyUnlockedIds] = useState<Set<string>>(new Set());
+    const [justUnlockedBadges, setJustUnlockedBadges] = useState<BadgeProgress[]>([]);
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -184,6 +187,58 @@ export default function BadgeCenter() {
                 setCategories(res.data.categories);
                 setRecommendedBadges(res.data.recommendedBadges || []);
                 setTimeout(() => setAnimatePercent(res.data.summary.completionRate), 300);
+
+                const justUnlocked = res.data.justUnlocked || [];
+                if (justUnlocked.length > 0) {
+                    setJustUnlockedBadges(justUnlocked);
+                    const newIds = new Set(justUnlocked.map(b => b.id));
+                    setNewlyUnlockedIds(newIds);
+
+                    justUnlocked.forEach((badge, index) => {
+                        setTimeout(() => {
+                            message.config({
+                                top: 100,
+                            });
+                            message.success({
+                                content: (
+                                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                        <div
+                                            style={{
+                                                width: 40,
+                                                height: 40,
+                                                borderRadius: "50%",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                background: getRarityGradient(badge.rarity, true),
+                                                color: "white",
+                                                fontSize: 20,
+                                            }}
+                                        >
+                                            {getBadgeIcon(badge.icon)}
+                                        </div>
+                                        <div>
+                                            <Text strong>🎉 新成就解锁！</Text>
+                                            <br />
+                                            <Text type="secondary">
+                                                {badge.name} - {badge.description}
+                                            </Text>
+                                        </div>
+                                    </div>
+                                ),
+                                duration: 5,
+                                style: {
+                                    marginTop: "10vh",
+                                },
+                            });
+                        }, index * 500);
+                    });
+
+                    setTimeout(() => {
+                        setNewlyUnlockedIds(new Set());
+                        setJustUnlockedBadges([]);
+                    }, 10000);
+                }
             }
         } catch (err) {
             message.error(err instanceof Error ? err.message : "加载失败");
@@ -522,7 +577,7 @@ export default function BadgeCenter() {
         );
     };
 
-    const renderBadgeCard = (badge: BadgeProgress, category: string) => {
+    const renderBadgeCard = (badge: BadgeProgress, category: string, isNewlyUnlocked: boolean = false) => {
         const rarityConfig = BADGE_RARITY_CONFIG[badge.rarity];
 
         return (
@@ -537,6 +592,11 @@ export default function BadgeCenter() {
                             <Tag color={rarityConfig.color}>
                                 {rarityConfig.name}
                             </Tag>
+                            {isNewlyUnlocked && (
+                                <Tag color="gold">
+                                    ✨ 新解锁
+                                </Tag>
+                            )}
                         </div>
                         <div style={{ color: "#999", marginBottom: 8, fontSize: 12 }}>
                             {badge.description}
@@ -562,15 +622,45 @@ export default function BadgeCenter() {
                     style={{
                         background: badge.isUnlocked ? "white" : "#fafafa",
                         opacity: badge.isUnlocked ? 1 : 0.8,
-                        border: badge.isUnlocked
+                        border: isNewlyUnlocked
+                            ? `3px solid #faad14`
+                            : badge.isUnlocked
                             ? `2px solid ${rarityConfig.color}`
                             : "2px solid #e8e8e8",
                         borderRadius: 16,
                         transition: "all 0.3s ease",
+                        boxShadow: isNewlyUnlocked
+                            ? "0 0 20px rgba(250, 173, 20, 0.4)"
+                            : badge.isUnlocked
+                            ? `0 2px 8px ${rarityConfig.color}22`
+                            : "none",
+                        transform: isNewlyUnlocked ? "scale(1.05)" : "scale(1)",
                     }}
                     bodyStyle={{ padding: "20px 16px" }}
                 >
                     <div style={{ textAlign: "center" }}>
+                        {isNewlyUnlocked && (
+                            <div
+                                style={{
+                                    position: "absolute",
+                                    top: -5,
+                                    right: -5,
+                                    width: 28,
+                                    height: 28,
+                                    borderRadius: "50%",
+                                    background: "linear-gradient(135deg, #faad14, #fadb14)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    color: "white",
+                                    fontSize: 14,
+                                    fontWeight: "bold",
+                                    boxShadow: "0 2px 8px rgba(250, 173, 20, 0.5)",
+                                }}
+                            >
+                                ✨
+                            </div>
+                        )}
                         <div
                             style={{
                                 width: 64,
@@ -581,7 +671,9 @@ export default function BadgeCenter() {
                                 alignItems: "center",
                                 justifyContent: "center",
                                 background: getRarityGradient(badge.rarity, badge.isUnlocked),
-                                boxShadow: badge.isUnlocked
+                                boxShadow: isNewlyUnlocked
+                                    ? `0 0 20px ${rarityConfig.color}88`
+                                    : badge.isUnlocked
                                     ? `0 4px 16px ${rarityConfig.color}33`
                                     : "none",
                                 fontSize: 32,
