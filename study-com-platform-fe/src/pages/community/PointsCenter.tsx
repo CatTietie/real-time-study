@@ -495,33 +495,49 @@ export default function PointsCenter() {
             </div>
           </Col>
 
-          <Col xs={24} sm={4} style={{ textAlign: "center" }}>
-            <Tooltip title="查看成就徽章">
-              <Button
-                type="text"
+          <Col xs={24} sm={4}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Tooltip title="查看成就徽章">
+                <Button
+                  type="text"
+                  style={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: "50%",
+                    background: "rgba(255,255,255,0.15)",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "white",
+                    transition: "all 0.3s",
+                  }}
+                  onClick={() => setBadgeModalVisible(true)}
+                >
+                  <TrophyOutlined style={{ fontSize: 28, lineHeight: 1, marginBottom: 2 }} />
+                  <Text style={{ color: "white", fontSize: 12, lineHeight: 1 }}>
+                    {overview.unlockedCount}/{overview.totalBadges}
+                  </Text>
+                </Button>
+              </Tooltip>
+              <Text
                 style={{
-                  width: 80,
-                  height: 80,
-                  borderRadius: "50%",
-                  background: "rgba(255,255,255,0.15)",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "white",
-                  transition: "all 0.3s",
+                  color: "rgba(255,255,255,0.6)",
+                  fontSize: 12,
+                  marginTop: 8,
+                  lineHeight: 1.5,
                 }}
-                onClick={() => setBadgeModalVisible(true)}
               >
-                <TrophyOutlined style={{ fontSize: 28, marginBottom: 4 }} />
-                <Text style={{ color: "white", fontSize: 12 }}>
-                  {overview.unlockedCount}/{overview.totalBadges}
-                </Text>
-              </Button>
-            </Tooltip>
-            <Text style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, display: "block", marginTop: 8 }}>
-              成就徽章
-            </Text>
+                成就徽章
+              </Text>
+            </div>
           </Col>
         </Row>
       </Card>
@@ -754,7 +770,12 @@ export default function PointsCenter() {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={12} sm={12} md={8} lg={4}>
-          <Card loading={loading} hoverable>
+          <Card
+            loading={loading}
+            hoverable
+            style={{ minHeight: 112 }}
+            bodyStyle={{ padding: "16px 24px" }}
+          >
             <Statistic
               title={
                 <Space>
@@ -769,7 +790,12 @@ export default function PointsCenter() {
           </Card>
         </Col>
         <Col xs={12} sm={12} md={8} lg={4}>
-          <Card loading={loading} hoverable>
+          <Card
+            loading={loading}
+            hoverable
+            style={{ minHeight: 112 }}
+            bodyStyle={{ padding: "16px 24px" }}
+          >
             <Statistic
               title={
                 <Space>
@@ -784,7 +810,12 @@ export default function PointsCenter() {
           </Card>
         </Col>
         <Col xs={12} sm={12} md={8} lg={4}>
-          <Card loading={loading} hoverable>
+          <Card
+            loading={loading}
+            hoverable
+            style={{ minHeight: 112 }}
+            bodyStyle={{ padding: "16px 24px" }}
+          >
             <Statistic
               title={
                 <Space>
@@ -798,7 +829,12 @@ export default function PointsCenter() {
           </Card>
         </Col>
         <Col xs={12} sm={12} md={8} lg={4}>
-          <Card loading={loading} hoverable>
+          <Card
+            loading={loading}
+            hoverable
+            style={{ minHeight: 112 }}
+            bodyStyle={{ padding: "16px 24px" }}
+          >
             <Statistic
               title={
                 <Space>
@@ -807,12 +843,17 @@ export default function PointsCenter() {
                 </Space>
               }
               value={formatDuration(overview.studyDuration)}
-              valueStyle={{ color: "#52c41a", fontSize: 18 }}
+              valueStyle={{ color: "#52c41a" }}
             />
           </Card>
         </Col>
         <Col xs={12} sm={12} md={8} lg={4}>
-          <Card loading={loading} hoverable>
+          <Card
+            loading={loading}
+            hoverable
+            style={{ minHeight: 112 }}
+            bodyStyle={{ padding: "16px 24px" }}
+          >
             <Statistic
               title={
                 <Space>
@@ -829,7 +870,7 @@ export default function PointsCenter() {
               size="small"
               showInfo={false}
               strokeColor="#722ed1"
-              style={{ marginTop: 8 }}
+              style={{ marginTop: 8, marginBottom: 0 }}
             />
           </Card>
         </Col>
@@ -838,7 +879,8 @@ export default function PointsCenter() {
             loading={loading}
             hoverable
             onClick={() => setBadgeModalVisible(true)}
-            style={{ cursor: "pointer" }}
+            style={{ cursor: "pointer", minHeight: 112 }}
+            bodyStyle={{ padding: "16px 24px" }}
           >
             <Statistic
               title={
