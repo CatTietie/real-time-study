@@ -2,6 +2,7 @@
 import { Router } from "express";
 import * as userController from "../controllers/user.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
+import { uploadAvatar } from "../middlewares/upload.middleware";
 
 const router = Router();
 
@@ -12,6 +13,8 @@ router.get("/permissions", authMiddleware, userController.getMyPermissions);
 router.get("/profile/:userId", authMiddleware, userController.getUserProfile);
 router.get("/study-stats/:userId", authMiddleware, userController.getUserStudyStats);
 router.put("/profile/:userId", authMiddleware, userController.updateUserProfile);
+// 头像上传路由
+router.post("/avatar", authMiddleware, uploadAvatar.single("avatar"), userController.uploadAvatar);
 router.put("/:id/password", authMiddleware, userController.updateUserPassword);
 router.get("/:id", authMiddleware, userController.getUser);
 router.put("/:id", authMiddleware, userController.updateUser);
