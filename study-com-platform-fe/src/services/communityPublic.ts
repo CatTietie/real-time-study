@@ -250,4 +250,79 @@ export const deleteCommunityDraft = async (id: number) => {
   return response.data;
 };
 
+// ========================================
+// 学习统计相关 API
+// ========================================
 
+export interface StudyDurationData {
+  today: number;
+  total: number;
+  dailyRecords: Array<{ date: string; duration: number }>;
+}
+
+export interface LoginStreakData {
+  current: number;
+  isActive: boolean;
+  history: Array<{ date: string; loggedIn: boolean }>;
+}
+
+export interface ContentQualityData {
+  score: number;
+  totalLikes: number;
+  totalComments: number;
+  hotPostsCount: number;
+  qualityBreakdown: Array<{ category: string; score: number; count: number }>;
+}
+
+export interface LearningStatsCardsData {
+  studyDuration: StudyDurationData;
+  loginStreak: LoginStreakData;
+  contentQuality: ContentQualityData;
+  postsStats: {
+    today: number;
+    total: number;
+    hotPosts: number;
+  };
+  taskCompletion: {
+    rate: number;
+    completedTasks: number;
+    totalTasks: number;
+  };
+  communityPoints: {
+    total: number;
+    rank: number;
+  };
+}
+
+export interface DailyStudyRecord {
+  date: string;
+  posts: number;
+  comments: number;
+  likesReceived: number;
+  studyDuration: number;
+}
+
+export const fetchLearningStatsCards = async () => {
+  const response = await api.get("/community/learning-stats");
+  return response.data;
+};
+
+export const fetchStudyDurationDetail = async () => {
+  const response = await api.get("/community/learning-stats/duration");
+  return response.data;
+};
+
+export const fetchLoginStreakDetail = async () => {
+  const response = await api.get("/community/learning-stats/streak");
+  return response.data;
+};
+
+export const fetchContentQualityDetail = async () => {
+  const response = await api.get("/community/learning-stats/quality");
+  return response.data;
+};
+
+export const fetchDailyStudyRecords = async (days: number = 7) => {
+  const response = await api.get(`/community/learning-stats/daily?days=${days}`);
+  return response.data;
+};

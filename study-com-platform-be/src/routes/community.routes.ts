@@ -36,6 +36,13 @@ import {
   streamCommunityEvents,
   getUserTodayStats,
 } from "../controllers/community-public.controller";
+import {
+  getLearningStatsCards,
+  getStudyDurationDetail,
+  getLoginStreakDetail,
+  getContentQualityDetail,
+  getDailyStudyRecords,
+} from "../controllers/study-stats.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { conditionalPostImages } from "../middlewares/upload.middleware";
 
@@ -97,5 +104,12 @@ router.get("/user/today-stats", authMiddleware, getUserTodayStats);
 router.get("/drafts", authMiddleware, getCommunityDrafts);
 router.get("/drafts/:id", authMiddleware, getCommunityDraftDetail);
 router.delete("/drafts/:id", authMiddleware, deleteCommunityDraft);
+
+// 学习统计相关路由
+router.get("/learning-stats", authMiddleware, getLearningStatsCards);
+router.get("/learning-stats/duration", authMiddleware, getStudyDurationDetail);
+router.get("/learning-stats/streak", authMiddleware, getLoginStreakDetail);
+router.get("/learning-stats/quality", authMiddleware, getContentQualityDetail);
+router.get("/learning-stats/daily", authMiddleware, getDailyStudyRecords);
 
 export default router;
