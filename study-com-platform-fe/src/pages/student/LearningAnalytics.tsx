@@ -71,7 +71,7 @@ import {
 const { Title, Text, Paragraph } = Typography;
 const { RangePicker } = DatePicker;
 const { Option } = Select;
-const { RadioGroup, RadioButton } = Radio;
+const { Group: RadioGroup } = Radio;
 
 interface StudyStat {
   date: string;
@@ -1427,12 +1427,12 @@ export default function LearningAnalytics() {
                         buttonStyle="solid"
                       >
                         {(Object.keys(trendTabConfig) as TrendDataType[]).map((type) => (
-                          <RadioButton key={type} value={type}>
+                          <Radio.Button key={type} value={type}>
                             <Space size={4}>
                               {trendTabConfig[type].icon}
                               <span>{trendTabConfig[type].label}</span>
                             </Space>
-                          </RadioButton>
+                          </Radio.Button>
                         ))}
                       </RadioGroup>
                       <Divider type="vertical" style={{ height: 32 }} />
