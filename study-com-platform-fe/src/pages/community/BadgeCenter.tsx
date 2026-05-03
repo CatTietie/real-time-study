@@ -48,6 +48,22 @@ import CommunityFooter from "../../components/community/CommunityFooter";
 
 const { Title, Text } = Typography;
 
+const getBadgeRedirectPath = (badgeId: string): string => {
+    const publishBadges = [
+        "first_post",
+        "regular_poster",
+        "content_master",
+        "first_like_received",
+        "popular_author",
+    ];
+
+    if (publishBadges.includes(badgeId)) {
+        return "/community/publish";
+    }
+
+    return "/community";
+};
+
 const getBadgeIcon = (iconName: string): React.ReactNode => {
     const iconMap: Record<string, React.ReactNode> = {
         EditOutlined: <EditOutlined />,
@@ -329,6 +345,11 @@ export default function BadgeCenter() {
     const renderRecommendedSection = () => {
         if (recommendedBadges.length === 0) return null;
 
+        const handleBadgeClick = (badgeId: string) => {
+            const path = getBadgeRedirectPath(badgeId);
+            navigate(path);
+        };
+
         return (
             <Card
                 loading={loading}
@@ -356,7 +377,7 @@ export default function BadgeCenter() {
                             </Text>
                             <br />
                             <Text style={{ fontSize: 12, color: "#faad14" }}>
-                                以下成就最容易达成，优先挑战！
+                                点击卡片即可前往完成挑战
                             </Text>
                         </div>
                     </Space>
@@ -370,11 +391,14 @@ export default function BadgeCenter() {
                             <Card
                                 size="small"
                                 hoverable
+                                onClick={() => handleBadgeClick(badge.id)}
                                 style={{
                                     background: "white",
                                     borderRadius: 12,
                                     border: "2px solid #ffd591",
                                     boxShadow: "0 4px 12px rgba(250, 173, 20, 0.15)",
+                                    cursor: "pointer",
+                                    transition: "all 0.3s ease",
                                 }}
                                 bodyStyle={{ padding: "16px" }}
                             >
@@ -455,6 +479,9 @@ export default function BadgeCenter() {
                                     >
                                         <BulbOutlined />
                                         <Text>还需 {badge.threshold - badge.current} 即可达成</Text>
+                                        <Text type="secondary" style={{ marginLeft: 4 }}>
+                                            点击前往 →
+                                        </Text>
                                     </div>
                                 </Space>
                             </Card>
