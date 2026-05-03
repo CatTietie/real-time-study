@@ -465,7 +465,7 @@ export const getMultiDimTrendData = async (
         [Op.lte]: endDate
       }
     },
-    attributes: ['id', 'createdAt', 'view_count', 'like_count', 'comment_count']
+    attributes: ['id', 'view_count', 'like_count', 'comment_count', [Sequelize.col("created_at"), "createdAt"]]
   });
 
   const comments = await Comment.findAll({
@@ -477,18 +477,18 @@ export const getMultiDimTrendData = async (
         [Op.lte]: endDate
       }
     },
-    attributes: ['id', 'createdAt']
+    attributes: ['id', [Sequelize.col("created_at"), "createdAt"]]
   });
 
   const pointsLogs = await PointsLog.findAll({
     where: {
       user_id: userId,
-      createdAt: {
+      created_at: {
         [Op.gte]: startDate,
         [Op.lte]: endDate
       }
     },
-    attributes: ['id', 'createdAt', 'change']
+    attributes: ['id', 'change', [Sequelize.col("created_at"), "createdAt"]]
   });
 
   const reservations = await RoomReservation.findAll({
@@ -581,18 +581,18 @@ export const getComparisonData = async (
         [Op.lt]: previousWeekEnd
       }
     },
-    attributes: ['id', 'createdAt', 'view_count']
+    attributes: ['id', 'view_count', [Sequelize.col("created_at"), "createdAt"]]
   });
 
   const pointsLogs = await PointsLog.findAll({
     where: {
       user_id: userId,
-      createdAt: {
+      created_at: {
         [Op.gte]: previousWeekStart,
         [Op.lt]: previousWeekEnd
       }
     },
-    attributes: ['id', 'createdAt', 'change']
+    attributes: ['id', 'change', [Sequelize.col("created_at"), "createdAt"]]
   });
 
   const reservations = await RoomReservation.findAll({
@@ -686,7 +686,7 @@ export const getHeatmapData = async (
         [Op.lte]: endDate
       }
     },
-    attributes: ['id', 'createdAt', 'like_count']
+    attributes: ['id', 'like_count', [Sequelize.col("created_at"), "createdAt"]]
   });
 
   const comments = await Comment.findAll({
@@ -698,7 +698,7 @@ export const getHeatmapData = async (
         [Op.lte]: endDate
       }
     },
-    attributes: ['id', 'createdAt']
+    attributes: ['id', [Sequelize.col("created_at"), "createdAt"]]
   });
 
   const reservations = await RoomReservation.findAll({
