@@ -11,11 +11,15 @@ import {
   getMultiDimTrendData,
   getComparisonData,
   getHeatmapData,
+  getActionRecommendations,
+  getRankingSnapshot,
   type LearningStatsCardData,
   type DailyStudyRecord,
   type MultiDimTrendData,
   type ComparisonData,
-  type HeatmapData
+  type HeatmapData,
+  type ActionRecommendations,
+  type RankingSnapshot
 } from "../services/learning-stats.service";
 
 interface DailyDuration {
@@ -365,6 +369,46 @@ export const getActivityHeatmap = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('获取热力图数据失败:', error);
+    const message = error instanceof Error ? error.message : "获取失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+export const getActionRecommendationsHandler = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const data = await getActionRecommendations(req.user.id);
+
+    res.json({
+      success: true,
+      message: "获取行动推荐成功",
+      data
+    });
+  } catch (error) {
+    console.error('获取行动推荐失败:', error);
+    const message = error instanceof Error ? error.message : "获取失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+export const getRankingSnapshotHandler = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const data = await getRankingSnapshot(req.user.id);
+
+    res.json({
+      success: true,
+      message: "获取排行榜快照成功",
+      data
+    });
+  } catch (error) {
+    console.error('获取排行榜快照失败:', error);
     const message = error instanceof Error ? error.message : "获取失败";
     res.status(500).json({ success: false, message });
   }

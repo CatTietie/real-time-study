@@ -372,3 +372,55 @@ export const fetchActivityHeatmap = async (weeks: number = 12) => {
   const response = await api.get(`/community/learning-stats/heatmap?weeks=${weeks}`);
   return response.data;
 };
+
+// ========================================
+// 行为驱动 API - 行动推荐、排行榜
+// ========================================
+
+export type TaskType = 'post' | 'learn' | 'points' | 'streak' | 'badge';
+export type ActionType = 'create_post' | 'start_learning' | 'earn_points' | 'check_in';
+
+export interface ActionTask {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  type: TaskType;
+  current: number;
+  target: number;
+  progress: number;
+  reward: string;
+  actionText: string;
+  actionType: ActionType;
+  isCompleted: boolean;
+  priority: number;
+}
+
+export interface RankingSnapshot {
+  currentRank: number;
+  totalUsers: number;
+  nextRankScore: number;
+  gapToNext: number;
+  leadToPrev: number;
+  myPoints: number;
+  rankPercent: number;
+  trends: Array<{
+    day: string;
+    rank: number;
+  }>;
+}
+
+export interface ActionRecommendations {
+  tasks: ActionTask[];
+  ranking: RankingSnapshot;
+}
+
+export const fetchActionRecommendations = async (): Promise<{ success: boolean; data: ActionRecommendations }> => {
+  const response = await api.get("/community/learning-stats/actions");
+  return response.data;
+};
+
+export const fetchRankingSnapshot = async (): Promise<{ success: boolean; data: RankingSnapshot }> => {
+  const response = await api.get("/community/learning-stats/ranking");
+  return response.data;
+};

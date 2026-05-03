@@ -45,6 +45,8 @@ import {
   getMultiDimTrend,
   getWeeklyComparison,
   getActivityHeatmap,
+  getActionRecommendationsHandler,
+  getRankingSnapshotHandler,
 } from "../controllers/study-stats.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { conditionalPostImages } from "../middlewares/upload.middleware";
@@ -119,5 +121,9 @@ router.get("/learning-stats/daily", authMiddleware, getDailyStudyRecords);
 router.get("/learning-stats/trend", authMiddleware, getMultiDimTrend);
 router.get("/learning-stats/comparison", authMiddleware, getWeeklyComparison);
 router.get("/learning-stats/heatmap", authMiddleware, getActivityHeatmap);
+
+// 行为驱动API - 行动推荐、排行榜快照
+router.get("/learning-stats/actions", authMiddleware, getActionRecommendationsHandler);
+router.get("/learning-stats/ranking", authMiddleware, getRankingSnapshotHandler);
 
 export default router;

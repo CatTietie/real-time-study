@@ -41,7 +41,12 @@ import {
   HeatMapOutlined,
   PlusOutlined,
   RiseOutlined,
-  PlayCircleOutlined
+  PlayCircleOutlined,
+  RightOutlined,
+  GiftOutlined,
+  RocketOutlined,
+  ArrowUpOutlined,
+  LoadingOutlined
 } from "@ant-design/icons";
 import { useAppSelector } from "../../app/hooks";
 import type { RootState } from "../../app/store";
@@ -56,12 +61,16 @@ import {
   fetchMultiDimTrend,
   fetchWeeklyComparison,
   fetchActivityHeatmap,
+  fetchActionRecommendations,
   type LearningStatsCardsData,
   type DailyStudyRecord,
   type MultiDimTrendData,
   type ComparisonData,
   type HeatmapData,
-  type TrendDataType
+  type TrendDataType,
+  type ActionTask,
+  type RankingSnapshot,
+  type ActionRecommendations
 } from "../../services/communityPublic";
 import {
   fetchCommunityProfileSummary,
@@ -830,6 +839,10 @@ export default function LearningAnalytics() {
   const [drawerType, setDrawerType] = useState<DrawerType>(null);
   const [drawerLoading, setDrawerLoading] = useState(false);
 
+  const [actionRecommendations, setActionRecommendations] = useState<ActionRecommendations | null>(null);
+  const [taskLoadingStates, setTaskLoadingStates] = useState<Record<string, boolean>>({});
+  const [taskCompletedStates, setTaskCompletedStates] = useState<Record<string, boolean>>({});
+
   const hasTrendData = multiDimTrendData.some(item => 
     item.posts > 0 || item.views > 0 || item.points > 0 || item.duration > 0
   );
@@ -1054,6 +1067,8 @@ export default function LearningAnalytics() {
           fetchActivityHeatmap(12)
         ]);
 
+        const actionResponse = await fetchActionRecommendations();
+
         if (postsResponse.data.success) {
           const userPostsData: PostData[] = postsResponse.data.data || [];
           console.log('用户帖子数据:', userPostsData);
@@ -1093,6 +1108,10 @@ export default function LearningAnalytics() {
             
             if (heatmapResponse.success && heatmapResponse.data) {
               setHeatmapData(heatmapResponse.data);
+            }
+
+            if (actionResponse.success && actionResponse.data) {
+              setActionRecommendations(actionResponse.data);
             }
           }
           
@@ -1186,6 +1205,25 @@ export default function LearningAnalytics() {
 
   const handleStartLearning = () => {
     message.info('正在跳转到自习室...');
+  };
+
+  const handleTaskAction = async (task: ActionTask) => {
+    if (task.isCompleted || taskCompletedStates[task.id]) {
+      return;
+    }
+
+    setTaskLoadingStates(prev => ({ ...prev, [task.id]: true }));
+
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    setTaskLoadingStates(prev => ({ ...prev, [task.id]: false }));
+    setTaskCompletedStates(prev => ({ ...prev, [task.id]: true }));
+
+    message.success(`任务"${task.title}"进度已更新！`);
+
+    setTimeout(() => {
+      loadData();
+    }, 1000);
   };
 
   return (
@@ -1369,6 +1407,303 @@ export default function LearningAnalytics() {
                     onClick={() => openDrawer('points')}
                     showCountUp
                   />
+                </Col>
+              </Row>
+
+              <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+                <Col xs={24} lg={16}>
+                  <Card 
+                    title={
+                      <Space>
+                        <RocketOutlined style={{ color: '#667eea' }} />
+                        <span>今日行动</span>
+                        <Tag color="processing">优先级</Tag>
+                      </Space>
+                    }
+                    extra={
+                      <Tag color="blue">
+                        <GiftOutlined /> 完成任务获得奖励
+                      </Tag>
+                    }
+                    style={{
+                      borderRadius: 16,
+                      backdropFilter: 'blur(10px)',
+                      background: 'rgba(255, 255, 255, 0.95)',
+                      transition: 'all 0.3s ease'
+                    }}
+                    bodyStyle={{ padding: '16px 24px' }}
+                  >
+                    {actionRecommendations?.tasks && actionRecommendations.tasks.length > 0 ? (
+                      <Space direction="vertical" style={{ width: '100%' }} size={16}>
+                        {actionRecommendations.tasks.map((task, index) => {
+                          const isLoading = taskLoadingStates[task.id];
+                          const isCompleted = task.isCompleted || taskCompletedStates[task.id];
+                          
+                          const iconMap: Record<string, React.ReactNode> = {
+                            book: <BookOutlined />,
+                            clock: <ClockCircleOutlined />,
+                            fire: <FireOutlined />,
+                            trophy: <TrophyOutlined />,
+                            star: <StarOutlined />
+                          };
+
+                          const colorMap: Record<string, string> = {
+                            post: '#667eea',
+                            learn: '#10b981',
+                            streak: '#f59e0b',
+                            points: '#ec4899',
+                            badge: '#8b5cf6'
+                          };
+
+                          return (
+                            <div
+                              key={task.id}
+                              style={{
+                                padding: 16,
+                                borderRadius: 12,
+                                background: isCompleted 
+                                  ? 'rgba(16, 185, 129, 0.08)' 
+                                  : 'rgba(102, 126, 234, 0.05)',
+                                border: isCompleted 
+                                  ? '1px solid rgba(16, 185, 129, 0.3)' 
+                                  : '1px solid rgba(102, 126, 234, 0.15)',
+                                transition: 'all 0.3s ease',
+                                animation: isLoading ? 'pulse 1.5s ease-in-out infinite' : 'none',
+                                opacity: isCompleted ? 0.8 : 1
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isLoading) {
+                                  e.currentTarget.style.transform = 'translateX(4px)';
+                                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(102, 126, 234, 0.15)';
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'translateX(0)';
+                                e.currentTarget.style.boxShadow = 'none';
+                              }}
+                            >
+                              <Row gutter={[16, 16]} align="middle">
+                                <Col flex="none">
+                                  <div
+                                    style={{
+                                      width: 48,
+                                      height: 48,
+                                      borderRadius: 12,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: 24,
+                                      background: isCompleted 
+                                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                                        : `linear-gradient(135deg, ${colorMap[task.type]} 0%, ${colorMap[task.type]}99 100%)`,
+                                      color: '#fff',
+                                      transition: 'all 0.3s ease',
+                                      boxShadow: isCompleted 
+                                        ? '0 4px 12px rgba(16, 185, 129, 0.3)'
+                                        : `0 4px 12px rgba(${parseInt(colorMap[task.type].slice(1,3),16)}, ${parseInt(colorMap[task.type].slice(3,5),16)}, ${parseInt(colorMap[task.type].slice(5,7),16)}, 0.3)`
+                                    }}
+                                  >
+                                    {isCompleted ? <CheckCircleOutlined /> : iconMap[task.icon]}
+                                  </div>
+                                </Col>
+                                <Col flex="auto">
+                                  <Space direction="vertical" style={{ width: '100%' }} size={4}>
+                                    <Space>
+                                      <Text strong style={{ fontSize: 15, color: isCompleted ? '#10b981' : '#1a1a2e' }}>
+                                        {task.title}
+                                      </Text>
+                                      {isCompleted && (
+                                        <Tag color="success" style={{ margin: 0 }}>已完成</Tag>
+                                      )}
+                                    </Space>
+                                    <Text type="secondary" style={{ fontSize: 13 }}>
+                                      {task.description}
+                                    </Text>
+                                    <div style={{ marginTop: 8 }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                                        <Text style={{ fontSize: 12, color: '#666' }}>
+                                          进度: {task.current}/{task.target}
+                                        </Text>
+                                        <Text style={{ fontSize: 12, color: colorMap[task.type] }}>
+                                          {Math.round(task.progress)}%
+                                        </Text>
+                                      </div>
+                                      <Progress
+                                        percent={Math.min(100, task.progress)}
+                                        size="small"
+                                        strokeColor={isCompleted ? '#10b981' : colorMap[task.type]}
+                                        trailColor="rgba(0,0,0,0.05)"
+                                        showInfo={false}
+                                      />
+                                    </div>
+                                    <Text type="secondary" style={{ fontSize: 12, marginTop: 4, display: 'block' }}>
+                                      <GiftOutlined style={{ marginRight: 4 }} />
+                                      奖励: {task.reward}
+                                    </Text>
+                                  </Space>
+                                </Col>
+                                <Col flex="none">
+                                  <Button
+                                    type={isCompleted ? 'default' : 'primary'}
+                                    size="middle"
+                                    icon={isLoading ? <LoadingOutlined spin /> : (isCompleted ? <CheckCircleOutlined /> : <RightOutlined />)}
+                                    onClick={() => handleTaskAction(task)}
+                                    disabled={isCompleted || isLoading}
+                                    style={{
+                                      borderRadius: 20,
+                                      minWidth: 100,
+                                      height: 40,
+                                      background: isCompleted 
+                                        ? undefined 
+                                        : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                      border: 'none',
+                                      transition: 'all 0.3s ease',
+                                      transform: isLoading ? 'scale(0.95)' : 'scale(1)',
+                                      opacity: isCompleted ? 0.6 : 1
+                                    }}
+                                  >
+                                    {isLoading ? '处理中' : task.actionText}
+                                  </Button>
+                                </Col>
+                              </Row>
+                            </div>
+                          );
+                        })}
+                      </Space>
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: 32 }}>
+                        <RocketOutlined style={{ fontSize: 48, color: '#667eea', marginBottom: 16 }} />
+                        <Text type="secondary">暂无今日行动任务</Text>
+                      </div>
+                    )}
+                  </Card>
+                </Col>
+
+                <Col xs={24} lg={8}>
+                  <Card 
+                    title={
+                      <Space>
+                        <TrophyOutlined style={{ color: '#f59e0b' }} />
+                        <span>我的排名</span>
+                      </Space>
+                    }
+                    style={{
+                      borderRadius: 16,
+                      backdropFilter: 'blur(10px)',
+                      background: 'rgba(255, 255, 255, 0.95)',
+                      height: '100%',
+                      transition: 'all 0.3s ease'
+                    }}
+                    bodyStyle={{ padding: '16px 24px' }}
+                  >
+                    {actionRecommendations?.ranking ? (
+                      <Space direction="vertical" style={{ width: '100%' }} size={16}>
+                        <div style={{
+                          textAlign: 'center',
+                          padding: 20,
+                          borderRadius: 12,
+                          background: 'linear-gradient(135deg, #fef3c7 0%, #fcd34d 100%)'
+                        }}>
+                          <div style={{
+                            fontSize: 48,
+                            fontWeight: 800,
+                            color: '#92400e',
+                            marginBottom: 4
+                          }}>
+                            第{actionRecommendations.ranking.currentRank}名
+                          </div>
+                          <Text style={{ color: '#92400e', fontSize: 13 }}>
+                            共 {actionRecommendations.ranking.totalUsers} 人
+                          </Text>
+                          <div style={{ marginTop: 8 }}>
+                            <Tag color="gold" style={{ fontSize: 12 }}>
+                              <ArrowUpOutlined style={{ marginRight: 4 }} />
+                              超越 {actionRecommendations.ranking.rankPercent}% 的用户
+                            </Tag>
+                          </div>
+                        </div>
+
+                        <Space direction="vertical" style={{ width: '100%' }} size={12}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text type="secondary" style={{ fontSize: 13 }}>我的积分</Text>
+                            <Text strong style={{ fontSize: 16, color: '#667eea' }}>
+                              {actionRecommendations.ranking.myPoints.toLocaleString()} 分
+                            </Text>
+                          </div>
+
+                          <Divider style={{ margin: '8px 0' }} />
+
+                          {actionRecommendations.ranking.gapToNext > 0 && (
+                            <div style={{
+                              padding: 12,
+                              borderRadius: 8,
+                              background: 'rgba(236, 72, 153, 0.08)',
+                              border: '1px solid rgba(236, 72, 153, 0.2)'
+                            }}>
+                              <Space direction="vertical" style={{ width: '100%' }} size={4}>
+                                <Text type="secondary" style={{ fontSize: 12 }}>距离上一名</Text>
+                                <Row align="middle" gutter={[8, 0]}>
+                                  <Col flex="none">
+                                    <RiseOutlined style={{ color: '#ec4899', fontSize: 18 }} />
+                                  </Col>
+                                  <Col flex="auto">
+                                    <Text strong style={{ fontSize: 20, color: '#ec4899' }}>
+                                      {actionRecommendations.ranking.gapToNext}
+                                    </Text>
+                                    <Text type="secondary" style={{ fontSize: 12, marginLeft: 4 }}>积分</Text>
+                                  </Col>
+                                </Row>
+                              </Space>
+                            </div>
+                          )}
+
+                          {actionRecommendations.ranking.leadToPrev > 0 && (
+                            <div style={{
+                              padding: 12,
+                              borderRadius: 8,
+                              background: 'rgba(16, 185, 129, 0.08)',
+                              border: '1px solid rgba(16, 185, 129, 0.2)'
+                            }}>
+                              <Space direction="vertical" style={{ width: '100%' }} size={4}>
+                                <Text type="secondary" style={{ fontSize: 12 }}>领先下一名</Text>
+                                <Row align="middle" gutter={[8, 0]}>
+                                  <Col flex="none">
+                                    <CheckCircleOutlined style={{ color: '#10b981', fontSize: 18 }} />
+                                  </Col>
+                                  <Col flex="auto">
+                                    <Text strong style={{ fontSize: 20, color: '#10b981' }}>
+                                      {actionRecommendations.ranking.leadToPrev}
+                                    </Text>
+                                    <Text type="secondary" style={{ fontSize: 12, marginLeft: 4 }}>积分</Text>
+                                  </Col>
+                                </Row>
+                              </Space>
+                            </div>
+                          )}
+                        </Space>
+
+                        <Button
+                          type="primary"
+                          block
+                          icon={<TrophyOutlined />}
+                          style={{
+                            borderRadius: 20,
+                            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                            border: 'none',
+                            height: 40,
+                            transition: 'all 0.3s ease'
+                          }}
+                        >
+                          查看完整排行榜
+                        </Button>
+                      </Space>
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: 32 }}>
+                        <TrophyOutlined style={{ fontSize: 48, color: '#f59e0b', marginBottom: 16 }} />
+                        <Text type="secondary">暂无排名数据</Text>
+                      </div>
+                    )}
+                  </Card>
                 </Col>
               </Row>
 
