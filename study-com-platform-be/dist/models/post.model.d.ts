@@ -19,6 +19,10 @@ export declare class Post extends Model {
     last_edited_at?: Date;
     images?: string;
     deleted_at?: Date;
+    forward_post_id?: number;
+    forward_user_id?: number;
+    ForwardPost?: Post;
+    ForwardUser?: any;
     createdAt: Date;
     updatedAt: Date;
 }

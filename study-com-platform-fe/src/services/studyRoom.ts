@@ -6,21 +6,15 @@ export const getStudyRooms = async (params?: Record<string, unknown>) => {
   return response.data;
 };
 
-// 确认预约
-export const confirmReservation = async (reservationId: number) => {
-  const response = await api.post("/study-rooms/reservations/confirm", { reservationId });
-  return response.data;
-};
-
-// 完成预约
-export const completeReservation = async (reservationId: number) => {
-  const response = await api.post("/study-rooms/reservations/complete", { reservationId });
-  return response.data;
-};
-
 // 结束预约
 export const endReservation = async (reservationId: number) => {
   const response = await api.post("/study-rooms/reservations/end", { reservationId });
+  return response.data;
+};
+
+// 提前退出预约
+export const earlyExitReservation = async (reservationId: number) => {
+  const response = await api.post("/study-rooms/reservations/early-exit", { reservationId });
   return response.data;
 };
 
@@ -50,6 +44,12 @@ export const leaveStudyRoom = async () => {
   return response.data;
 };
 
+// 原子化退出自习室并结束预约
+export const leaveAndEndReservation = async (reservationId: number) => {
+  const response = await api.post("/study-rooms/reservations/leave-and-end", { reservationId });
+  return response.data;
+};
+
 // 获取我的预约记录
 export const getMyReservations = async (params?: Record<string, unknown>) => {
   const response = await api.get("/study-rooms/my/reservations", { params });
@@ -65,5 +65,50 @@ export const checkExpiredReservations = async () => {
 // 强制更新过期状态
 export const forceUpdateExpired = async () => {
   const response = await api.post("/study-rooms/force-update-expired");
+  return response.data;
+};
+
+// 获取每小时可用状态（用于时间轴视图）
+export const getHourlyAvailability = async (date?: string) => {
+  const params = date ? { date } : {};
+  const response = await api.get("/study-rooms/hourly/availability", { params });
+  return response.data;
+};
+
+interface DailyDuration {
+  date: string;
+  duration: number;
+}
+
+interface RoomUsage {
+  roomId: number;
+  roomName: string;
+  duration: number;
+  count: number;
+}
+
+export interface StudyStats {
+  totalDuration: number;
+  totalSessions: number;
+  dailyDurations: DailyDuration[];
+  roomUsages: RoomUsage[];
+}
+
+export interface OverallStudyStats {
+  totalDuration: number;
+  totalSessions: number;
+  roomUsages: RoomUsage[];
+}
+
+export const getStudyStats = async (month?: number, year?: number) => {
+  const params: Record<string, unknown> = {};
+  if (month !== undefined) params.month = month;
+  if (year !== undefined) params.year = year;
+  const response = await api.get("/study-rooms/my/stats", { params });
+  return response.data;
+};
+
+export const getOverallStudyStats = async () => {
+  const response = await api.get("/study-rooms/my/stats/overall");
   return response.data;
 };
