@@ -3010,16 +3010,16 @@ export const getBadgesOverview = async (req: Request, res: Response) => {
           isUnlocked = totalCommentLogs >= 30;
           break;
         case "streak_3":
-          current = loginStreak.current;
-          isUnlocked = loginStreak.current >= 3;
+          current = loginStreak;
+          isUnlocked = loginStreak >= 3;
           break;
         case "streak_7":
-          current = loginStreak.current;
-          isUnlocked = loginStreak.current >= 7;
+          current = loginStreak;
+          isUnlocked = loginStreak >= 7;
           break;
         case "streak_30":
-          current = loginStreak.current;
-          isUnlocked = loginStreak.current >= 30;
+          current = loginStreak;
+          isUnlocked = loginStreak >= 30;
           break;
         case "daily_high":
           current = maxDailyPoints;
