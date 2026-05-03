@@ -31,6 +31,8 @@ import {
   updateFavoriteFolder,
   getPointsSummary,
   getPointsLogs,
+  getPointsOverviewPlus,
+  getPointsActions,
   getCommunityProfileSummary,
   getCommunityTagSuggestions,
   streamCommunityEvents,
@@ -98,6 +100,8 @@ router.post("/visit", authMiddleware, recordCommunityVisit);
 // 积分
 router.get("/points/summary", authMiddleware, getPointsSummary);
 router.get("/points/logs", authMiddleware, getPointsLogs);
+router.get("/points/overview-plus", authMiddleware, getPointsOverviewPlus);
+router.get("/points/actions", authMiddleware, getPointsActions);
 
 // 个人信息汇总
 router.get("/profile/summary", authMiddleware, getCommunityProfileSummary);

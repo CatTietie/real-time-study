@@ -9,11 +9,13 @@ export const getStartOfDay = () => {
   return start;
 };
 
+export type SourceType = "post" | "comment" | "like" | "task" | "study" | "report" | "admin" | "system" | "remark";
+
 export const addPoints = async (options: {
   userId: number;
   change: number;
   reason: string;
-  sourceType: "post" | "comment" | "report" | "admin" | "system";
+  sourceType: SourceType;
   sourceId?: number;
   dailyCap?: number;
 }) => {

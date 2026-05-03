@@ -27,6 +27,12 @@ import {
 } from "../services/community-realtime.service";
 import { recordView, getUserTodayViews } from "../services/view-record.service";
 import { uploadFilesToOss } from "../middlewares/upload.middleware";
+import {
+  getLoginStreak,
+  getStudyDuration,
+  getContentQualityScore,
+  getMultiDimTrendData,
+} from "../services/learning-stats.service";
 
 const parseTags = (tags?: string[] | string) => {
   const parsed = Array.isArray(tags)
@@ -2471,6 +2477,183 @@ export const deleteCommunityDraft = async (req: Request, res: Response) => {
     res.json({ success: true, message: "草稿已删除" });
   } catch (error) {
     const message = error instanceof Error ? error.message : "删除草稿失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+export const getPointsOverviewPlus = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const userId = req.user.id;
+
+    const [user, loginStreak, studyDuration, contentQuality, trendData] = await Promise.all([
+      User.findByPk(userId),
+      getLoginStreak(userId),
+      getStudyDuration(userId),
+      getContentQualityScore(userId),
+      getMultiDimTrendData(userId, 7),
+    ]);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "用户不存在" });
+    }
+
+    const startOfDay = getStartOfDay();
+    const todayPoints = await PointsLog.sum("change", {
+      where: {
+        user_id: userId,
+        createdAt: { [Op.gte]: startOfDay },
+      },
+    });
+
+    const totalLikes = contentQuality.totalLikes || 0;
+    const totalPosts = await Post.count({
+      where: {
+        user_id: userId,
+        status: 1,
+        publish_status: 1,
+      },
+    });
+
+    const totalViewsResult = await Post.sum('view_count', {
+      where: {
+        user_id: userId,
+        status: 1,
+        publish_status: 1,
+      },
+    });
+    const totalViews = Number(totalViewsResult || 0);
+
+    let qualityScore = 0;
+    if (totalPosts > 0 && totalViews > 0) {
+      const likeViewRatio = totalLikes / Math.max(totalViews, 1);
+      qualityScore = Math.round(likeViewRatio * 1000);
+    } else if (totalPosts > 0) {
+      qualityScore = totalLikes * 10;
+    }
+
+    res.json({
+      success: true,
+      message: "获取成功",
+      data: {
+        totalPoints: user.points || 0,
+        todayPoints: Number(todayPoints || 0),
+        level: calculateLevel(user.points || 0),
+        streakDays: loginStreak.current,
+        studyDuration: studyDuration.total,
+        todayStudyDuration: studyDuration.today,
+        qualityScore: qualityScore,
+        trendData,
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "获取失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+export const getPointsActions = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const actions = [
+      {
+        id: "create_post",
+        title: "发布帖子",
+        description: "发布一篇新帖子",
+        points: 10,
+        sourceType: "post",
+        dailyCap: 50,
+        icon: "edit",
+        route: "/community/post/create",
+        buttonText: "去发帖",
+      },
+      {
+        id: "create_comment",
+        title: "发表评论",
+        description: "对他人的帖子发表评论",
+        points: 1,
+        sourceType: "comment",
+        dailyCap: 10,
+        icon: "message",
+        route: "/community",
+        buttonText: "去互动",
+      },
+      {
+        id: "give_like",
+        title: "点赞互动",
+        description: "对喜欢的帖子或评论点赞",
+        points: 0,
+        note: "被点赞者获得积分",
+        sourceType: "like",
+        dailyCap: 20,
+        icon: "like",
+        route: "/community",
+        buttonText: "去逛逛",
+      },
+      {
+        id: "daily_visit",
+        title: "每日签到",
+        description: "每日首次访问社区",
+        points: 1,
+        sourceType: "system",
+        dailyCap: 1,
+        icon: "calendar",
+        route: "/community",
+        buttonText: "去签到",
+      },
+      {
+        id: "study_duration",
+        title: "学习时长",
+        description: "使用自习室学习",
+        points: 0,
+        note: "学习时长单独统计",
+        sourceType: "study",
+        dailyCap: 0,
+        icon: "clock-circle",
+        route: "/study-room",
+        buttonText: "去学习",
+      },
+      {
+        id: "task_complete",
+        title: "完成任务",
+        description: "完成系统任务",
+        points: 5,
+        sourceType: "task",
+        dailyCap: 50,
+        icon: "check-circle",
+        route: "/community",
+        buttonText: "查看任务",
+      },
+    ];
+
+    const streakRewards = [
+      { days: 3, points: 3, description: "连续签到3天" },
+      { days: 7, points: 10, description: "连续签到7天" },
+      { days: 30, points: 50, description: "连续签到30天" },
+    ];
+
+    const qualityRewards = [
+      { condition: "帖子获赞≥50", points: 30, description: "优质内容奖励" },
+    ];
+
+    res.json({
+      success: true,
+      message: "获取成功",
+      data: {
+        actions,
+        streakRewards,
+        qualityRewards,
+        todayEarned: {},
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "获取失败";
     res.status(500).json({ success: false, message });
   }
 };

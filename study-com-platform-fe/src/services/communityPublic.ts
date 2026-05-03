@@ -158,6 +158,16 @@ export const fetchPointsLogs = async (params?: QueryParams) => {
   return response.data;
 };
 
+export const fetchPointsOverviewPlus = async () => {
+  const response = await api.get("/community/points/overview-plus");
+  return response.data;
+};
+
+export const fetchPointsActions = async () => {
+  const response = await api.get("/community/points/actions");
+  return response.data;
+};
+
 export const fetchCommunityProfileSummary = async () => {
   const response = await api.get("/community/profile/summary");
   return response.data;
