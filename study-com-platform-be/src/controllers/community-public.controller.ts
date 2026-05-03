@@ -2086,13 +2086,22 @@ export const getPointsSummary = async (req: Request, res: Response) => {
 
     const [today, week, month] = await Promise.all([
       PointsLog.sum("change", {
-        where: { user_id: user.id, createdAt: { [Op.gte]: startOfDay } },
+        where: {
+          user_id: user.id,
+          [Op.and]: [Sequelize.where(Sequelize.col("created_at"), { [Op.gte]: startOfDay })],
+        },
       }),
       PointsLog.sum("change", {
-        where: { user_id: user.id, createdAt: { [Op.gte]: startOfWeek } },
+        where: {
+          user_id: user.id,
+          [Op.and]: [Sequelize.where(Sequelize.col("created_at"), { [Op.gte]: startOfWeek })],
+        },
       }),
       PointsLog.sum("change", {
-        where: { user_id: user.id, createdAt: { [Op.gte]: startOfMonth } },
+        where: {
+          user_id: user.id,
+          [Op.and]: [Sequelize.where(Sequelize.col("created_at"), { [Op.gte]: startOfMonth })],
+        },
       }),
     ]);
 
@@ -2214,7 +2223,7 @@ export const getPointsLogs = async (req: Request, res: Response) => {
     const { page = 1, pageSize = 10 } = req.query;
     const result = await PointsLog.findAndCountAll({
       where: { user_id: req.user.id },
-      order: [["createdAt", "DESC"]],
+      order: [[Sequelize.col("created_at"), "DESC"]],
       offset: (Number(page) - 1) * Number(pageSize),
       limit: Number(pageSize),
     });
@@ -2504,7 +2513,7 @@ export const getPointsOverviewPlus = async (req: Request, res: Response) => {
     const todayPoints = await PointsLog.sum("change", {
       where: {
         user_id: userId,
-        createdAt: { [Op.gte]: startOfDay },
+        [Op.and]: [Sequelize.where(Sequelize.col("created_at"), { [Op.gte]: startOfDay })],
       },
     });
 
