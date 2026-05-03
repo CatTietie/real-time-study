@@ -8,4 +8,8 @@ export declare const getUserStudyStats: (req: Request, res: Response) => Promise
 export declare const updateUserProfile: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
 export declare const updateUserPassword: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
 export declare const getMyPermissions: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
+/**
+ * 上传用户头像
+ */
+export declare const uploadAvatar: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
 //# sourceMappingURL=user.controller.d.ts.map
