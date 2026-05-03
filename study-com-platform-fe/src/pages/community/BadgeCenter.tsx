@@ -31,8 +31,8 @@ import {
 } from "@ant-design/icons";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-    fetchBadgesOverview,
+import { fetchBadgesOverview } from "../../services/communityPublic";
+import type {
     BadgeProgress,
     BadgeCategoryGroup,
     BadgesOverviewSummary,
