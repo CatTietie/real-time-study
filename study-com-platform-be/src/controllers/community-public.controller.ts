@@ -152,13 +152,13 @@ export const getCommunityPosts = async (req: Request, res: Response) => {
       // 热门推荐：综合算法排序 - 点赞(权重3) + 评论(权重2) + 浏览量(权重1)
       console.log('getCommunityPosts - 使用热门排序');
       orderBy = [
-        [Sequelize.literal(`(like_count * 3 + comment_count * 2 + view_count)`), "DESC"],
-        ["created_at", "DESC"],
+        [Sequelize.literal(`(Post.like_count * 3 + Post.comment_count * 2 + Post.view_count)`), "DESC"],
+        [Sequelize.col("Post.created_at"), "DESC"],
       ];
     } else if (mode === "zeroReply") {
       // 零回复模式：按创建时间倒序，最新的问题优先
       console.log('getCommunityPosts - 使用零回复排序');
-      orderBy = [["created_at", "DESC"]];
+      orderBy = [[Sequelize.col("Post.created_at"), "DESC"]];
     } else {
       // 最新发布（默认）：按创建时间倒序
       // 同时支持旧的 order 参数（兼容历史代码）
@@ -166,11 +166,11 @@ export const getCommunityPosts = async (req: Request, res: Response) => {
       orderBy =
         order === "hot"
           ? [
-              ["like_count", "DESC"],
-              ["comment_count", "DESC"],
-              ["created_at", "DESC"],
+              [Sequelize.col("Post.like_count"), "DESC"],
+              [Sequelize.col("Post.comment_count"), "DESC"],
+              [Sequelize.col("Post.created_at"), "DESC"],
             ]
-          : [["created_at", "DESC"]];
+          : [[Sequelize.col("Post.created_at"), "DESC"]];
     }
 
     console.log('getCommunityPosts - 最终 orderBy:', JSON.stringify(orderBy));
