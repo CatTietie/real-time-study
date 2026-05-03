@@ -758,6 +758,15 @@ export default function BadgeCenter() {
     const renderCategorySection = (category: BadgeCategoryGroup) => {
         if (category.badges.length === 0) return null;
 
+        const sortedBadges = [...category.badges].sort((a, b) => {
+            const aIsNew = newlyUnlockedIds.has(a.id);
+            const bIsNew = newlyUnlockedIds.has(b.id);
+            if (aIsNew !== bIsNew) {
+                return aIsNew ? -1 : 1;
+            }
+            return a.sortOrder - b.sortOrder;
+        });
+
         return (
             <Card
                 key={category.category}
@@ -800,9 +809,9 @@ export default function BadgeCenter() {
                 bodyStyle={{ padding: "24px" }}
             >
                 <Row gutter={[16, 16]}>
-                    {category.badges.map((badge) => (
+                    {sortedBadges.map((badge) => (
                         <Col xs={12} sm={8} md={6} lg={4} xl={3} key={badge.id}>
-                            {renderBadgeCard(badge, category.category)}
+                            {renderBadgeCard(badge, category.category, newlyUnlockedIds.has(badge.id))}
                         </Col>
                     ))}
                 </Row>
