@@ -18,7 +18,13 @@ import { verifyToken } from "../services/auth.service";
 import {
   addPoints,
   calculateLevel,
+  calculateLevelDetail,
   getStartOfDay,
+  BADGE_DEFINITIONS,
+  getGrowthTip,
+  LevelDetail,
+  BADGE_CATEGORY_CONFIG,
+  BadgeNewCategory,
 } from "../services/points.service";
 import {
   addCommunityClient,
@@ -26,6 +32,23 @@ import {
   removeCommunityClient,
 } from "../services/community-realtime.service";
 import { recordView, getUserTodayViews } from "../services/view-record.service";
+import { uploadFilesToOss } from "../middlewares/upload.middleware";
+import {
+  getStudyDuration,
+  getContentQualityScore,
+  getMultiDimTrendData,
+} from "../services/learning-stats.service";
+
+const safeToDateString = (value: any): string => {
+  if (!value) return "";
+  if (value instanceof Date) {
+    return value.toISOString().split("T")[0];
+  }
+  if (typeof value === "string") {
+    return value.split("T")[0];
+  }
+  return String(value).split("T")[0];
+};
 
 const parseTags = (tags?: string[] | string) => {
   const parsed = Array.isArray(tags)
@@ -78,39 +101,102 @@ const canDeletePost = async (user: { id: number; role: string }) => {
   return Boolean(permission);
 };
 
+type ViewMode = "latest" | "hot" | "zeroReply";
+
 export const getCommunityPosts = async (req: Request, res: Response) => {
   try {
-    const { page = 1, pageSize = 10, category, keyword, order, userId } = req.query;
+    const { page = 1, pageSize = 10, category, keyword, order, userId, viewMode } = req.query;
 
-    const where: any = {
-      status: 1,
-      publish_status: 1,
-    };
+    console.log('getCommunityPosts - 接收到的参数:', {
+      viewMode,
+      order,
+      category,
+      keyword,
+      userId
+    });
 
-    // 如果提供了userId参数，则只返回该用户的帖子
+    const where: any = {};
+
+    // 如果提供了userId参数（用户查看自己的帖子），则显示所有状态的帖子（除了已删除）
     if (userId) {
       where.user_id = Number(userId);
+      where.publish_status = { [Op.ne]: 2 }; // 排除已删除的帖子
+    } else {
+      // 没有userId参数（公开列表），只显示已发布且审核通过的帖子
+      where.status = 1;
+      where.publish_status = 1;
     }
 
-    if (category) {
+    // 处理视图模式
+    const mode = (viewMode as ViewMode) || "latest";
+    console.log('getCommunityPosts - 确定的视图模式:', mode);
+    
+    // 零回复模式：仅显示"问题求助"分类且评论数为0的帖子
+    if (mode === "zeroReply") {
+      where.category = "问题求助";
+      // 处理 comment_count 可能为 null 或 0 的情况
+      where[Op.or] = [
+        { comment_count: 0 },
+        { comment_count: null },
+      ];
+    } else if (category) {
+      // 非零回复模式时，才应用用户选择的分类
       where.category = category;
     }
 
     if (keyword) {
-      where[Op.or] = [
-        { title: { [Op.like]: `%${keyword}%` } },
-        { content: { [Op.like]: `%${keyword}%` } },
-      ];
+      // 如果已有 where[Op.or]（来自零回复模式），需要合并
+      if (where[Op.or]) {
+        // 零回复模式下的 keyword 搜索：在 comment_count 为 0/null 且 category="问题求助" 的基础上，添加 keyword 条件
+        const existingOr = where[Op.or];
+        delete where[Op.or];
+        where[Op.and] = [
+          { [Op.or]: existingOr },
+          {
+            [Op.or]: [
+              { title: { [Op.like]: `%${keyword}%` } },
+              { content: { [Op.like]: `%${keyword}%` } },
+            ],
+          },
+        ];
+      } else {
+        where[Op.or] = [
+          { title: { [Op.like]: `%${keyword}%` } },
+          { content: { [Op.like]: `%${keyword}%` } },
+        ];
+      }
     }
 
-    const orderBy: any =
-      order === "hot"
-        ? [
-            [Sequelize.col("like_count"), "DESC"],
-            [Sequelize.col("comment_count"), "DESC"],
-            [Sequelize.col("created_at"), "DESC"],
-          ]
-        : [[Sequelize.col("created_at"), "DESC"]];
+    // 根据视图模式确定排序
+    let orderBy: any;
+    
+    if (mode === "hot") {
+      // 热门推荐：综合算法排序 - 点赞(权重3) + 评论(权重2) + 浏览量(权重1)
+      console.log('getCommunityPosts - 使用热门排序');
+      orderBy = [
+        [Sequelize.literal(`(Post.like_count * 3 + Post.comment_count * 2 + Post.view_count)`), "DESC"],
+        [Sequelize.col("Post.created_at"), "DESC"],
+      ];
+    } else if (mode === "zeroReply") {
+      // 零回复模式：按创建时间倒序，最新的问题优先
+      console.log('getCommunityPosts - 使用零回复排序');
+      orderBy = [[Sequelize.col("Post.created_at"), "DESC"]];
+    } else {
+      // 最新发布（默认）：按创建时间倒序
+      // 同时支持旧的 order 参数（兼容历史代码）
+      console.log('getCommunityPosts - 使用最新发布排序');
+      orderBy =
+        order === "hot"
+          ? [
+              [Sequelize.col("Post.like_count"), "DESC"],
+              [Sequelize.col("Post.comment_count"), "DESC"],
+              [Sequelize.col("Post.created_at"), "DESC"],
+            ]
+          : [[Sequelize.col("Post.created_at"), "DESC"]];
+    }
+
+    console.log('getCommunityPosts - 最终 orderBy:', JSON.stringify(orderBy));
+    console.log('getCommunityPosts - 最终 where:', JSON.stringify(where));
 
     const result = await Post.findAndCountAll({
       where,
@@ -119,11 +205,40 @@ export const getCommunityPosts = async (req: Request, res: Response) => {
           model: User,
           attributes: ["id", "username", "nickname"],
         },
+        {
+          model: Post,
+          as: "ForwardPost",
+          attributes: ["id", "title", "content", "like_count", "comment_count", "user_id"],
+          include: [
+            {
+              model: User,
+              attributes: ["id", "username", "nickname"],
+            },
+          ],
+        },
+        {
+          model: User,
+          as: "ForwardUser",
+          attributes: ["id", "username", "nickname"],
+        },
       ],
       order: orderBy,
       offset: (Number(page) - 1) * Number(pageSize),
       limit: Number(pageSize),
     });
+
+    console.log('getCommunityPosts - 查询结果数量:', result.count);
+    if (result.rows.length > 0) {
+      const firstPost = result.rows[0] as any;
+      console.log('getCommunityPosts - 第一条帖子:', {
+        id: firstPost.id,
+        title: firstPost.title,
+        like_count: firstPost.like_count,
+        comment_count: firstPost.comment_count,
+        view_count: firstPost.view_count,
+        created_at: firstPost.created_at
+      });
+    }
 
     const data = result.rows.map((post) => {
       const raw = post.toJSON() as any;
@@ -178,10 +293,65 @@ export const getCommunityTagSuggestions = async (
 ) => {
   try {
     const keyword = String(req.query.keyword || "").trim();
+
+    // 如果没有关键词，返回热门标签（从已发布的帖子中提取）
     if (keyword.length < 1) {
-      return res.json({ success: true, message: "获取成功", data: [] });
+      // 获取最近200条已发布的帖子，提取所有标签并统计频率
+      const posts = await Post.findAll({
+        attributes: ["tags"],
+        where: {
+          status: 1, // 审核通过
+          publish_status: 1, // 已发布
+          tags: { [Op.ne]: null },
+        },
+        limit: 200,
+        order: [["created_at", "DESC"]],
+      });
+
+      // 统计标签出现频率
+      const tagCount = new Map<string, number>();
+      posts.forEach((post) => {
+        const raw = (post as any).tags as string | undefined;
+        if (!raw) return;
+        
+        let tags: string[] = [];
+        try {
+          // 尝试解析为 JSON 数组
+          const parsed = JSON.parse(raw) as string[];
+          if (Array.isArray(parsed)) {
+            tags = parsed;
+          }
+        } catch {
+          // 如果不是 JSON，尝试按逗号分割
+          tags = raw
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean);
+        }
+
+        tags.forEach((tag) => {
+          const key = tag.trim();
+          if (key && key.length > 0) {
+            tagCount.set(key, (tagCount.get(key) || 0) + 1);
+          }
+        });
+      });
+
+      // 按频率排序，返回前15个热门标签
+      const hotTags = Array.from(tagCount.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 15)
+        .map(([tag]) => tag);
+
+      return res.json({
+        success: true,
+        message: "获取成功",
+        data: hotTags,
+        isHotTags: true,
+      });
     }
 
+    // 如果有关键词，执行联想搜索
     const posts = await Post.findAll({
       attributes: ["tags"],
       where: {
@@ -211,6 +381,7 @@ export const getCommunityTagSuggestions = async (
       success: true,
       message: "获取成功",
       data: Array.from(tags).slice(0, 10),
+      isHotTags: false,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "获取失败";
@@ -293,12 +464,13 @@ export const createCommunityPost = async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, message: "未授权访问" });
     }
 
-    const { title, content, category, tags, isDraft } = req.body as {
+    const { title, content, category, tags, isDraft, forwardPostId } = req.body as {
       title?: string;
       content?: string;
       category?: string;
       tags?: string[] | string;
       isDraft?: string | boolean;
+      forwardPostId?: number;
     };
 
     if (!title || !content) {
@@ -344,10 +516,9 @@ export const createCommunityPost = async (req: Request, res: Response) => {
         .status(400)
         .json({ success: false, message: "最多只能上传4张图片" });
     }
-    const baseUrl = `${req.protocol}://${req.get("host")}`;
-    const imageUrls = files.map(
-      (file) => `${baseUrl}/uploads/posts/${file.filename}`,
-    );
+    
+    // 使用 OSS 上传（如果 OSS 可用）
+    const imageUrls = await uploadFilesToOss(req);
 
     const isDraftFlag =
       typeof isDraft === "string" ? isDraft === "true" : Boolean(isDraft);
@@ -368,6 +539,13 @@ export const createCommunityPost = async (req: Request, res: Response) => {
       ? `包含敏感词：${matches.slice(0, 10).join("、")}`
       : undefined;
 
+    let forwardPost: any = null;
+    if (forwardPostId) {
+      forwardPost = await Post.findOne({
+        where: { id: forwardPostId, status: 1, publish_status: 1 },
+      });
+    }
+
     const post = await Post.create({
       user_id: req.user.id,
       title,
@@ -381,6 +559,8 @@ export const createCommunityPost = async (req: Request, res: Response) => {
       comment_count: 0,
       is_top: 0,
       edit_count: 0,
+      forward_post_id: forwardPost ? forwardPost.id : null,
+      forward_user_id: forwardPost ? forwardPost.user_id : null,
       ...(auditReason
         ? { audit_reason: auditReason, audit_at: new Date() }
         : {}),
@@ -595,19 +775,50 @@ export const getCommunityPostComments = async (req: Request, res: Response) => {
     const decoded = token ? verifyToken(token) : null;
     const viewerId = decoded?.id;
 
-    const where: any = { post_id: postId };
+    // 获取主评论的条件
+    const mainCommentWhere: any = { 
+      post_id: postId, 
+      parent_id: null 
+    };
     if (viewerId) {
-      where[Op.or] = [{ status: 1 }, { status: 0, user_id: viewerId }];
+      mainCommentWhere[Op.or] = [{ status: 1 }, { status: 0, user_id: viewerId }];
     } else {
-      where.status = 1;
+      mainCommentWhere.status = 1;
     }
 
+    // 获取主评论的总数（用于分页）
+    const totalMainComments = await Comment.count({
+      where: mainCommentWhere,
+    });
+
+    // 获取主评论及其子评论
     const result = await Comment.findAndCountAll({
-      where,
+      where: mainCommentWhere,
       include: [
         {
           model: User,
-          attributes: ["id", "username", "nickname"],
+          attributes: ["id", "username", "nickname", "avatar"],
+        },
+        {
+          model: Comment,
+          as: "Replies",
+          include: [
+            {
+              model: User,
+              attributes: ["id", "username", "nickname", "avatar"],
+            },
+            {
+              model: Comment,
+              as: "ParentComment",
+              include: [
+                {
+                  model: User,
+                  attributes: ["id", "username", "nickname", "avatar"],
+                },
+              ],
+            },
+          ],
+          order: [["created_at", "ASC"]],
         },
       ],
       order: orderBy,
@@ -618,8 +829,19 @@ export const getCommunityPostComments = async (req: Request, res: Response) => {
     const rows = result.rows.map((item) => {
       const raw = item.toJSON() as any;
       if (raw.is_deleted) {
-        return { ...raw, content: "该评论已被删除" };
+        return { ...raw, content: "该评论已被删除", Replies: [] };
       }
+      
+      // 处理子评论
+      if (raw.Replies && raw.Replies.length > 0) {
+        raw.Replies = raw.Replies.map((reply: any) => {
+          if (reply.is_deleted) {
+            return { ...reply, content: "该评论已被删除" };
+          }
+          return reply;
+        });
+      }
+      
       return raw;
     });
 
@@ -630,7 +852,7 @@ export const getCommunityPostComments = async (req: Request, res: Response) => {
       pagination: {
         page: Number(page),
         pageSize: Number(pageSize),
-        total: result.count,
+        total: totalMainComments,
       },
     });
   } catch (error) {
@@ -774,14 +996,20 @@ export const createCommunityReport = async (req: Request, res: Response) => {
 
 export const getCommunityComments = async (req: Request, res: Response) => {
   try {
-    const { page = 1, pageSize = 10 } = req.query;
+    const { page = 1, pageSize = 10, userId } = req.query;
+
+    // 构建 where 条件
+    const where: any = { status: 1 };
+    if (userId) {
+      where.user_id = Number(userId);
+    }
 
     const result = await Comment.findAndCountAll({
-      where: { status: 1 },
+      where,
       include: [
         {
           model: User,
-          attributes: ["id", "username", "nickname"],
+          attributes: ["id", "username", "nickname", "avatar"],
         },
         {
           model: Post,
@@ -817,35 +1045,83 @@ export const getCommunityComments = async (req: Request, res: Response) => {
   }
 };
 
+const getStartOfWeek = () => {
+  const start = new Date();
+  const day = start.getDay();
+  const diff = start.getDate() - day + (day === 0 ? -6 : 1);
+  start.setDate(diff);
+  start.setHours(0, 0, 0, 0);
+  return start;
+};
+
+const getStartOfNDaysAgo = (days: number) => {
+  const start = new Date();
+  start.setDate(start.getDate() - days);
+  start.setHours(0, 0, 0, 0);
+  return start;
+};
+
 export const getCommunityLeaderboard = async (req: Request, res: Response) => {
   try {
     const type = String((req.query as any)?.type || "total");
+    const timeRange = String((req.query as any)?.timeRange || "all");
 
     if (type === "post_hot") {
       // 热门内容榜 - 返回帖子相关信息，按热度排序
+      const where: any = { status: 1, publish_status: 1 };
+
+      // 时间筛选 - 必须明确指定 Post.created_at，因为 User 表也有 created_at 字段
+      if (timeRange === "today") {
+        where[Op.and] = [
+          Sequelize.where(Sequelize.col("Post.created_at"), {
+            [Op.gte]: getStartOfDay(),
+          }),
+        ];
+      } else if (timeRange === "week") {
+        where[Op.and] = [
+          Sequelize.where(Sequelize.col("Post.created_at"), {
+            [Op.gte]: getStartOfWeek(),
+          }),
+        ];
+      }
+
       const posts = await Post.findAll({
-        where: { status: 1, publish_status: 1 },
+        where,
         include: [{
           model: User,
           attributes: ["id", "nickname", "username", "avatar"]
         }],
         order: [
-          [Sequelize.col("view_count"), "DESC"],
-          [Sequelize.col("like_count"), "DESC"],
-          [Sequelize.col("comment_count"), "DESC"],
-          [Sequelize.col("created_at"), "DESC"]
+          [Sequelize.literal(`(Post.view_count * 0.5 + Post.like_count * 2 + Post.comment_count)`), "DESC"],
+          [Sequelize.col("Post.created_at"), "DESC"]
         ],
         limit: 50,
       });
 
+      // 热度计算规则
+      const heatRules = {
+        viewWeight: 0.5,
+        likeWeight: 2,
+        commentWeight: 1,
+        formula: "热度值 = 浏览量 × 0.5 + 点赞数 × 2 + 评论数",
+        description: "热度值综合考虑浏览、点赞、评论三个维度，其中点赞权重最高，评论次之，浏览最低。"
+      };
+
       const data = posts.map((post: any) => {
         const postData = post.toJSON();
+        // 计算热度值
+        const heatScore = Math.round(
+          (postData.view_count || 0) * 0.5 +
+          (postData.like_count || 0) * 2 +
+          (postData.comment_count || 0)
+        );
         return {
           id: postData.id,
           title: postData.title,
           view_count: postData.view_count,
           like_count: postData.like_count,
           comment_count: postData.comment_count,
+          heat_score: heatScore,
           user_id: postData.User?.id,
           user_nickname: postData.User?.nickname,
           user_username: postData.User?.username,
@@ -858,15 +1134,22 @@ export const getCommunityLeaderboard = async (req: Request, res: Response) => {
         success: true,
         message: "获取排行榜成功",
         data,
+        heat_rules: heatRules,
+        time_range: timeRange,
       });
     }
 
     if (type === "comment_count") {
-      // 评论之星榜 - 按评论数量统计
-      const rows = await Comment.findAll({
+      // 评论之星榜 - 区分总评论数和周期（近7天）评论数
+      const sevenDaysAgo = getStartOfNDaysAgo(7);
+      const commentPeriod = String((req.query as any)?.commentPeriod || "7days"); // "7days" 或 "all"
+      
+      // 1. 先查询所有有评论的用户的基础数据（总评论数）
+      const totalRows = await Comment.findAll({
         attributes: [
           "user_id",
-          [Sequelize.fn("COUNT", Sequelize.col("Comment.id")), "comment_count"],
+          [Sequelize.fn("COUNT", Sequelize.col("Comment.id")), "total_comment_count"],
+          [Sequelize.fn("MAX", Sequelize.col("Comment.created_at")), "last_comment_time"],
         ],
         where: { status: 1 },
         group: ["user_id"],
@@ -874,23 +1157,82 @@ export const getCommunityLeaderboard = async (req: Request, res: Response) => {
           model: User,
           attributes: ["id", "nickname", "username", "avatar", "points"]
         }],
-        order: [[Sequelize.literal("comment_count"), "DESC"]],
-        limit: 50,
+        limit: 200,
       });
-
-      const data = rows.map((row: any) => {
+      
+      // 2. 查询近7天的评论数
+      const periodRows = await Comment.findAll({
+        attributes: [
+          "user_id",
+          [Sequelize.fn("COUNT", Sequelize.col("Comment.id")), "period_comment_count"],
+        ],
+        where: { 
+          status: 1,
+          created_at: { [Op.gte]: sevenDaysAgo }
+        },
+        group: ["user_id"],
+        raw: true,
+      });
+      
+      // 3. 构建周期评论数的Map
+      const periodMap = new Map<number, number>();
+      periodRows.forEach((item: any) => {
+        periodMap.set(Number(item.user_id), Number(item.period_comment_count || 0));
+      });
+      
+      // 4. 组合数据
+      const combinedData = totalRows.map((row: any) => {
         const rawData = row.toJSON();
+        const userId = Number(rawData.user_id);
+        const totalCount = Number(rawData.total_comment_count || 0);
+        const periodCount = periodMap.get(userId) || 0;
+        
+        // 根据参数决定使用哪个作为主要排序字段
+        const mainCommentCount = commentPeriod === "all" ? totalCount : periodCount;
+        const periodType = commentPeriod === "all" ? "all" : "7days";
+        const periodLabel = commentPeriod === "all" ? "全部" : "近7天";
+        
         return {
-          id: rawData.user_id,
+          id: userId,
           nickname: rawData.User?.nickname,
           username: rawData.User?.username,
           avatar: rawData.User?.avatar,
+          points: Number(rawData.User?.points || 0),
           level: calculateLevel(Number(rawData.User?.points || 0)),
-          comment_count: Number(rawData.comment_count || 0),
+          // 主要评论数（用于排序和显示）
+          comment_count: mainCommentCount,
+          period_comment_count: periodCount,
+          total_comment_count: totalCount,
+          // 最新评论时间
+          last_comment_time: rawData.last_comment_time,
+          // 周期类型
+          period_type: periodType,
+          period_label: periodLabel,
         };
       });
+      
+      // 按选择的评论数降序排序
+      if (commentPeriod === "all") {
+        combinedData.sort((a, b) => b.total_comment_count - a.total_comment_count);
+      } else {
+        combinedData.sort((a, b) => b.period_comment_count - a.period_comment_count);
+      }
+      
+      // 只取前50条
+      const data = combinedData.slice(0, 50);
 
-      return res.json({ success: true, message: "获取排行榜成功", data });
+      return res.json({ 
+        success: true, 
+        message: "获取排行榜成功", 
+        data,
+        meta: {
+          period_type: commentPeriod === "all" ? "all" : "7days",
+          period_label: commentPeriod === "all" ? "全部" : "近7天",
+          description: commentPeriod === "all" 
+            ? "评论之星榜按历史总评论数排序" 
+            : "评论之星榜按近7天评论数排序，更公平地反映近期活跃度"
+        }
+      });
     }
 
     // 默认是 total - 社区达人榜（按总积分排行）
@@ -901,17 +1243,105 @@ export const getCommunityLeaderboard = async (req: Request, res: Response) => {
       limit: 100,
     });
 
+    // 收集用户ID，用于批量查询统计数据
+    const userIds = users.map((user) => user.id);
+    
+    // 查询每个用户的发帖数
+    const postCounts = await Post.findAll({
+      attributes: [
+        "user_id",
+        [Sequelize.fn("COUNT", Sequelize.col("id")), "post_count"],
+      ],
+      where: { 
+        user_id: { [Op.in]: userIds },
+        status: 1,
+        publish_status: 1 
+      },
+      group: ["user_id"],
+      raw: true,
+    });
+    
+    // 查询每个用户的帖子获赞数（其他用户给该用户的帖子点赞）
+    const postLikeCounts = await Post.findAll({
+      attributes: [
+        "Post.user_id",
+        [Sequelize.fn("COUNT", Sequelize.col("PostLikes.id")), "like_count"],
+      ],
+      where: { 
+        user_id: { [Op.in]: userIds },
+        status: 1,
+        publish_status: 1 
+      },
+      include: [{
+        model: PostLike,
+        attributes: [],
+        as: "PostLikes",
+        required: false,
+      }],
+      group: ["Post.user_id"],
+      raw: true,
+    });
+
+    // 查询每个用户的评论获赞数（其他用户给该用户的评论点赞）
+    const commentLikeCounts = await Comment.findAll({
+      attributes: [
+        "Comment.user_id",
+        [Sequelize.fn("COUNT", Sequelize.col("CommentLikes.id")), "like_count"],
+      ],
+      where: { 
+        user_id: { [Op.in]: userIds },
+        is_deleted: 0,
+        status: 1 
+      },
+      include: [{
+        model: CommentLike,
+        attributes: [],
+        as: "CommentLikes",
+        required: false,
+      }],
+      group: ["Comment.user_id"],
+      raw: true,
+    });
+
+    // 构建统计数据的Map
+    const postCountMap = new Map<number, number>();
+    const postLikeCountMap = new Map<number, number>();
+    const commentLikeCountMap = new Map<number, number>();
+
+    postCounts.forEach((item: any) => {
+      postCountMap.set(Number(item.user_id), Number(item.post_count || 0));
+    });
+
+    postLikeCounts.forEach((item: any) => {
+      postLikeCountMap.set(Number(item["Post.user_id"]), Number(item.like_count || 0));
+    });
+
+    commentLikeCounts.forEach((item: any) => {
+      commentLikeCountMap.set(Number(item["Comment.user_id"]), Number(item.like_count || 0));
+    });
+
     res.json({
       success: true,
       message: "获取排行榜成功",
-      data: users.map((user) => ({
-        id: user.id,
-        nickname: user.nickname,
-        username: user.username,
-        avatar: user.avatar,
-        points: user.points,
-        level: calculateLevel(user.points),
-      })),
+      data: users.map((user) => {
+        const postCount = postCountMap.get(user.id) || 0;
+        const postLikes = postLikeCountMap.get(user.id) || 0;
+        const commentLikes = commentLikeCountMap.get(user.id) || 0;
+        const totalLikes = postLikes + commentLikes;
+        
+        return {
+          id: user.id,
+          nickname: user.nickname,
+          username: user.username,
+          avatar: user.avatar,
+          points: user.points,
+          level: calculateLevel(user.points),
+          post_count: postCount,
+          like_count: totalLikes,
+          post_like_count: postLikes,
+          comment_like_count: commentLikes,
+        };
+      }),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "获取排行榜失败";
@@ -1340,7 +1770,7 @@ export const getFavorites = async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, message: "未授权访问" });
     }
 
-    const { page = 1, pageSize = 10, folderId, keyword, category } = req.query;
+    const { page = 1, pageSize = 10, folderId, keyword, category, sortBy, sortOrder } = req.query;
     const where: any = { user_id: req.user.id };
     if (folderId) where.folder_id = Number(folderId);
 
@@ -1351,6 +1781,29 @@ export const getFavorites = async (req: Request, res: Response) => {
         { title: { [Op.like]: `%${keyword}%` } },
         { content: { [Op.like]: `%${keyword}%` } },
       ];
+    }
+
+    let orderBy: any;
+    const order = sortBy || "created_at";
+    const orderDir = (sortOrder as string)?.toUpperCase() === "ASC" ? "ASC" : "DESC";
+
+    if (order === "view_count") {
+      orderBy = [
+        [Sequelize.col("Post.view_count"), orderDir],
+        [Sequelize.col("created_at"), "DESC"],
+      ];
+    } else if (order === "like_count") {
+      orderBy = [
+        [Sequelize.col("Post.like_count"), orderDir],
+        [Sequelize.col("created_at"), "DESC"],
+      ];
+    } else if (order === "comment_count") {
+      orderBy = [
+        [Sequelize.col("Post.comment_count"), orderDir],
+        [Sequelize.col("created_at"), "DESC"],
+      ];
+    } else {
+      orderBy = [[Sequelize.col("created_at"), orderDir]];
     }
 
     const result = await Favorite.findAndCountAll({
@@ -1366,7 +1819,7 @@ export const getFavorites = async (req: Request, res: Response) => {
         },
         { model: FavoriteFolder, attributes: ["id", "name"] },
       ],
-      order: [[Sequelize.col("created_at"), "DESC"]],
+      order: orderBy,
       offset: (Number(page) - 1) * Number(pageSize),
       limit: Number(pageSize),
     });
@@ -1650,13 +2103,22 @@ export const getPointsSummary = async (req: Request, res: Response) => {
 
     const [today, week, month] = await Promise.all([
       PointsLog.sum("change", {
-        where: { user_id: user.id, createdAt: { [Op.gte]: startOfDay } },
+        where: {
+          user_id: user.id,
+          [Op.and]: [Sequelize.where(Sequelize.col("created_at"), { [Op.gte]: startOfDay })],
+        },
       }),
       PointsLog.sum("change", {
-        where: { user_id: user.id, createdAt: { [Op.gte]: startOfWeek } },
+        where: {
+          user_id: user.id,
+          [Op.and]: [Sequelize.where(Sequelize.col("created_at"), { [Op.gte]: startOfWeek })],
+        },
       }),
       PointsLog.sum("change", {
-        where: { user_id: user.id, createdAt: { [Op.gte]: startOfMonth } },
+        where: {
+          user_id: user.id,
+          [Op.and]: [Sequelize.where(Sequelize.col("created_at"), { [Op.gte]: startOfMonth })],
+        },
       }),
     ]);
 
@@ -1778,7 +2240,7 @@ export const getPointsLogs = async (req: Request, res: Response) => {
     const { page = 1, pageSize = 10 } = req.query;
     const result = await PointsLog.findAndCountAll({
       where: { user_id: req.user.id },
-      order: [["createdAt", "DESC"]],
+      order: [[Sequelize.col("created_at"), "DESC"]],
       offset: (Number(page) - 1) * Number(pageSize),
       limit: Number(pageSize),
     });
@@ -1906,6 +2368,751 @@ export const getUserTodayStats = async (req: Request, res: Response) => {
       }
     });
   } catch (error) {
+    const message = error instanceof Error ? error.message : "获取失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+// ========================================
+// 草稿相关接口
+// ========================================
+
+/**
+ * 获取用户的草稿列表
+ */
+export const getCommunityDrafts = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const { page = 1, pageSize = 20 } = req.query;
+    const userId = req.user.id;
+
+    const where: any = {
+      user_id: userId,
+      publish_status: 0, // 草稿状态
+    };
+
+    const total = await Post.count({ where });
+
+    const drafts = await Post.findAll({
+      where,
+      attributes: ['id', 'title', 'content', 'category', 'tags', 'images', 'created_at', 'updated_at'],
+      order: [['updated_at', 'DESC']],
+      offset: (Number(page) - 1) * Number(pageSize),
+      limit: Number(pageSize),
+      raw: true,
+    });
+
+    // 处理 tags 和 images
+    const processedDrafts = drafts.map((draft: any) => ({
+      ...draft,
+      tags: parseTags(draft.tags),
+      images: parseImages(draft.images),
+    }));
+
+    res.json({
+      success: true,
+      message: "获取草稿列表成功",
+      data: processedDrafts,
+      pagination: {
+        page: Number(page),
+        pageSize: Number(pageSize),
+        total,
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "获取草稿列表失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+/**
+ * 获取单个草稿详情
+ */
+export const getCommunityDraftDetail = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const id = Number(req.params.id);
+
+    const draft = await Post.findOne({
+      where: {
+        id,
+        user_id: req.user.id,
+        publish_status: 0, // 必须是草稿状态
+      },
+      attributes: ['id', 'title', 'content', 'category', 'tags', 'images', 'created_at', 'updated_at'],
+      raw: true,
+    });
+
+    if (!draft) {
+      return res.status(404).json({ success: false, message: "草稿不存在" });
+    }
+
+    const processedDraft = {
+      ...draft,
+      tags: parseTags(draft.tags),
+      images: parseImages(draft.images),
+    };
+
+    res.json({
+      success: true,
+      message: "获取草稿详情成功",
+      data: processedDraft,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "获取草稿详情失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+/**
+ * 删除草稿
+ */
+export const deleteCommunityDraft = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const id = Number(req.params.id);
+
+    const draft = await Post.findOne({
+      where: {
+        id,
+        user_id: req.user.id,
+        publish_status: 0, // 只能删除草稿
+      },
+    });
+
+    if (!draft) {
+      return res.status(404).json({ success: false, message: "草稿不存在" });
+    }
+
+    // 软删除
+    await draft.update({
+      publish_status: 2,
+      deleted_at: new Date(),
+    });
+
+    res.json({ success: true, message: "草稿已删除" });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "删除草稿失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+export const getPointsOverviewPlus = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const userId = req.user.id;
+
+    const [user, loginStreak, studyDuration, contentQuality, trendData] = await Promise.all([
+      User.findByPk(userId),
+      getLoginStreak(userId),
+      getStudyDuration(userId),
+      getContentQualityScore(userId),
+      getMultiDimTrendData(userId, 7),
+    ]);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "用户不存在" });
+    }
+
+    const startOfDay = getStartOfDay();
+    const todayPoints = await PointsLog.sum("change", {
+      where: {
+        user_id: userId,
+        [Op.and]: [Sequelize.where(Sequelize.col("created_at"), { [Op.gte]: startOfDay })],
+      },
+    });
+
+    const totalLikes = contentQuality.totalLikes || 0;
+    const totalPosts = await Post.count({
+      where: {
+        user_id: userId,
+        status: 1,
+        publish_status: 1,
+      },
+    });
+
+    const totalComments = await PointsLog.count({
+      where: {
+        user_id: userId,
+        source_type: "comment",
+      },
+    });
+
+    const totalPostPointsLogs = await PointsLog.count({
+      where: {
+        user_id: userId,
+        source_type: "post",
+      },
+    });
+
+    const allLogs = await PointsLog.findAll({
+      where: { user_id: userId },
+      attributes: ["change", "created_at", "source_type", "reason"],
+      order: [[Sequelize.col("created_at"), "DESC"]],
+      raw: true,
+    });
+
+    const dailyPoints: Record<string, number> = {};
+    allLogs.forEach((log: any) => {
+      const date = safeToDateString(log.created_at);
+      if (date) {
+        dailyPoints[date] = (dailyPoints[date] || 0) + (log.change > 0 ? log.change : 0);
+      }
+    });
+
+    const maxDailyPoints = Math.max(0, ...Object.values(dailyPoints));
+
+    const totalPoints = user.points || 0;
+    const levelDetail = calculateLevelDetail(totalPoints);
+
+    let qualityScore = 0;
+    const totalViewsResult = await Post.sum('view_count', {
+      where: {
+        user_id: userId,
+        status: 1,
+        publish_status: 1,
+      },
+    });
+    const totalViews = Number(totalViewsResult || 0);
+
+    if (totalPosts > 0 && totalViews > 0) {
+      const likeViewRatio = totalLikes / Math.max(totalViews, 1);
+      qualityScore = Math.round(likeViewRatio * 1000);
+    } else if (totalPosts > 0) {
+      qualityScore = totalLikes * 10;
+    }
+
+    const unlockedCount = calculateUnlockedBadgeCount({
+      totalPoints,
+      totalPosts: totalPostPointsLogs,
+      totalComments,
+      totalLikes,
+      currentStreak: loginStreak,
+      maxDailyPoints,
+    });
+
+    const totalBadges = BADGE_DEFINITIONS.length;
+    const achievementProgress = Math.round((unlockedCount / totalBadges) * 100);
+
+    const growthTip = getGrowthTip(
+      levelDetail,
+      Number(todayPoints || 0),
+      totalPostPointsLogs,
+      totalComments,
+      loginStreak,
+      totalPoints
+    );
+
+    res.json({
+      success: true,
+      message: "获取成功",
+      data: {
+        totalPoints,
+        todayPoints: Number(todayPoints || 0),
+        level: levelDetail.currentLevel,
+        levelDetail: {
+          ...levelDetail,
+        },
+        streakDays: loginStreak,
+        studyDuration: studyDuration.total,
+        todayStudyDuration: studyDuration.today,
+        qualityScore,
+        achievementProgress,
+        unlockedCount,
+        totalBadges,
+        growthTip,
+        trendData,
+      },
+    });
+  } catch (error) {
+    console.error("getPointsOverviewPlus error:", error);
+    const message = error instanceof Error ? error.message : "获取失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+const calculateUnlockedBadgeCount = (stats: {
+  totalPoints: number;
+  totalPosts: number;
+  totalComments: number;
+  totalLikes: number;
+  currentStreak: number;
+  maxDailyPoints: number;
+}): number => {
+  let count = 0;
+
+  if (stats.totalPosts >= 1) count++;
+  if (stats.totalPosts >= 10) count++;
+  if (stats.totalPosts >= 50) count++;
+  if (stats.totalComments >= 1) count++;
+  if (stats.totalComments >= 30) count++;
+  if (stats.currentStreak >= 3) count++;
+  if (stats.currentStreak >= 7) count++;
+  if (stats.currentStreak >= 30) count++;
+  if (stats.maxDailyPoints >= 20) count++;
+  if (stats.totalPoints >= 100) count++;
+  if (stats.totalPoints >= 1000) count++;
+  if (stats.totalLikes >= 1) count++;
+  if (stats.totalLikes >= 50) count++;
+
+  return count;
+};
+
+export const getPointsActions = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const actions = [
+      {
+        id: "create_post",
+        title: "发布帖子",
+        description: "发布一篇新帖子",
+        points: 10,
+        sourceType: "post",
+        dailyCap: 50,
+        icon: "edit",
+        route: "/community/post/create",
+        buttonText: "去发帖",
+      },
+      {
+        id: "create_comment",
+        title: "发表评论",
+        description: "对他人的帖子发表评论",
+        points: 1,
+        sourceType: "comment",
+        dailyCap: 10,
+        icon: "message",
+        route: "/community",
+        buttonText: "去互动",
+      },
+      {
+        id: "give_like",
+        title: "点赞互动",
+        description: "对喜欢的帖子或评论点赞",
+        points: 0,
+        note: "被点赞者获得积分",
+        sourceType: "like",
+        dailyCap: 20,
+        icon: "like",
+        route: "/community",
+        buttonText: "去逛逛",
+      },
+      {
+        id: "daily_visit",
+        title: "每日签到",
+        description: "每日首次访问社区",
+        points: 1,
+        sourceType: "system",
+        dailyCap: 1,
+        icon: "calendar",
+        route: "/community",
+        buttonText: "去签到",
+      },
+      {
+        id: "study_duration",
+        title: "学习时长",
+        description: "使用自习室学习",
+        points: 0,
+        note: "学习时长单独统计",
+        sourceType: "study",
+        dailyCap: 0,
+        icon: "clock-circle",
+        route: "/study-room",
+        buttonText: "去学习",
+      },
+      {
+        id: "task_complete",
+        title: "完成任务",
+        description: "完成系统任务",
+        points: 5,
+        sourceType: "task",
+        dailyCap: 50,
+        icon: "check-circle",
+        route: "/community",
+        buttonText: "查看任务",
+      },
+    ];
+
+    const streakRewards = [
+      { days: 3, points: 3, description: "连续签到3天" },
+      { days: 7, points: 10, description: "连续签到7天" },
+      { days: 30, points: 50, description: "连续签到30天" },
+    ];
+
+    const qualityRewards = [
+      { condition: "帖子获赞≥50", points: 30, description: "优质内容奖励" },
+    ];
+
+    res.json({
+      success: true,
+      message: "获取成功",
+      data: {
+        actions,
+        streakRewards,
+        qualityRewards,
+        todayEarned: {},
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "获取失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+export const getPointsBadges = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const userId = req.user.id;
+
+    const [user, loginStreak, contentQuality] = await Promise.all([
+      User.findByPk(userId),
+      getLoginStreak(userId),
+      getContentQualityScore(userId),
+    ]);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "用户不存在" });
+    }
+
+    const totalPoints = user.points || 0;
+    const totalLikes = contentQuality.totalLikes || 0;
+
+    const [totalPostLogs, totalCommentLogs] = await Promise.all([
+      PointsLog.count({
+        where: { user_id: userId, source_type: "post" },
+      }),
+      PointsLog.count({
+        where: { user_id: userId, source_type: "comment" },
+      }),
+    ]);
+
+    const allLogs = await PointsLog.findAll({
+      where: { user_id: userId },
+      attributes: ["change", "created_at"],
+      order: [[Sequelize.col("created_at"), "DESC"]],
+      raw: true,
+    });
+
+    const dailyPoints: Record<string, number> = {};
+    allLogs.forEach((log: any) => {
+      const date = safeToDateString(log.created_at);
+      if (date) {
+        dailyPoints[date] = (dailyPoints[date] || 0) + (log.change > 0 ? log.change : 0);
+      }
+    });
+
+    const maxDailyPoints = Math.max(0, ...Object.values(dailyPoints));
+
+    const levelDetail = calculateLevelDetail(totalPoints);
+
+    const badgesWithProgress = BADGE_DEFINITIONS.map((badge) => {
+      let current = 0;
+      let isUnlocked = false;
+
+      switch (badge.id) {
+        case "first_post":
+          current = totalPostLogs;
+          isUnlocked = totalPostLogs >= 1;
+          break;
+        case "regular_poster":
+          current = totalPostLogs;
+          isUnlocked = totalPostLogs >= 10;
+          break;
+        case "content_master":
+          current = totalPostLogs;
+          isUnlocked = totalPostLogs >= 50;
+          break;
+        case "first_comment":
+          current = totalCommentLogs;
+          isUnlocked = totalCommentLogs >= 1;
+          break;
+        case "social_butterfly":
+          current = totalCommentLogs;
+          isUnlocked = totalCommentLogs >= 30;
+          break;
+        case "streak_3":
+          current = loginStreak;
+          isUnlocked = loginStreak >= 3;
+          break;
+        case "streak_7":
+          current = loginStreak;
+          isUnlocked = loginStreak >= 7;
+          break;
+        case "streak_30":
+          current = loginStreak;
+          isUnlocked = loginStreak >= 30;
+          break;
+        case "daily_high":
+          current = maxDailyPoints;
+          isUnlocked = maxDailyPoints >= 20;
+          break;
+        case "centurion":
+          current = totalPoints;
+          isUnlocked = totalPoints >= 100;
+          break;
+        case "thousandaire":
+          current = totalPoints;
+          isUnlocked = totalPoints >= 1000;
+          break;
+        case "first_like_received":
+          current = totalLikes;
+          isUnlocked = totalLikes >= 1;
+          break;
+        case "popular_author":
+          current = totalLikes;
+          isUnlocked = totalLikes >= 50;
+          break;
+        default:
+          current = 0;
+          isUnlocked = false;
+      }
+
+      const progress = badge.target > 0 ? Math.min(100, Math.round((current / badge.target) * 100)) : 0;
+
+      return {
+        ...badge,
+        current,
+        isUnlocked,
+        progress,
+      };
+    });
+
+    const unlockedCount = badgesWithProgress.filter((b) => b.isUnlocked).length;
+    const totalBadges = badgesWithProgress.length;
+
+    const growthTip = getGrowthTip(
+      levelDetail,
+      0,
+      totalPostLogs,
+      totalCommentLogs,
+      loginStreak,
+      totalPoints
+    );
+
+    const badgesByCategory: Record<string, typeof badgesWithProgress> = {
+      achievement: badgesWithProgress.filter((b) => b.category === "achievement"),
+      activity: badgesWithProgress.filter((b) => b.category === "activity"),
+      quality: badgesWithProgress.filter((b) => b.category === "quality"),
+      special: badgesWithProgress.filter((b) => b.category === "special"),
+    };
+
+    res.json({
+      success: true,
+      message: "获取成功",
+      data: {
+        badges: badgesWithProgress,
+        badgesByCategory,
+        unlockedCount,
+        totalBadges,
+        achievementProgress: Math.round((unlockedCount / totalBadges) * 100),
+        growthTip,
+        currentLevel: levelDetail.currentLevel,
+        currentLevelName: levelDetail.currentLevelName,
+        nextLevelPoints: levelDetail.nextLevelPoints,
+        pointsToNext: levelDetail.pointsToNext,
+        levelProgress: levelDetail.progress,
+      },
+    });
+  } catch (error) {
+    console.error("getPointsBadges error:", error);
+    const message = error instanceof Error ? error.message : "获取失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+export const getBadgesOverview = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const userId = req.user.id;
+
+    const [user, loginStreak, contentQuality] = await Promise.all([
+      User.findByPk(userId),
+      getLoginStreak(userId),
+      getContentQualityScore(userId),
+    ]);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "用户不存在" });
+    }
+
+    const totalPoints = user.points || 0;
+    const totalLikes = contentQuality.totalLikes || 0;
+
+    const [totalPostLogs, totalCommentLogs] = await Promise.all([
+      PointsLog.count({
+        where: { user_id: userId, source_type: "post" },
+      }),
+      PointsLog.count({
+        where: { user_id: userId, source_type: "comment" },
+      }),
+    ]);
+
+    const allLogs = await PointsLog.findAll({
+      where: { user_id: userId },
+      attributes: ["change", "created_at"],
+      order: [[Sequelize.col("created_at"), "DESC"]],
+      raw: true,
+    });
+
+    const dailyPoints: Record<string, number> = {};
+    allLogs.forEach((log: any) => {
+      const date = safeToDateString(log.created_at);
+      if (date) {
+        dailyPoints[date] = (dailyPoints[date] || 0) + (log.change > 0 ? log.change : 0);
+      }
+    });
+
+    const maxDailyPoints = Math.max(0, ...Object.values(dailyPoints));
+
+    const badgesWithProgress = BADGE_DEFINITIONS.map((badge) => {
+      let current = 0;
+      let isUnlocked = false;
+
+      switch (badge.id) {
+        case "first_post":
+          current = totalPostLogs;
+          isUnlocked = totalPostLogs >= 1;
+          break;
+        case "regular_poster":
+          current = totalPostLogs;
+          isUnlocked = totalPostLogs >= 10;
+          break;
+        case "content_master":
+          current = totalPostLogs;
+          isUnlocked = totalPostLogs >= 50;
+          break;
+        case "first_comment":
+          current = totalCommentLogs;
+          isUnlocked = totalCommentLogs >= 1;
+          break;
+        case "social_butterfly":
+          current = totalCommentLogs;
+          isUnlocked = totalCommentLogs >= 30;
+          break;
+        case "streak_3":
+          current = loginStreak;
+          isUnlocked = loginStreak >= 3;
+          break;
+        case "streak_7":
+          current = loginStreak;
+          isUnlocked = loginStreak >= 7;
+          break;
+        case "streak_30":
+          current = loginStreak;
+          isUnlocked = loginStreak >= 30;
+          break;
+        case "daily_high":
+          current = maxDailyPoints;
+          isUnlocked = maxDailyPoints >= 20;
+          break;
+        case "centurion":
+          current = totalPoints;
+          isUnlocked = totalPoints >= 100;
+          break;
+        case "thousandaire":
+          current = totalPoints;
+          isUnlocked = totalPoints >= 1000;
+          break;
+        case "first_like_received":
+          current = totalLikes;
+          isUnlocked = totalLikes >= 1;
+          break;
+        case "popular_author":
+          current = totalLikes;
+          isUnlocked = totalLikes >= 50;
+          break;
+        default:
+          current = 0;
+          isUnlocked = false;
+      }
+
+      const progress = badge.target > 0 ? Math.min(100, Math.round((current / badge.target) * 100)) : 0;
+
+      return {
+        id: badge.id,
+        name: badge.name,
+        description: badge.description,
+        icon: badge.icon,
+        category: badge.newCategory as BadgeNewCategory,
+        threshold: badge.target,
+        current,
+        progress,
+        isUnlocked,
+        requirement: badge.requirement,
+        sortOrder: badge.sortOrder,
+        rarity: badge.rarity,
+      };
+    });
+
+    const unlockedCount = badgesWithProgress.filter((b) => b.isUnlocked).length;
+    const totalBadges = badgesWithProgress.length;
+
+    const recommendedBadges = badgesWithProgress
+      .filter((b) => !b.isUnlocked)
+      .sort((a, b) => {
+        const remA = a.threshold - a.current;
+        const remB = b.threshold - b.current;
+        if (a.progress === b.progress) {
+          return remA - remB;
+        }
+        return b.progress - a.progress;
+      })
+      .slice(0, 3);
+
+    const categoryOrder: BadgeNewCategory[] = ["learning", "community", "challenge"];
+    const categories = categoryOrder.map((cat) => {
+      const config = BADGE_CATEGORY_CONFIG[cat];
+      const badges = badgesWithProgress
+        .filter((b) => b.category === cat)
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+      const catUnlocked = badges.filter((b) => b.isUnlocked).length;
+
+      return {
+        category: cat,
+        categoryName: config.name,
+        categoryIcon: config.icon,
+        categoryColor: config.color,
+        badges,
+        unlockedCount: catUnlocked,
+        totalCount: badges.length,
+      };
+    });
+
+    res.json({
+      success: true,
+      message: "获取成功",
+      data: {
+        summary: {
+          unlockedCount,
+          totalCount: totalBadges,
+          completionRate: totalBadges > 0 ? Math.round((unlockedCount / totalBadges) * 100) : 0,
+        },
+        categories,
+        recommendedBadges,
+      },
+    });
+  } catch (error) {
+    console.error("getBadgesOverview error:", error);
     const message = error instanceof Error ? error.message : "获取失败";
     res.status(500).json({ success: false, message });
   }
