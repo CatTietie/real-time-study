@@ -64,6 +64,33 @@ const getStartOfNDaysAgo = (days: number) => {
   return start;
 };
 
+const safeGetDate = (obj: any): Date | null => {
+  const rawValue =
+    (obj as { createdAt?: Date | string }).createdAt ??
+    (obj as { created_at?: Date | string }).created_at ??
+    (obj as unknown as { get?: (key: string) => unknown }).get?.("createdAt");
+  
+  if (!rawValue) return null;
+  if (
+    !(
+      rawValue instanceof Date ||
+      typeof rawValue === "string" ||
+      typeof rawValue === "number"
+    )
+  ) {
+    return null;
+  }
+  const date = rawValue instanceof Date ? rawValue : new Date(rawValue as string);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+};
+
+const safeGetDateString = (obj: any): string | null => {
+  const date = safeGetDate(obj);
+  if (!date) return null;
+  return date.toISOString().split('T')[0];
+};
+
 export const getLoginStreak = async (userId: number): Promise<{ current: number; isActive: boolean; history: Array<{ date: string; loggedIn: boolean }> }> => {
   const start = new Date();
   start.setDate(start.getDate() - 30);
@@ -342,8 +369,7 @@ export const getDailyRecords = async (userId: number, days: number = 7): Promise
         [Op.gte]: startDate,
         [Op.lte]: endDate
       }
-    },
-    attributes: ['id', 'created_at', 'like_count', 'comment_count']
+    }
   });
 
   const comments = await Comment.findAll({
@@ -354,8 +380,7 @@ export const getDailyRecords = async (userId: number, days: number = 7): Promise
         [Op.gte]: startDate,
         [Op.lte]: endDate
       }
-    },
-    attributes: ['id', 'created_at']
+    }
   });
 
   const reservations = await RoomReservation.findAll({
@@ -380,7 +405,8 @@ export const getDailyRecords = async (userId: number, days: number = 7): Promise
   }
 
   posts.forEach((post) => {
-    const dateKey = new Date(post.createdAt).toISOString().split('T')[0];
+    const dateKey = safeGetDateString(post);
+    if (!dateKey) return;
     const record = dailyMap.get(dateKey);
     if (record) {
       record.posts += 1;
@@ -389,7 +415,8 @@ export const getDailyRecords = async (userId: number, days: number = 7): Promise
   });
 
   comments.forEach((comment) => {
-    const dateKey = new Date(comment.createdAt).toISOString().split('T')[0];
+    const dateKey = safeGetDateString(comment);
+    if (!dateKey) return;
     const record = dailyMap.get(dateKey);
     if (record) {
       record.comments += 1;
@@ -464,8 +491,7 @@ export const getMultiDimTrendData = async (
         [Op.gte]: startDate,
         [Op.lte]: endDate
       }
-    },
-    attributes: ['id', 'view_count', 'like_count', 'comment_count', [Sequelize.col("created_at"), "createdAt"]]
+    }
   });
 
   const comments = await Comment.findAll({
@@ -476,8 +502,7 @@ export const getMultiDimTrendData = async (
         [Op.gte]: startDate,
         [Op.lte]: endDate
       }
-    },
-    attributes: ['id', [Sequelize.col("created_at"), "createdAt"]]
+    }
   });
 
   const pointsLogs = await PointsLog.findAll({
@@ -487,8 +512,7 @@ export const getMultiDimTrendData = async (
         [Op.gte]: startDate,
         [Op.lte]: endDate
       }
-    },
-    attributes: ['id', 'change', [Sequelize.col("created_at"), "createdAt"]]
+    }
   });
 
   const reservations = await RoomReservation.findAll({
@@ -518,7 +542,8 @@ export const getMultiDimTrendData = async (
   }
 
   posts.forEach((post) => {
-    const dateKey = new Date(post.createdAt).toISOString().split('T')[0];
+    const dateKey = safeGetDateString(post);
+    if (!dateKey) return;
     const record = dailyMap.get(dateKey);
     if (record) {
       record.posts += 1;
@@ -529,7 +554,8 @@ export const getMultiDimTrendData = async (
   comments.forEach(() => {});
 
   pointsLogs.forEach((log: any) => {
-    const dateKey = new Date(log.createdAt).toISOString().split('T')[0];
+    const dateKey = safeGetDateString(log);
+    if (!dateKey) return;
     const record = dailyMap.get(dateKey);
     if (record) {
       record.points += log.change || 0;
@@ -580,8 +606,7 @@ export const getComparisonData = async (
         [Op.gte]: previousWeekStart,
         [Op.lt]: previousWeekEnd
       }
-    },
-    attributes: ['id', 'view_count', [Sequelize.col("created_at"), "createdAt"]]
+    }
   });
 
   const pointsLogs = await PointsLog.findAll({
@@ -591,8 +616,7 @@ export const getComparisonData = async (
         [Op.gte]: previousWeekStart,
         [Op.lt]: previousWeekEnd
       }
-    },
-    attributes: ['id', 'change', [Sequelize.col("created_at"), "createdAt"]]
+    }
   });
 
   const reservations = await RoomReservation.findAll({
@@ -622,7 +646,8 @@ export const getComparisonData = async (
   }
 
   posts.forEach((post) => {
-    const dateKey = new Date(post.createdAt).toISOString().split('T')[0];
+    const dateKey = safeGetDateString(post);
+    if (!dateKey) return;
     const record = dailyMap.get(dateKey);
     if (record) {
       record.posts += 1;
@@ -631,7 +656,8 @@ export const getComparisonData = async (
   });
 
   pointsLogs.forEach((log: any) => {
-    const dateKey = new Date(log.createdAt).toISOString().split('T')[0];
+    const dateKey = safeGetDateString(log);
+    if (!dateKey) return;
     const record = dailyMap.get(dateKey);
     if (record) {
       record.points += log.change || 0;
@@ -685,8 +711,7 @@ export const getHeatmapData = async (
         [Op.gte]: startDate,
         [Op.lte]: endDate
       }
-    },
-    attributes: ['id', 'like_count', [Sequelize.col("created_at"), "createdAt"]]
+    }
   });
 
   const comments = await Comment.findAll({
@@ -697,8 +722,7 @@ export const getHeatmapData = async (
         [Op.gte]: startDate,
         [Op.lte]: endDate
       }
-    },
-    attributes: ['id', [Sequelize.col("created_at"), "createdAt"]]
+    }
   });
 
   const reservations = await RoomReservation.findAll({
@@ -728,7 +752,8 @@ export const getHeatmapData = async (
   }
 
   posts.forEach((post) => {
-    const dateKey = new Date(post.createdAt).toISOString().split('T')[0];
+    const dateKey = safeGetDateString(post);
+    if (!dateKey) return;
     const record = dailyMap.get(dateKey);
     if (record) {
       record.posts += 1;
@@ -737,7 +762,8 @@ export const getHeatmapData = async (
   });
 
   comments.forEach((comment) => {
-    const dateKey = new Date(comment.createdAt).toISOString().split('T')[0];
+    const dateKey = safeGetDateString(comment);
+    if (!dateKey) return;
     const record = dailyMap.get(dateKey);
     if (record) {
       record.comments += 1;
