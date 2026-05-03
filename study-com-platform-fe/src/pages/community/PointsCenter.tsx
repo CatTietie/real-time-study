@@ -16,7 +16,6 @@ import {
   Progress,
   Modal,
   Tabs,
-  ProgressProps,
 } from "antd";
 import {
   TrophyOutlined,
