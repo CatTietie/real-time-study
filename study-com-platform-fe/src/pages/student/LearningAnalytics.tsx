@@ -1888,5 +1888,4 @@ export default function LearningAnalytics() {
         </Drawer>
       </div>
     );
-  }
-} 
+  } 
