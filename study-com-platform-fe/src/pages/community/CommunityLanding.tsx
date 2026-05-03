@@ -605,6 +605,7 @@ export default function CommunityLanding() {
                             <Button onClick={() => navigate("/community/posts")}>我的帖子</Button>
                             <Button onClick={() => navigate("/community/favorites")}>我的收藏</Button>
                             <Button onClick={() => navigate("/community/leaderboard")}>排行榜</Button>
+                            <Button onClick={() => navigate("/community/badges")}>成就中心</Button>
                             <Button
                                 type="primary"
                                 onClick={() => navigate("/community/publish")}

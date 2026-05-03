@@ -153,12 +153,15 @@ export const calculateLevelDetail = (points: number): LevelDetail => {
   };
 };
 
+export type BadgeNewCategory = "learning" | "community" | "challenge";
+
 export interface BadgeDefinition {
   id: string;
   name: string;
   description: string;
   icon: string;
   category: "achievement" | "activity" | "quality" | "special";
+  newCategory: BadgeNewCategory;
   target: number;
   requirement: string;
   sortOrder: number;
@@ -179,6 +182,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     description: "发布你的第一篇帖子",
     icon: "EditOutlined",
     category: "achievement",
+    newCategory: "community",
     target: 1,
     requirement: "累计发帖 ≥ 1",
     sortOrder: 1,
@@ -189,6 +193,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     description: "累计发布10篇帖子",
     icon: "EditFilled",
     category: "activity",
+    newCategory: "community",
     target: 10,
     requirement: "累计发帖 ≥ 10",
     sortOrder: 2,
@@ -199,6 +204,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     description: "累计发布50篇帖子",
     icon: "TrophyOutlined",
     category: "achievement",
+    newCategory: "community",
     target: 50,
     requirement: "累计发帖 ≥ 50",
     sortOrder: 3,
@@ -209,6 +215,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     description: "发表第一条评论",
     icon: "MessageOutlined",
     category: "activity",
+    newCategory: "community",
     target: 1,
     requirement: "累计评论 ≥ 1",
     sortOrder: 4,
@@ -219,6 +226,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     description: "累计发表30条评论",
     icon: "TeamOutlined",
     category: "activity",
+    newCategory: "community",
     target: 30,
     requirement: "累计评论 ≥ 30",
     sortOrder: 5,
@@ -229,6 +237,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     description: "连续3天都获得积分",
     icon: "FireOutlined",
     category: "activity",
+    newCategory: "challenge",
     target: 3,
     requirement: "连续3天有积分记录",
     sortOrder: 6,
@@ -239,6 +248,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     description: "连续7天都获得积分",
     icon: "CalendarOutlined",
     category: "activity",
+    newCategory: "challenge",
     target: 7,
     requirement: "连续7天有积分记录",
     sortOrder: 7,
@@ -249,6 +259,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     description: "连续30天都获得积分",
     icon: "RocketOutlined",
     category: "achievement",
+    newCategory: "challenge",
     target: 30,
     requirement: "连续30天有积分记录",
     sortOrder: 8,
@@ -259,6 +270,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     description: "单日获得积分≥20",
     icon: "RiseOutlined",
     category: "quality",
+    newCategory: "challenge",
     target: 20,
     requirement: "单日积分 ≥ 20",
     sortOrder: 9,
@@ -269,6 +281,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     description: "累计获得100积分",
     icon: "StarOutlined",
     category: "achievement",
+    newCategory: "learning",
     target: 100,
     requirement: "累计积分 ≥ 100",
     sortOrder: 10,
@@ -279,6 +292,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     description: "累计获得1000积分",
     icon: "CrownOutlined",
     category: "achievement",
+    newCategory: "learning",
     target: 1000,
     requirement: "累计积分 ≥ 1000",
     sortOrder: 11,
@@ -289,6 +303,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     description: "获得第一个点赞",
     icon: "LikeOutlined",
     category: "quality",
+    newCategory: "community",
     target: 1,
     requirement: "获得点赞 ≥ 1",
     sortOrder: 12,
@@ -299,6 +314,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     description: "累计获得50个点赞",
     icon: "HeartOutlined",
     category: "quality",
+    newCategory: "community",
     target: 50,
     requirement: "获得点赞 ≥ 50",
     sortOrder: 13,
@@ -342,4 +358,59 @@ export const getGrowthTip = (
   }
   
   return "每日访问、发帖、评论都能获得积分，坚持每日学习成长！";
+};
+
+export interface BadgeProgress {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: BadgeNewCategory;
+  threshold: number;
+  current: number;
+  progress: number;
+  isUnlocked: boolean;
+  requirement: string;
+  sortOrder: number;
+}
+
+export interface BadgeCategoryGroup {
+  category: BadgeNewCategory;
+  categoryName: string;
+  categoryIcon: string;
+  categoryColor: string;
+  badges: BadgeProgress[];
+  unlockedCount: number;
+  totalCount: number;
+}
+
+export interface BadgesOverview {
+  summary: {
+    unlockedCount: number;
+    totalCount: number;
+    completionRate: number;
+  };
+  categories: BadgeCategoryGroup[];
+}
+
+export const BADGE_CATEGORY_CONFIG: Record<BadgeNewCategory, {
+  name: string;
+  icon: string;
+  color: string;
+}> = {
+  learning: {
+    name: "学习类",
+    icon: "BookOutlined",
+    color: "#1890ff",
+  },
+  community: {
+    name: "社区类",
+    icon: "TeamOutlined",
+    color: "#52c41a",
+  },
+  challenge: {
+    name: "挑战类",
+    icon: "TrophyOutlined",
+    color: "#722ed1",
+  },
 };

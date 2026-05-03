@@ -439,3 +439,45 @@ export const fetchRankingSnapshot = async (): Promise<{ success: boolean; data: 
   const response = await api.get("/community/learning-stats/ranking");
   return response.data;
 };
+
+export type BadgeNewCategory = "learning" | "community" | "challenge";
+
+export interface BadgeProgress {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: BadgeNewCategory;
+  threshold: number;
+  current: number;
+  progress: number;
+  isUnlocked: boolean;
+  requirement: string;
+  sortOrder: number;
+}
+
+export interface BadgeCategoryGroup {
+  category: BadgeNewCategory;
+  categoryName: string;
+  categoryIcon: string;
+  categoryColor: string;
+  badges: BadgeProgress[];
+  unlockedCount: number;
+  totalCount: number;
+}
+
+export interface BadgesOverviewSummary {
+  unlockedCount: number;
+  totalCount: number;
+  completionRate: number;
+}
+
+export interface BadgesOverviewData {
+  summary: BadgesOverviewSummary;
+  categories: BadgeCategoryGroup[];
+}
+
+export const fetchBadgesOverview = async (): Promise<{ success: boolean; data: BadgesOverviewData }> => {
+  const response = await api.get("/community/badges/overview");
+  return response.data;
+};

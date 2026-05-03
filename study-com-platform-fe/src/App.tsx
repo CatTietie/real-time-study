@@ -23,6 +23,7 @@ import PublishPost from "./pages/community/PublishPost";
 import Leaderboard from "./pages/community/Leaderboard";
 import Favorites from "./pages/community/Favorites";
 import PointsCenter from "./pages/community/PointsCenter";
+import BadgeCenter from "./pages/community/BadgeCenter";
 import MyLikes from "./pages/community/MyLikes";
 import UserProfile from "./pages/community/UserProfile";
 import StudentDashboard from "./pages/student/Dashboard";
@@ -71,6 +72,7 @@ function App() {
         <Route path="/community/favorites" element={<Favorites />} />
         <Route path="/community/likes" element={<MyLikes />} />
         <Route path="/community/points" element={<PointsCenter />} />
+        <Route path="/community/badges" element={<BadgeCenter />} />
         <Route path="/student/entry" element={<StudentEntry />} />
         <Route path="/register" element={<Register />} />
         <Route path="/student/coming-soon" element={<ComingSoon />} />

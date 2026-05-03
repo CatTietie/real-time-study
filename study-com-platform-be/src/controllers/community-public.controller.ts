@@ -23,6 +23,8 @@ import {
   BADGE_DEFINITIONS,
   getGrowthTip,
   LevelDetail,
+  BADGE_CATEGORY_CONFIG,
+  BadgeNewCategory,
 } from "../services/points.service";
 import {
   addCommunityClient,
@@ -2930,6 +2932,173 @@ export const getPointsBadges = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("getPointsBadges error:", error);
+    const message = error instanceof Error ? error.message : "获取失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+export const getBadgesOverview = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const userId = req.user.id;
+
+    const [user, loginStreak, contentQuality] = await Promise.all([
+      User.findByPk(userId),
+      getLoginStreak(userId),
+      getContentQualityScore(userId),
+    ]);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "用户不存在" });
+    }
+
+    const totalPoints = user.points || 0;
+    const totalLikes = contentQuality.totalLikes || 0;
+
+    const [totalPostLogs, totalCommentLogs] = await Promise.all([
+      PointsLog.count({
+        where: { user_id: userId, source_type: "post" },
+      }),
+      PointsLog.count({
+        where: { user_id: userId, source_type: "comment" },
+      }),
+    ]);
+
+    const allLogs = await PointsLog.findAll({
+      where: { user_id: userId },
+      attributes: ["change", "created_at"],
+      order: [[Sequelize.col("created_at"), "DESC"]],
+      raw: true,
+    });
+
+    const dailyPoints: Record<string, number> = {};
+    allLogs.forEach((log: any) => {
+      const date = safeToDateString(log.created_at);
+      if (date) {
+        dailyPoints[date] = (dailyPoints[date] || 0) + (log.change > 0 ? log.change : 0);
+      }
+    });
+
+    const maxDailyPoints = Math.max(0, ...Object.values(dailyPoints));
+
+    const badgesWithProgress = BADGE_DEFINITIONS.map((badge) => {
+      let current = 0;
+      let isUnlocked = false;
+
+      switch (badge.id) {
+        case "first_post":
+          current = totalPostLogs;
+          isUnlocked = totalPostLogs >= 1;
+          break;
+        case "regular_poster":
+          current = totalPostLogs;
+          isUnlocked = totalPostLogs >= 10;
+          break;
+        case "content_master":
+          current = totalPostLogs;
+          isUnlocked = totalPostLogs >= 50;
+          break;
+        case "first_comment":
+          current = totalCommentLogs;
+          isUnlocked = totalCommentLogs >= 1;
+          break;
+        case "social_butterfly":
+          current = totalCommentLogs;
+          isUnlocked = totalCommentLogs >= 30;
+          break;
+        case "streak_3":
+          current = loginStreak.current;
+          isUnlocked = loginStreak.current >= 3;
+          break;
+        case "streak_7":
+          current = loginStreak.current;
+          isUnlocked = loginStreak.current >= 7;
+          break;
+        case "streak_30":
+          current = loginStreak.current;
+          isUnlocked = loginStreak.current >= 30;
+          break;
+        case "daily_high":
+          current = maxDailyPoints;
+          isUnlocked = maxDailyPoints >= 20;
+          break;
+        case "centurion":
+          current = totalPoints;
+          isUnlocked = totalPoints >= 100;
+          break;
+        case "thousandaire":
+          current = totalPoints;
+          isUnlocked = totalPoints >= 1000;
+          break;
+        case "first_like_received":
+          current = totalLikes;
+          isUnlocked = totalLikes >= 1;
+          break;
+        case "popular_author":
+          current = totalLikes;
+          isUnlocked = totalLikes >= 50;
+          break;
+        default:
+          current = 0;
+          isUnlocked = false;
+      }
+
+      const progress = badge.target > 0 ? Math.min(100, Math.round((current / badge.target) * 100)) : 0;
+
+      return {
+        id: badge.id,
+        name: badge.name,
+        description: badge.description,
+        icon: badge.icon,
+        category: badge.newCategory as BadgeNewCategory,
+        threshold: badge.target,
+        current,
+        progress,
+        isUnlocked,
+        requirement: badge.requirement,
+        sortOrder: badge.sortOrder,
+      };
+    });
+
+    const unlockedCount = badgesWithProgress.filter((b) => b.isUnlocked).length;
+    const totalBadges = badgesWithProgress.length;
+
+    const categoryOrder: BadgeNewCategory[] = ["learning", "community", "challenge"];
+    const categories = categoryOrder.map((cat) => {
+      const config = BADGE_CATEGORY_CONFIG[cat];
+      const badges = badgesWithProgress
+        .filter((b) => b.category === cat)
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+      const catUnlocked = badges.filter((b) => b.isUnlocked).length;
+
+      return {
+        category: cat,
+        categoryName: config.name,
+        categoryIcon: config.icon,
+        categoryColor: config.color,
+        badges,
+        unlockedCount: catUnlocked,
+        totalCount: badges.length,
+      };
+    });
+
+    res.json({
+      success: true,
+      message: "获取成功",
+      data: {
+        summary: {
+          unlockedCount,
+          totalCount: totalBadges,
+          completionRate: totalBadges > 0 ? Math.round((unlockedCount / totalBadges) * 100) : 0,
+        },
+        categories,
+      },
+    });
+  } catch (error) {
+    console.error("getBadgesOverview error:", error);
     const message = error instanceof Error ? error.message : "获取失败";
     res.status(500).json({ success: false, message });
   }

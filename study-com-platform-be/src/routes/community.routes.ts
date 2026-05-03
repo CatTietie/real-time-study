@@ -38,6 +38,7 @@ import {
   getCommunityTagSuggestions,
   streamCommunityEvents,
   getUserTodayStats,
+  getBadgesOverview,
 } from "../controllers/community-public.controller";
 import {
   getLearningStatsCards,
@@ -104,6 +105,9 @@ router.get("/points/logs", authMiddleware, getPointsLogs);
 router.get("/points/overview-plus", authMiddleware, getPointsOverviewPlus);
 router.get("/points/actions", authMiddleware, getPointsActions);
 router.get("/points/badges", authMiddleware, getPointsBadges);
+
+// 徽章/成就中心
+router.get("/badges/overview", authMiddleware, getBadgesOverview);
 
 // 个人信息汇总
 router.get("/profile/summary", authMiddleware, getCommunityProfileSummary);
