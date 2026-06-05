@@ -3067,6 +3067,7 @@ export const getPointsBadges = async (req: Request, res: Response) => {
           current = qualityScore;
           isUnlocked = qualityScore >= 500;
           break;
+<<<<<<< HEAD
         case "daily_question_7":
           current = dailyQuestionStreak;
           isUnlocked = dailyQuestionStreak >= 7;
@@ -3075,6 +3076,8 @@ export const getPointsBadges = async (req: Request, res: Response) => {
           current = dailyQuestionStreak;
           isUnlocked = dailyQuestionStreak >= 30;
           break;
+=======
+>>>>>>> 474ab06ecc97776e510dc6483f061409e511b4f2
         default:
           current = 0;
           isUnlocked = false;
@@ -3251,6 +3254,7 @@ export const getBadgesOverview = async (req: Request, res: Response) => {
           current = qualityScore;
           isUnlocked = qualityScore >= 500;
           break;
+<<<<<<< HEAD
         case "daily_question_7":
           current = dailyQuestionStreak;
           isUnlocked = dailyQuestionStreak >= 7;
@@ -3259,6 +3263,8 @@ export const getBadgesOverview = async (req: Request, res: Response) => {
           current = dailyQuestionStreak;
           isUnlocked = dailyQuestionStreak >= 30;
           break;
+=======
+>>>>>>> 474ab06ecc97776e510dc6483f061409e511b4f2
         default:
           current = 0;
           isUnlocked = false;

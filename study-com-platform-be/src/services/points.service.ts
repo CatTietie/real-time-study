@@ -396,6 +396,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     sortOrder: 16,
     rarity: "epic",
   },
+<<<<<<< HEAD
   {
     id: "daily_question_7",
     name: "每日一题周达人",
@@ -420,6 +421,8 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     sortOrder: 18,
     rarity: "epic",
   },
+=======
+>>>>>>> 474ab06ecc97776e510dc6483f061409e511b4f2
 ];
 
 export const getGrowthTip = (
