@@ -396,4 +396,6 @@ export const initAssociations = () => {
   // 文档 -> 权限
   KnowledgeDocument.hasMany(DocumentPermission, { foreignKey: "document_id", as: "Permissions" });
   DocumentPermission.belongsTo(KnowledgeDocument, { foreignKey: "document_id" });
+  DocumentPermission.belongsTo(User, { foreignKey: "granted_by", as: "GrantedByUser" });
+  DocumentPermission.belongsTo(User, { foreignKey: "target_id", as: "TargetUser", constraints: false });
 };

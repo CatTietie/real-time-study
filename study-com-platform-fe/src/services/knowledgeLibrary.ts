@@ -67,3 +67,28 @@ export const resolveAnnotation = (docId: number, aid: number) =>
 
 export const deleteAnnotation = (docId: number, aid: number) =>
   api.delete(`/knowledge-library/${docId}/annotations/${aid}`);
+
+// ===== 权限 =====
+
+export const getMyDocumentPermission = (docId: number) =>
+  api.get(`/knowledge-library/${docId}/permissions/me`);
+
+export const getDocumentPermissions = (docId: number) =>
+  api.get(`/knowledge-library/${docId}/permissions`);
+
+export const grantDocumentPermission = (
+  docId: number,
+  data: { target_type: "all" | "role" | "user"; target_id?: number | null; permission_level: string }
+) => api.post(`/knowledge-library/${docId}/permissions`, data);
+
+export const batchSetDocumentPermissions = (
+  docId: number,
+  permissions: Array<{
+    target_type: "all" | "role" | "user";
+    target_id: number | null;
+    permission_level: string;
+  }>
+) => api.put(`/knowledge-library/${docId}/permissions`, { permissions });
+
+export const revokeDocumentPermission = (docId: number, permId: number) =>
+  api.delete(`/knowledge-library/${docId}/permissions/${permId}`);

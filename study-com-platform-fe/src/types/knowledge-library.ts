@@ -107,3 +107,27 @@ export interface KnowledgeStats {
   totalCategories: number;
   byFileType: Array<{ file_type: string; count: number }>;
 }
+
+// ===== 文档权限 =====
+
+export type DocumentPermissionLevel = "view" | "comment" | "edit" | "manage";
+
+export interface DocumentPermissionRecord {
+  id: number;
+  document_id: number;
+  target_type: "all" | "role" | "user";
+  target_id: number | null;
+  permission_level: DocumentPermissionLevel;
+  granted_by: number;
+  created_at: string;
+  GrantedByUser?: {
+    id: number;
+    username: string;
+    nickname: string;
+  };
+  TargetUser?: {
+    id: number;
+    username: string;
+    nickname: string;
+  } | null;
+}

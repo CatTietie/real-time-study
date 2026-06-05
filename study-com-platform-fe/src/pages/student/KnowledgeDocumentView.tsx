@@ -2,24 +2,42 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Card, Button, Spin, Typography, Space, Tag, Avatar, Tooltip,
-  Drawer, List, message, Descriptions, Popconfirm, Image,
+  Drawer, List, message, Popconfirm, Image, Upload,
 } from "antd";
 import {
   ArrowLeftOutlined, DownloadOutlined, HistoryOutlined,
-  EyeOutlined, UserOutlined, CloudDownloadOutlined,
+  LockOutlined, UploadOutlined, SendOutlined,
 } from "@ant-design/icons";
 import { useAppSelector } from "../../app/hooks";
 import {
   getDocument, downloadDocument, listAnnotations, createAnnotation,
   resolveAnnotation, deleteAnnotation, listVersions, restoreVersion,
+  uploadNewVersion, getMyDocumentPermission,
 } from "../../services/knowledgeLibrary";
 import { useDocumentAnnotations } from "../../hooks/useDocumentAnnotations";
 import PdfViewer from "../../components/knowledge/PdfViewer";
 import DocxViewer from "../../components/knowledge/DocxViewer";
+import PptxViewer from "../../components/knowledge/PptxViewer";
 import AnnotationPanel from "../../components/knowledge/AnnotationPanel";
-import type { KnowledgeDocument, DocumentAnnotation, DocumentVersion, CreateAnnotationPayload } from "../../types/knowledge-library";
+import DocumentPermissionModal from "../../components/knowledge/DocumentPermissionModal";
+import type {
+  KnowledgeDocument, DocumentAnnotation, DocumentVersion,
+  CreateAnnotationPayload, DocumentPermissionLevel,
+} from "../../types/knowledge-library";
 
 const { Title, Text } = Typography;
+
+const PERMISSION_RANK: Record<DocumentPermissionLevel, number> = {
+  view: 1,
+  comment: 2,
+  edit: 3,
+  manage: 4,
+};
+
+const hasPermission = (level: DocumentPermissionLevel | null, min: DocumentPermissionLevel) => {
+  if (!level) return false;
+  return PERMISSION_RANK[level] >= PERMISSION_RANK[min];
+};
 
 const KnowledgeDocumentView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -34,6 +52,9 @@ const KnowledgeDocumentView: React.FC = () => {
   const [versionDrawerOpen, setVersionDrawerOpen] = useState(false);
   const [versions, setVersions] = useState<DocumentVersion[]>([]);
   const [versionsLoading, setVersionsLoading] = useState(false);
+  const [permissionModalOpen, setPermissionModalOpen] = useState(false);
+  const [myPermission, setMyPermission] = useState<DocumentPermissionLevel | null>(null);
+  const [permissionLoading, setPermissionLoading] = useState(true);
 
   const {
     viewers,
@@ -52,10 +73,29 @@ const KnowledgeDocumentView: React.FC = () => {
       if (res.data.success) {
         setDocument(res.data.data);
       }
-    } catch {
-      message.error("Failed to load document");
+    } catch (err: any) {
+      if (err?.response?.status === 403) {
+        message.error("您没有权限查看此文档");
+        navigate("/student/knowledge-library");
+        return;
+      }
+      message.error("加载文档失败");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMyPermission = async () => {
+    setPermissionLoading(true);
+    try {
+      const res = await getMyDocumentPermission(docId);
+      if (res.data.success) {
+        setMyPermission(res.data.data.permission_level);
+      }
+    } catch {
+      setMyPermission(null);
+    } finally {
+      setPermissionLoading(false);
     }
   };
 
@@ -71,11 +111,11 @@ const KnowledgeDocumentView: React.FC = () => {
   useEffect(() => {
     if (docId) {
       fetchDocument();
+      fetchMyPermission();
       fetchAnnotations();
     }
   }, [docId]);
 
-  // Handle real-time annotation updates
   useEffect(() => {
     if (newAnnotation) {
       setAnnotations((prev) => {
@@ -118,7 +158,7 @@ const KnowledgeDocumentView: React.FC = () => {
         }
       }
     } catch {
-      message.error("Failed to create annotation");
+      message.error("添加批注失败");
     }
   };
 
@@ -129,7 +169,7 @@ const KnowledgeDocumentView: React.FC = () => {
         prev.map((a) => (a.id === annotationId ? { ...a, status: "resolved" } : a))
       );
     } catch {
-      message.error("Operation failed");
+      message.error("操作失败");
     }
   };
 
@@ -138,7 +178,7 @@ const KnowledgeDocumentView: React.FC = () => {
       await deleteAnnotation(docId, annotationId);
       setAnnotations((prev) => prev.filter((a) => a.id !== annotationId));
     } catch {
-      message.error("Delete failed");
+      message.error("删除失败");
     }
   };
 
@@ -149,7 +189,7 @@ const KnowledgeDocumentView: React.FC = () => {
         window.open(res.data.data.url, "_blank");
       }
     } catch {
-      message.error("Download failed");
+      message.error("下载失败");
     }
   };
 
@@ -169,21 +209,40 @@ const KnowledgeDocumentView: React.FC = () => {
   const handleRestoreVersion = async (vid: number) => {
     try {
       await restoreVersion(docId, vid);
-      message.success("Version restored");
+      message.success("版本已恢复");
       fetchDocument();
       handleOpenVersions();
     } catch {
-      message.error("Restore failed");
+      message.error("恢复失败");
     }
   };
 
-  if (loading) {
+  const handleUploadNewVersion = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("change_summary", `上传新版本: ${file.name}`);
+    try {
+      const res = await uploadNewVersion(docId, formData);
+      if (res.data.success) {
+        message.success("新版本上传成功");
+        fetchDocument();
+      }
+    } catch {
+      message.error("上传失败");
+    }
+  };
+
+  if (loading || permissionLoading) {
     return <div style={{ display: "flex", justifyContent: "center", padding: 100 }}><Spin size="large" /></div>;
   }
 
   if (!document) {
-    return <div style={{ textAlign: "center", padding: 100 }}>Document not found</div>;
+    return <div style={{ textAlign: "center", padding: 100 }}>文档不存在</div>;
   }
+
+  const canComment = hasPermission(myPermission, "comment");
+  const canEdit = hasPermission(myPermission, "edit");
+  const canManage = hasPermission(myPermission, "manage");
 
   const renderPreview = () => {
     const url = document.original_url;
@@ -199,22 +258,14 @@ const KnowledgeDocumentView: React.FC = () => {
           </div>
         );
       case "ppt":
-        return (
-          <div style={{ textAlign: "center", padding: 60 }}>
-            <Text type="secondary">PPT preview is not supported. Please download to view.</Text>
-            <br /><br />
-            <Button type="primary" icon={<DownloadOutlined />} onClick={handleDownload}>
-              Download File
-            </Button>
-          </div>
-        );
+        return <PptxViewer url={url} onPageChange={setCurrentPage} />;
       default:
         return (
           <div style={{ textAlign: "center", padding: 60 }}>
-            <Text type="secondary">Preview not available for this file type.</Text>
+            <Text type="secondary">该文件类型暂不支持预览。</Text>
             <br /><br />
             <Button type="primary" icon={<DownloadOutlined />} onClick={handleDownload}>
-              Download File
+              下载文件
             </Button>
           </div>
         );
@@ -242,12 +293,29 @@ const KnowledgeDocumentView: React.FC = () => {
                 ))}
               </Avatar.Group>
             )}
+            {canEdit && (
+              <Upload
+                showUploadList={false}
+                beforeUpload={(file) => {
+                  handleUploadNewVersion(file);
+                  return false;
+                }}
+                accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp"
+              >
+                <Button icon={<UploadOutlined />}>上传新版本</Button>
+              </Upload>
+            )}
             <Button icon={<HistoryOutlined />} onClick={handleOpenVersions}>
               v{document.current_version}
             </Button>
             <Button icon={<DownloadOutlined />} onClick={handleDownload}>
-              Download
+              下载
             </Button>
+            {canManage && (
+              <Button icon={<LockOutlined />} onClick={() => setPermissionModalOpen(true)}>
+                权限
+              </Button>
+            )}
           </Space>
         </div>
       </Card>
@@ -258,7 +326,7 @@ const KnowledgeDocumentView: React.FC = () => {
         <Card
           size="small"
           style={{ flex: 1, overflow: "auto" }}
-          bodyStyle={{ padding: 0 }}
+          styles={{ body: { padding: 0 } }}
         >
           {renderPreview()}
         </Card>
@@ -267,12 +335,13 @@ const KnowledgeDocumentView: React.FC = () => {
         <Card
           size="small"
           style={{ width: 320, flexShrink: 0 }}
-          bodyStyle={{ padding: 0, height: "100%", display: "flex", flexDirection: "column" }}
+          styles={{ body: { padding: 0, height: "100%", display: "flex", flexDirection: "column" } }}
         >
           <AnnotationPanel
             annotations={annotations}
             currentUserId={auth.userId ? Number(auth.userId) : undefined}
             isAdmin={auth.role === "admin" || auth.role === "super_admin"}
+            canComment={canComment}
             onAdd={handleAddAnnotation}
             onResolve={handleResolveAnnotation}
             onDelete={handleDeleteAnnotation}
@@ -283,7 +352,7 @@ const KnowledgeDocumentView: React.FC = () => {
 
       {/* Version history drawer */}
       <Drawer
-        title="Version History"
+        title="版本历史"
         open={versionDrawerOpen}
         onClose={() => setVersionDrawerOpen(false)}
         width={400}
@@ -293,15 +362,19 @@ const KnowledgeDocumentView: React.FC = () => {
             dataSource={versions}
             renderItem={(ver) => (
               <List.Item
-                actions={[
-                  <Popconfirm
-                    key="restore"
-                    title="Restore this version?"
-                    onConfirm={() => handleRestoreVersion(ver.id)}
-                  >
-                    <Button size="small" type="link">Restore</Button>
-                  </Popconfirm>,
-                ]}
+                actions={
+                  canEdit
+                    ? [
+                        <Popconfirm
+                          key="restore"
+                          title="确定恢复到此版本？"
+                          onConfirm={() => handleRestoreVersion(ver.id)}
+                        >
+                          <Button size="small" type="link">恢复</Button>
+                        </Popconfirm>,
+                      ]
+                    : undefined
+                }
               >
                 <List.Item.Meta
                   avatar={
@@ -309,7 +382,7 @@ const KnowledgeDocumentView: React.FC = () => {
                       {(ver.Creator?.nickname || ver.Creator?.username)?.[0]}
                     </Avatar>
                   }
-                  title={`v${ver.version_number} - ${ver.change_summary || "No description"}`}
+                  title={`v${ver.version_number} - ${ver.change_summary || "无描述"}`}
                   description={
                     <span>
                       {ver.Creator?.nickname || ver.Creator?.username} |{" "}
@@ -322,6 +395,13 @@ const KnowledgeDocumentView: React.FC = () => {
           />
         </Spin>
       </Drawer>
+
+      {/* Permission management modal */}
+      <DocumentPermissionModal
+        documentId={docId}
+        open={permissionModalOpen}
+        onClose={() => setPermissionModalOpen(false)}
+      />
     </div>
   );
 };

@@ -14,6 +14,7 @@ interface KnowledgeDocumentAttributes {
   content_text: string | null;
   tags: string | null;
   status: "pending_review" | "approved" | "rejected" | "archived";
+  reject_reason: string | null;
   download_count: number;
   view_count: number;
   current_version: number;
@@ -22,7 +23,7 @@ interface KnowledgeDocumentAttributes {
 }
 
 interface KnowledgeDocumentCreationAttributes
-  extends Optional<KnowledgeDocumentAttributes, "id" | "category_id" | "preview_url" | "content_text" | "tags" | "status" | "download_count" | "view_count" | "current_version" | "created_at" | "updated_at"> {}
+  extends Optional<KnowledgeDocumentAttributes, "id" | "category_id" | "preview_url" | "content_text" | "tags" | "status" | "reject_reason" | "download_count" | "view_count" | "current_version" | "created_at" | "updated_at"> {}
 
 class KnowledgeDocument
   extends Model<KnowledgeDocumentAttributes, KnowledgeDocumentCreationAttributes>
@@ -40,6 +41,7 @@ class KnowledgeDocument
   public content_text!: string | null;
   public tags!: string | null;
   public status!: "pending_review" | "approved" | "rejected" | "archived";
+  public reject_reason!: string | null;
   public download_count!: number;
   public view_count!: number;
   public current_version!: number;
@@ -106,6 +108,10 @@ KnowledgeDocument.init(
       type: DataTypes.ENUM("pending_review", "approved", "rejected", "archived"),
       allowNull: false,
       defaultValue: "pending_review",
+    },
+    reject_reason: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
     },
     download_count: {
       type: DataTypes.INTEGER,

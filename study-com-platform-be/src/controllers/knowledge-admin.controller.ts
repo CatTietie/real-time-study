@@ -162,7 +162,7 @@ export const adminAuditDocument = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, message: "文档不存在" });
     }
 
-    await document.update({ status });
+    await document.update({ status, reject_reason: status === "rejected" ? (reason || null) : null });
 
     res.json({ success: true, message: status === "approved" ? "文档已通过审核" : "文档已驳回" });
   } catch (error: any) {

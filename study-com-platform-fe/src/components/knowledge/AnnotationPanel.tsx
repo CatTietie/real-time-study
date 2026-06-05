@@ -10,6 +10,7 @@ interface AnnotationPanelProps {
   annotations: DocumentAnnotation[];
   currentUserId?: number;
   isAdmin?: boolean;
+  canComment?: boolean;
   onAdd: (payload: CreateAnnotationPayload) => void;
   onResolve: (annotationId: number) => void;
   onDelete: (annotationId: number) => void;
@@ -20,6 +21,7 @@ const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
   annotations,
   currentUserId,
   isAdmin,
+  canComment = true,
   onAdd,
   onResolve,
   onDelete,
@@ -85,7 +87,7 @@ const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
                 <Text style={{ fontSize: 13 }}>{item.content}</Text>
 
                 <Space style={{ marginTop: 4 }}>
-                  {item.status === "active" && (
+                  {item.status === "active" && canComment && (
                     <Button type="link" size="small" icon={<CheckOutlined />} onClick={() => onResolve(item.id)}>
                       Resolve
                     </Button>
@@ -95,9 +97,11 @@ const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
                       <Button type="link" size="small" danger icon={<DeleteOutlined />} />
                     </Popconfirm>
                   )}
-                  <Button type="link" size="small" onClick={() => setReplyTo(replyTo === item.id ? null : item.id)}>
-                    Reply
-                  </Button>
+                  {canComment && (
+                    <Button type="link" size="small" onClick={() => setReplyTo(replyTo === item.id ? null : item.id)}>
+                      Reply
+                    </Button>
+                  )}
                 </Space>
 
                 {item.Replies && item.Replies.length > 0 && (
@@ -131,23 +135,25 @@ const AnnotationPanel: React.FC<AnnotationPanelProps> = ({
         />
       </div>
 
-      <div style={{ padding: "8px 12px", borderTop: "1px solid #f0f0f0" }}>
-        <div style={{ display: "flex", gap: 8 }}>
-          <TextArea
-            rows={2}
-            placeholder="Add an annotation..."
-            value={newContent}
-            onChange={(e) => setNewContent(e.target.value)}
-            onPressEnter={(e) => {
-              if (!e.shiftKey) {
-                e.preventDefault();
-                handleAdd();
-              }
-            }}
-          />
-          <Button type="primary" icon={<SendOutlined />} onClick={handleAdd} style={{ alignSelf: "flex-end" }} />
+      {canComment && (
+        <div style={{ padding: "8px 12px", borderTop: "1px solid #f0f0f0" }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            <TextArea
+              rows={2}
+              placeholder="Add an annotation..."
+              value={newContent}
+              onChange={(e) => setNewContent(e.target.value)}
+              onPressEnter={(e) => {
+                if (!e.shiftKey) {
+                  e.preventDefault();
+                  handleAdd();
+                }
+              }}
+            />
+            <Button type="primary" icon={<SendOutlined />} onClick={handleAdd} style={{ alignSelf: "flex-end" }} />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
