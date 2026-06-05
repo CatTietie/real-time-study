@@ -25,6 +25,7 @@ import type { InputRef, UploadProps } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { RobotOutlined } from "@ant-design/icons";
 import { useAppSelector } from "../../app/hooks";
 import type { RootState } from "../../app/store";
 import {
@@ -41,6 +42,7 @@ import {
   toggleCommentLike,
   togglePostLike,
 } from "../../services/communityPublic";
+import AiAssistantDrawer from "../../components/community/AiAssistantDrawer";
 
 const { Title, Text, Paragraph } = Typography;
 const API_BASE = (
@@ -76,6 +78,14 @@ type PostDetailData = {
   }>;
   like_count?: number;
   comment_count?: number;
+  LinkedQuestion?: {
+    id: number;
+    bank_id: number;
+    type: number;
+    content: string;
+    options?: string | { label: string; text: string }[];
+    difficulty: number;
+  };
 };
 
 type CommentRow = {
@@ -137,6 +147,7 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
   const [emojiPage, setEmojiPage] = useState(1);
   const [topicVisible, setTopicVisible] = useState(false);
   const [emojiVisible, setEmojiVisible] = useState(false);
+  const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   
   // 楼中楼折叠/展开状态
   const [expandedReplies, setExpandedReplies] = useState<Set<number>>(new Set());
@@ -889,6 +900,62 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
                   </Image.PreviewGroup>
                 </div>
               )}
+
+              {post?.LinkedQuestion && (
+                <Card
+                  size="small"
+                  style={{
+                    marginBottom: 16,
+                    background: "#f6f8fa",
+                    borderRadius: 12,
+                    border: "1px solid #e8eaed",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <Tag color="blue">关联题目</Tag>
+                    <Tag color={
+                      { 1: "blue", 2: "purple", 3: "green", 4: "orange", 5: "red" }[post.LinkedQuestion.type] || "default"
+                    }>
+                      {{ 1: "单选题", 2: "多选题", 3: "判断题", 4: "填空题", 5: "主观题" }[post.LinkedQuestion.type] || "题目"}
+                    </Tag>
+                  </div>
+                  <Paragraph style={{ margin: 0, fontSize: 14, color: "#333", marginBottom: 8 }}>
+                    {post.LinkedQuestion.content}
+                  </Paragraph>
+                  {(() => {
+                    let opts: { label: string; text: string }[] | null = null;
+                    if (post.LinkedQuestion.options) {
+                      if (Array.isArray(post.LinkedQuestion.options)) {
+                        opts = post.LinkedQuestion.options;
+                      } else if (typeof post.LinkedQuestion.options === "string") {
+                        try { opts = JSON.parse(post.LinkedQuestion.options); } catch {}
+                      }
+                    }
+                    if (opts && opts.length > 0) {
+                      return (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
+                          {opts.map((opt) => (
+                            <Text key={opt.label} style={{ fontSize: 13, color: "#555", paddingLeft: 12 }}>
+                              {opt.label}. {opt.text}
+                            </Text>
+                          ))}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                  <div style={{ marginTop: 8 }}>
+                    <Button
+                      type="link"
+                      size="small"
+                      onClick={() => navigate(`/community/question-bank/${post.LinkedQuestion!.bank_id}/mode`)}
+                      style={{ paddingLeft: 0 }}
+                    >
+                      前往该题库练习 →
+                    </Button>
+                  </div>
+                </Card>
+              )}
             </div>
 
             <div style={{
@@ -1489,6 +1556,30 @@ export default function PostDetail({ postId, onClose }: PostDetailProps) {
           }
         }
       `}</style>
+
+      {/* AI 学习助手浮窗按钮 */}
+      <Button
+        type="primary"
+        shape="circle"
+        size="large"
+        icon={<RobotOutlined />}
+        onClick={() => setAiDrawerOpen(true)}
+        style={{
+          position: "fixed",
+          bottom: 32,
+          right: 32,
+          width: 52,
+          height: 52,
+          fontSize: 24,
+          boxShadow: "0 4px 12px rgba(24,144,255,0.4)",
+          zIndex: 999,
+        }}
+      />
+      <AiAssistantDrawer
+        postId={postId}
+        open={aiDrawerOpen}
+        onClose={() => setAiDrawerOpen(false)}
+      />
     </div>
   );
 }

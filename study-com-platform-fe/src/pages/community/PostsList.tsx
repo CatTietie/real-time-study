@@ -58,6 +58,7 @@ type PostRow = {
   tags?: string;
   images?: string[];
   publish_status?: number;
+  audit_reason?: string;
   createdAt?: string;
   created_at?: string;
   updatedAt?: string;
@@ -883,7 +884,26 @@ export default function PostsList() {
                 <Tag color={statusInfo.color} style={{ fontSize: 12, padding: "2px 10px", borderRadius: 6 }}>
                   {statusInfo.text}
                 </Tag>
+                {item.status === 2 && (
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<RedoOutlined />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/community/publish?edit=${item.id}`);
+                    }}
+                    style={{ fontSize: 12, padding: "0 4px", color: "#f5222d" }}
+                  >
+                    修改并重新提交
+                  </Button>
+                )}
               </Space>
+              {item.status === 2 && item.audit_reason && (
+                <div style={{ marginBottom: 6, padding: "4px 8px", background: "#fff1f0", borderRadius: 6, fontSize: 12, color: "#cf1322" }}>
+                  退回原因：{item.audit_reason}
+                </div>
+              )}
               <Text
                 strong
                 style={{

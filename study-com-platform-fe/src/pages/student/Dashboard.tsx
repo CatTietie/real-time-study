@@ -25,6 +25,9 @@ import type { RootState } from "../../app/store";
 import api from "../../services/api";
 import { useNavigate } from "react-router-dom";
 import "../../styles/student-dashboard.css";
+import DailyQuestionCard from "./DailyQuestionCard";
+import RecommendationSection from "./RecommendationSection";
+import { fetchDailyQuestionStreak } from "../../services/communityPublic";
 
 interface UserProfile {
   id: number;
@@ -39,6 +42,8 @@ interface UserProfile {
   todayLikes: number;
   todayViews: number;
   hotPostsCount: number;
+  totalQuestions: number;
+  accuracyRate: number;
   role: string;
   status: number;
 }
@@ -64,6 +69,7 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
   const [userPosts, setUserPosts] = useState<PostItem[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
+  const [dailyStreak, setDailyStreak] = useState(0);
   const navigate = useNavigate();
   
   const defaultStatsData = {
@@ -72,7 +78,9 @@ export default function StudentDashboard() {
     todayPosts: 0,
     todayComments: 0,
     todayLikes: 0,
-    rank: 1
+    rank: 1,
+    totalQuestions: 0,
+    accuracyRate: 0
   };
 
   const statsData = userProfile || defaultStatsData;
@@ -110,6 +118,14 @@ export default function StudentDashboard() {
     return () => {
       clearInterval(intervalId);
     };
+  }, [userId]);
+
+  useEffect(() => {
+    if (userId && userId > 0) {
+      fetchDailyQuestionStreak().then((res) => {
+        if (res.success) setDailyStreak(res.data.streak);
+      }).catch(() => {});
+    }
   }, [userId]);
 
   const [todayGoals, setTodayGoals] = useState({
@@ -303,6 +319,22 @@ export default function StudentDashboard() {
                       <span className="profile-stat-label">社区排名</span>
                       <span className="profile-stat-value">第{statsData.rank}名</span>
                     </div>
+                    <div className="profile-stat-item">
+                      <span className="profile-stat-label">累计做题</span>
+                      <span className="profile-stat-value">{statsData.totalQuestions}</span>
+                    </div>
+                    <div className="profile-stat-item">
+                      <span className="profile-stat-label">正确率</span>
+                      <span className="profile-stat-value">
+                        {statsData.totalQuestions > 0 ? `${statsData.accuracyRate.toFixed(1)}%` : '-'}
+                      </span>
+                    </div>
+                    <div className="profile-stat-item">
+                      <span className="profile-stat-label">连续打卡</span>
+                      <span className="profile-stat-value" style={{ color: dailyStreak > 0 ? '#fa8c16' : undefined }}>
+                        {dailyStreak}天
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -331,6 +363,12 @@ export default function StudentDashboard() {
               </div>
             </div>
           </div>
+
+          {/* 每日一题 */}
+          <DailyQuestionCard onStreakChange={(s) => setDailyStreak(s)} />
+
+          {/* 为你推荐 */}
+          <RecommendationSection />
 
           {/* 今日目标 */}
           <div className="dashboard-card">

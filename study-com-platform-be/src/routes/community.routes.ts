@@ -39,6 +39,7 @@ import {
   streamCommunityEvents,
   getUserTodayStats,
   getBadgesOverview,
+  checkSensitiveWordsPublic,
 } from "../controllers/community-public.controller";
 import {
   getLearningStatsCards,
@@ -51,7 +52,13 @@ import {
   getActivityHeatmap,
   getActionRecommendationsHandler,
   getRankingSnapshotHandler,
+  getLearningReport,
 } from "../controllers/study-stats.controller";
+import {
+  getDailyQuestionToday,
+  submitDailyQuestionAnswer,
+  getDailyQuestionStreakInfo,
+} from "../controllers/daily-question.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { conditionalPostImages } from "../middlewares/upload.middleware";
 
@@ -79,6 +86,9 @@ router.get("/leaderboard", getCommunityLeaderboard);
 
 // 标签联想
 router.get("/tags/suggest", getCommunityTagSuggestions);
+
+// 敏感词检测（学生端）
+router.post("/check-sensitive-words", authMiddleware, checkSensitiveWordsPublic);
 
 // 社区实时事件流
 router.get("/stream", streamCommunityEvents);
@@ -135,5 +145,13 @@ router.get("/learning-stats/heatmap", authMiddleware, getActivityHeatmap);
 // 行为驱动API - 行动推荐、排行榜快照
 router.get("/learning-stats/actions", authMiddleware, getActionRecommendationsHandler);
 router.get("/learning-stats/ranking", authMiddleware, getRankingSnapshotHandler);
+
+// 个人学习报告
+router.get("/learning-report", authMiddleware, getLearningReport);
+
+// 每日一题
+router.get("/daily-question/today", authMiddleware, getDailyQuestionToday);
+router.post("/daily-question/submit", authMiddleware, submitDailyQuestionAnswer);
+router.get("/daily-question/streak", authMiddleware, getDailyQuestionStreakInfo);
 
 export default router;

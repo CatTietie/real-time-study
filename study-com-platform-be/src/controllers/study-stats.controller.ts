@@ -13,6 +13,8 @@ import {
   getHeatmapData,
   getActionRecommendations,
   getRankingSnapshot,
+  getStudyDurationPercentile,
+  getPointsSourceBreakdown,
   type LearningStatsCardData,
   type DailyStudyRecord,
   type MultiDimTrendData,
@@ -409,6 +411,40 @@ export const getRankingSnapshotHandler = async (req: Request, res: Response) => 
     });
   } catch (error) {
     console.error('获取排行榜快照失败:', error);
+    const message = error instanceof Error ? error.message : "获取失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+export const getLearningReport = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const [durationPercentile, heatmapData, pointsBreakdown, studyDuration] =
+      await Promise.all([
+        getStudyDurationPercentile(req.user.id),
+        getHeatmapData(req.user.id, 12),
+        getPointsSourceBreakdown(req.user.id),
+        getStudyDuration(req.user.id),
+      ]);
+
+    res.json({
+      success: true,
+      message: "获取学习报告成功",
+      data: {
+        summary: {
+          totalHours: durationPercentile.totalHours,
+          percentile: durationPercentile.percentile,
+        },
+        heatmap: heatmapData,
+        pointsRadar: pointsBreakdown,
+        trend30Days: studyDuration.dailyRecords,
+      },
+    });
+  } catch (error) {
+    console.error("获取学习报告失败:", error);
     const message = error instanceof Error ? error.message : "获取失败";
     res.status(500).json({ success: false, message });
   }

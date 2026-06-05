@@ -396,6 +396,30 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     sortOrder: 16,
     rarity: "epic",
   },
+  {
+    id: "daily_question_7",
+    name: "每日一题周达人",
+    description: "连续7天完成每日一题",
+    icon: "CalendarOutlined",
+    category: "achievement",
+    newCategory: "challenge",
+    target: 7,
+    requirement: "每日一题连续 ≥ 7天",
+    sortOrder: 17,
+    rarity: "rare",
+  },
+  {
+    id: "daily_question_30",
+    name: "每日一题月冠军",
+    description: "连续30天完成每日一题",
+    icon: "RocketOutlined",
+    category: "achievement",
+    newCategory: "challenge",
+    target: 30,
+    requirement: "每日一题连续 ≥ 30天",
+    sortOrder: 18,
+    rarity: "epic",
+  },
 ];
 
 export const getGrowthTip = (

@@ -11,14 +11,16 @@ import { LearningGoal } from "../models/learning-goal.model";
 import { Op, Sequelize } from "sequelize";
 import { comparePassword, hashPassword } from "../utils/password";
 import { generateToken } from "../services/auth.service";
-import { 
-  checkAccountLock, 
-  recordFailedLogin, 
-  resetFailedLoginAttempts 
+import {
+  checkAccountLock,
+  recordFailedLogin,
+  resetFailedLoginAttempts
 } from "../services/auth.service";
+import { recordLoginLog } from "../services/login-log.service";
 import { PERMISSION_CODES } from "../constants/permissions";
 import { calculateLevel, getStartOfDay, getStartOfWeek } from "../utils/helper";
 import { getUserHotPostsCount } from "../services/hot-posts.service";
+import UserStats from "../models/user-stats.model";
 import { validatePasswordStrength } from "../utils/validator";
 import type { PasswordStrengthResult } from "../utils/validator";
 import { uploadSingleFileToOss } from "../middlewares/upload.middleware";
@@ -156,6 +158,9 @@ export const login = async (req: Request, res: Response) => {
     await resetFailedLoginAttempts(user);
 
     await user.update({ last_login: new Date() });
+
+    const clientIp = (req.headers["x-forwarded-for"] as string)?.split(",")[0] || req.ip || "";
+    recordLoginLog(user.id, clientIp).catch(() => {});
 
     const token = generateToken({
       id: user.id,
@@ -306,7 +311,10 @@ export const getUserProfile = async (req: Request, res: Response) => {
     const higherCount = await User.count({
       where: { status: 1, points: { [Op.gt]: user.points } },
     });
-    
+
+    // 查询做题统计
+    const userStats = await UserStats.findOne({ where: { user_id: userId } });
+
     res.json({
       success: true,
       data: {
@@ -323,6 +331,9 @@ export const getUserProfile = async (req: Request, res: Response) => {
         todayLikes: totalTodayLikes,
         todayViews: todayViews || 0,
         hotPostsCount: hotPostsCount || 0,
+        // 做题统计
+        totalQuestions: userStats?.total_questions ?? 0,
+        accuracyRate: userStats?.accuracy_rate ?? 0,
         // 状态信息
         role: user.role,
         status: user.status

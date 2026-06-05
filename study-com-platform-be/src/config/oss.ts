@@ -30,4 +30,6 @@ export const ossDirectories = {
   post: "posts/",
   temp: "temp/",
   chat: "chat/",
+  recording: "recordings/",
+  knowledge: "knowledge/",
 };

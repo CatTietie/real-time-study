@@ -39,6 +39,8 @@ interface UserProfile {
   todayLikes: number;
   todayViews: number;
   hotPostsCount: number;
+  totalQuestions: number;
+  accuracyRate: number;
   role: string;
   status: number;
 }
@@ -94,7 +96,9 @@ export default function UserProfile() {
     todayPosts: 0,
     todayComments: 0,
     todayLikes: 0,
-    rank: 1
+    rank: 1,
+    totalQuestions: 0,
+    accuracyRate: 0
   };
 
   const statsData = userProfile || defaultStatsData;
@@ -476,6 +480,16 @@ export default function UserProfile() {
                     <div className="profile-stat-item">
                       <span className="profile-stat-label">社区排名</span>
                       <span className="profile-stat-value">第{statsData.rank}名</span>
+                    </div>
+                    <div className="profile-stat-item">
+                      <span className="profile-stat-label">累计做题</span>
+                      <span className="profile-stat-value">{statsData.totalQuestions}</span>
+                    </div>
+                    <div className="profile-stat-item">
+                      <span className="profile-stat-label">正确率</span>
+                      <span className="profile-stat-value">
+                        {statsData.totalQuestions > 0 ? `${statsData.accuracyRate.toFixed(1)}%` : '-'}
+                      </span>
                     </div>
                   </div>
                 </div>

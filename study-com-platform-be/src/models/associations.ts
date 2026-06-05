@@ -25,8 +25,48 @@ import Whiteboard from "./whiteboard.model";
 import WhiteboardAction from "./whiteboard-action.model";
 import WhiteboardSnapshot from "./whiteboard-snapshot.model";
 import Notification from "./notification.model";
+import Professional from "./professional.model";
+import Category from "./category.model";
+import QuestionBank from "./question-bank.model";
+import Question from "./question.model";
+import UserExerciseRecord from "./user-exercise-record.model";
+import UserAnswerDetail from "./user-answer-detail.model";
+import WrongBook from "./wrong-book.model";
+import UserStats from "./user-stats.model";
+import QuestionPost from "./question-post.model";
+import AuditConfig from "./audit-config.model";
+import DailyQuestionAnswer from "./daily-question-answer.model";
+import QuestionFeedback from "./question-feedback.model";
+import UserTagMastery from "./user-tag-mastery.model";
+import CollaborativeNote from "./collaborative-note.model";
+import NoteVersion from "./note-version.model";
+import NoteComment from "./note-comment.model";
+import UserRecommendation from "./user-recommendation.model";
+import RecommendationFeedback from "./recommendation-feedback.model";
+import LearningPath from "./learning-path.model";
+import PathNode from "./path-node.model";
+import PathEdge from "./path-edge.model";
+import PathNodeResource from "./path-node-resource.model";
+import UserLearningPath from "./user-learning-path.model";
+import UserNodeProgress from "./user-node-progress.model";
+import AiChatHistory from "./ai-chat-history.model";
+import RoomRecording from "./room-recording.model";
+import UserLoginLog from "./user-login-log.model";
+import CodeExecution from "./code-execution.model";
+import CodeProblem from "./code-problem.model";
+import ProblemTestCase from "./problem-test-case.model";
+import CodeSubmission from "./code-submission.model";
+import KnowledgeCategory from "./knowledge-category.model";
+import KnowledgeDocument from "./knowledge-document.model";
+import DocumentVersion from "./document-version.model";
+import DocumentAnnotation from "./document-annotation.model";
+import DocumentPermission from "./document-permission.model";
 
 export const initAssociations = () => {
+  // 用户与登录日志
+  User.hasMany(UserLoginLog, { foreignKey: "user_id" });
+  UserLoginLog.belongsTo(User, { foreignKey: "user_id" });
+
   // 用户与帖子/评论/点赞
   User.hasMany(Post, { foreignKey: "user_id" });
   Post.belongsTo(User, { foreignKey: "user_id" });
@@ -37,6 +77,10 @@ export const initAssociations = () => {
 
   // 转发关联：被转发的原作者
   Post.belongsTo(User, { foreignKey: "forward_user_id", as: "ForwardUser" });
+
+  // 帖子关联题目（题库讨论帖）
+  Post.belongsTo(Question, { foreignKey: "question_id", as: "LinkedQuestion" });
+  Question.hasMany(Post, { foreignKey: "question_id", as: "DiscussionPosts" });
 
   User.hasMany(Comment, { foreignKey: "user_id" });
   Comment.belongsTo(User, { foreignKey: "user_id" });
@@ -121,15 +165,19 @@ export const initAssociations = () => {
   // 自习室相关关联
   User.hasMany(RoomReservation, { foreignKey: "user_id" });
   RoomReservation.belongsTo(User, { foreignKey: "user_id" });
-  
+
   StudyRoom.hasMany(RoomReservation, { foreignKey: "room_id" });
   RoomReservation.belongsTo(StudyRoom, { foreignKey: "room_id" });
-  
+
   User.hasMany(RoomOccupancy, { foreignKey: "user_id" });
   RoomOccupancy.belongsTo(User, { foreignKey: "user_id" });
-  
+
   StudyRoom.hasMany(RoomOccupancy, { foreignKey: "room_id" });
   RoomOccupancy.belongsTo(StudyRoom, { foreignKey: "room_id" });
+
+  // 视频自习室房主
+  StudyRoom.belongsTo(User, { foreignKey: "owner_id", as: "Owner" });
+  User.hasMany(StudyRoom, { foreignKey: "owner_id", as: "OwnedVideoRooms" });
   
   // 聊天相关关联
   // 聊天房间与用户关联
@@ -165,4 +213,187 @@ export const initAssociations = () => {
   
   ChatRoom.hasMany(Notification, { foreignKey: "chat_room_id", constraints: false });
   Notification.belongsTo(ChatRoom, { foreignKey: "chat_room_id", as: "ChatRoom", constraints: false });
+
+  // ===== 题库系统关联 =====
+
+  // 专业 -> 分类
+  Professional.hasMany(Category, { foreignKey: "professional_id" });
+  Category.belongsTo(Professional, { foreignKey: "professional_id" });
+
+  // 分类自关联（树形结构）
+  Category.belongsTo(Category, { foreignKey: "parent_id", as: "Parent" });
+  Category.hasMany(Category, { foreignKey: "parent_id", as: "Children" });
+
+  // 分类 -> 题库
+  Category.hasMany(QuestionBank, { foreignKey: "category_id" });
+  QuestionBank.belongsTo(Category, { foreignKey: "category_id" });
+
+  // 题库 -> 题目
+  QuestionBank.hasMany(Question, { foreignKey: "bank_id" });
+  Question.belongsTo(QuestionBank, { foreignKey: "bank_id" });
+
+  // 用户 -> 练习记录
+  User.hasMany(UserExerciseRecord, { foreignKey: "user_id" });
+  UserExerciseRecord.belongsTo(User, { foreignKey: "user_id" });
+
+  // 题库 -> 练习记录
+  QuestionBank.hasMany(UserExerciseRecord, { foreignKey: "bank_id" });
+  UserExerciseRecord.belongsTo(QuestionBank, { foreignKey: "bank_id" });
+
+  // 练习记录 -> 答题详情
+  UserExerciseRecord.hasMany(UserAnswerDetail, { foreignKey: "record_id" });
+  UserAnswerDetail.belongsTo(UserExerciseRecord, { foreignKey: "record_id" });
+
+  // 题目 -> 答题详情
+  Question.hasMany(UserAnswerDetail, { foreignKey: "question_id" });
+  UserAnswerDetail.belongsTo(Question, { foreignKey: "question_id" });
+
+  // 批改人 -> 答题详情
+  User.hasMany(UserAnswerDetail, { foreignKey: "reviewer_id", as: "ReviewedAnswers" });
+  UserAnswerDetail.belongsTo(User, { foreignKey: "reviewer_id", as: "Reviewer" });
+
+  // 用户 -> 错题本
+  User.hasMany(WrongBook, { foreignKey: "user_id" });
+  WrongBook.belongsTo(User, { foreignKey: "user_id" });
+
+  // 题目 -> 错题本
+  Question.hasMany(WrongBook, { foreignKey: "question_id" });
+  WrongBook.belongsTo(Question, { foreignKey: "question_id" });
+
+  // 用户 -> 统计
+  User.hasOne(UserStats, { foreignKey: "user_id" });
+  UserStats.belongsTo(User, { foreignKey: "user_id" });
+
+  // 题目 -> 讨论帖
+  Question.hasMany(QuestionPost, { foreignKey: "question_id" });
+  QuestionPost.belongsTo(Question, { foreignKey: "question_id" });
+
+  // 用户 -> 讨论帖
+  User.hasMany(QuestionPost, { foreignKey: "user_id" });
+  QuestionPost.belongsTo(User, { foreignKey: "user_id" });
+
+  // 题目反馈（点赞/点踩）
+  User.hasMany(QuestionFeedback, { foreignKey: "user_id" });
+  QuestionFeedback.belongsTo(User, { foreignKey: "user_id" });
+  Question.hasMany(QuestionFeedback, { foreignKey: "question_id" });
+  QuestionFeedback.belongsTo(Question, { foreignKey: "question_id" });
+
+  // 用户 -> 知识点掌握度
+  User.hasMany(UserTagMastery, { foreignKey: "user_id" });
+  UserTagMastery.belongsTo(User, { foreignKey: "user_id" });
+
+  // ===== 每日一题 =====
+  User.hasMany(DailyQuestionAnswer, { foreignKey: "user_id" });
+  DailyQuestionAnswer.belongsTo(User, { foreignKey: "user_id" });
+  Question.hasMany(DailyQuestionAnswer, { foreignKey: "question_id" });
+  DailyQuestionAnswer.belongsTo(Question, { foreignKey: "question_id" });
+
+  // ===== 协作笔记版本与评论 =====
+  CollaborativeNote.hasMany(NoteVersion, { foreignKey: "note_id" });
+  NoteVersion.belongsTo(CollaborativeNote, { foreignKey: "note_id" });
+  User.hasMany(NoteVersion, { foreignKey: "creator_id" });
+  NoteVersion.belongsTo(User, { foreignKey: "creator_id" });
+
+  CollaborativeNote.hasMany(NoteComment, { foreignKey: "note_id" });
+  NoteComment.belongsTo(CollaborativeNote, { foreignKey: "note_id" });
+  User.hasMany(NoteComment, { foreignKey: "user_id" });
+  NoteComment.belongsTo(User, { foreignKey: "user_id" });
+  NoteComment.belongsTo(NoteComment, { foreignKey: "parent_id", as: "ParentComment" });
+  NoteComment.hasMany(NoteComment, { foreignKey: "parent_id", as: "Replies" });
+
+  // ===== 个性化推荐 =====
+  User.hasMany(UserRecommendation, { foreignKey: "user_id", as: "Recommendations" });
+  UserRecommendation.belongsTo(User, { foreignKey: "user_id" });
+  UserRecommendation.belongsTo(Post, { foreignKey: "target_id", constraints: false, as: "Post" });
+  UserRecommendation.belongsTo(StudyRoom, { foreignKey: "target_id", constraints: false, as: "StudyRoom" });
+  UserRecommendation.hasMany(RecommendationFeedback, { foreignKey: "recommendation_id", as: "Feedbacks" });
+  RecommendationFeedback.belongsTo(UserRecommendation, { foreignKey: "recommendation_id" });
+  RecommendationFeedback.belongsTo(User, { foreignKey: "user_id" });
+
+  // ===== 学习路径技能树 =====
+  LearningPath.hasMany(PathNode, { foreignKey: "path_id", as: "Nodes" });
+  PathNode.belongsTo(LearningPath, { foreignKey: "path_id" });
+
+  LearningPath.hasMany(PathEdge, { foreignKey: "path_id", as: "Edges" });
+  PathEdge.belongsTo(LearningPath, { foreignKey: "path_id" });
+
+  PathNode.hasMany(PathNodeResource, { foreignKey: "node_id", as: "Resources" });
+  PathNodeResource.belongsTo(PathNode, { foreignKey: "node_id" });
+
+  PathEdge.belongsTo(PathNode, { foreignKey: "source_node_id", as: "SourceNode" });
+  PathEdge.belongsTo(PathNode, { foreignKey: "target_node_id", as: "TargetNode" });
+
+  User.hasMany(UserLearningPath, { foreignKey: "user_id" });
+  UserLearningPath.belongsTo(User, { foreignKey: "user_id" });
+  LearningPath.hasMany(UserLearningPath, { foreignKey: "path_id" });
+  UserLearningPath.belongsTo(LearningPath, { foreignKey: "path_id" });
+
+  User.hasMany(UserNodeProgress, { foreignKey: "user_id" });
+  UserNodeProgress.belongsTo(User, { foreignKey: "user_id" });
+  PathNode.hasMany(UserNodeProgress, { foreignKey: "node_id" });
+  UserNodeProgress.belongsTo(PathNode, { foreignKey: "node_id" });
+
+  LearningPath.belongsTo(User, { foreignKey: "created_by", as: "Creator" });
+
+  // AI 问答历史
+  User.hasMany(AiChatHistory, { foreignKey: "user_id" });
+  AiChatHistory.belongsTo(User, { foreignKey: "user_id" });
+  Post.hasMany(AiChatHistory, { foreignKey: "post_id" });
+  AiChatHistory.belongsTo(Post, { foreignKey: "post_id" });
+
+  // ===== 房间录制 =====
+  StudyRoom.hasMany(RoomRecording, { foreignKey: "room_id", as: "Recordings" });
+  RoomRecording.belongsTo(StudyRoom, { foreignKey: "room_id" });
+  User.hasMany(RoomRecording, { foreignKey: "recorder_user_id", as: "Recordings" });
+  RoomRecording.belongsTo(User, { foreignKey: "recorder_user_id", as: "Recorder" });
+
+  // ===== 代码执行记录 =====
+  User.hasMany(CodeExecution, { foreignKey: "user_id", as: "CodeExecutions" });
+  CodeExecution.belongsTo(User, { foreignKey: "user_id" });
+  Question.hasMany(CodeExecution, { foreignKey: "question_id", as: "CodeExecutions" });
+  CodeExecution.belongsTo(Question, { foreignKey: "question_id" });
+
+  // ===== 编程题库系统 =====
+  User.hasMany(CodeProblem, { foreignKey: "created_by", as: "CreatedProblems" });
+  CodeProblem.belongsTo(User, { foreignKey: "created_by", as: "Creator" });
+
+  CodeProblem.hasMany(ProblemTestCase, { foreignKey: "problem_id", as: "TestCases" });
+  ProblemTestCase.belongsTo(CodeProblem, { foreignKey: "problem_id" });
+
+  User.hasMany(CodeSubmission, { foreignKey: "user_id", as: "CodeSubmissions" });
+  CodeSubmission.belongsTo(User, { foreignKey: "user_id" });
+
+  CodeProblem.hasMany(CodeSubmission, { foreignKey: "problem_id", as: "Submissions" });
+  CodeSubmission.belongsTo(CodeProblem, { foreignKey: "problem_id" });
+
+  // ===== 知识文库系统 =====
+  // 分类树形结构
+  KnowledgeCategory.belongsTo(KnowledgeCategory, { foreignKey: "parent_id", as: "Parent" });
+  KnowledgeCategory.hasMany(KnowledgeCategory, { foreignKey: "parent_id", as: "Children" });
+
+  // 文档 -> 分类
+  KnowledgeCategory.hasMany(KnowledgeDocument, { foreignKey: "category_id", as: "Documents" });
+  KnowledgeDocument.belongsTo(KnowledgeCategory, { foreignKey: "category_id", as: "Category" });
+
+  // 文档 -> 上传者
+  User.hasMany(KnowledgeDocument, { foreignKey: "uploader_id", as: "UploadedDocuments" });
+  KnowledgeDocument.belongsTo(User, { foreignKey: "uploader_id", as: "Uploader" });
+
+  // 文档 -> 版本
+  KnowledgeDocument.hasMany(DocumentVersion, { foreignKey: "document_id", as: "Versions" });
+  DocumentVersion.belongsTo(KnowledgeDocument, { foreignKey: "document_id" });
+  User.hasMany(DocumentVersion, { foreignKey: "creator_id", as: "DocumentVersions" });
+  DocumentVersion.belongsTo(User, { foreignKey: "creator_id", as: "Creator" });
+
+  // 文档 -> 批注
+  KnowledgeDocument.hasMany(DocumentAnnotation, { foreignKey: "document_id", as: "Annotations" });
+  DocumentAnnotation.belongsTo(KnowledgeDocument, { foreignKey: "document_id" });
+  User.hasMany(DocumentAnnotation, { foreignKey: "user_id", as: "DocumentAnnotations" });
+  DocumentAnnotation.belongsTo(User, { foreignKey: "user_id", as: "Author" });
+  DocumentAnnotation.belongsTo(DocumentAnnotation, { foreignKey: "parent_id", as: "ParentAnnotation" });
+  DocumentAnnotation.hasMany(DocumentAnnotation, { foreignKey: "parent_id", as: "Replies" });
+
+  // 文档 -> 权限
+  KnowledgeDocument.hasMany(DocumentPermission, { foreignKey: "document_id", as: "Permissions" });
+  DocumentPermission.belongsTo(KnowledgeDocument, { foreignKey: "document_id" });
 };

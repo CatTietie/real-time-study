@@ -54,6 +54,66 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     module: "管理员管理",
     description: "允许管理管理员账号与角色",
   },
+  {
+    name: "标签管理权限",
+    code: "community.tag.manage",
+    module: "内容分类",
+    description: "允许创建、编辑和删除社区标签",
+  },
+  {
+    name: "分类管理权限",
+    code: "community.category.manage",
+    module: "内容分类",
+    description: "允许创建、编辑和删除社区分类",
+  },
+  {
+    name: "公告管理权限",
+    code: "community.announcement.manage",
+    module: "社区运营",
+    description: "允许发布、编辑和删除社区公告",
+  },
+  {
+    name: "学习资源管理权限",
+    code: "resource.manage",
+    module: "学习资源",
+    description: "允许上传、编辑和删除学习资源",
+  },
+  {
+    name: "积分规则管理权限",
+    code: "points.rule.manage",
+    module: "积分系统",
+    description: "允许配置和管理积分规则",
+  },
+  {
+    name: "徽章管理权限",
+    code: "badge.manage",
+    module: "徽章系统",
+    description: "允许创建、编辑和管理徽章",
+  },
+  {
+    name: "题库批阅管理权限",
+    code: "exercise.review.manage",
+    module: "题库管理",
+    description: "允许批改主观题、查看批改列表与统计",
+  },
+  {
+    name: "学习路径管理权限",
+    code: "learning_path.manage",
+    module: "学习路径",
+    description: "允许创建、编辑和管理学习路径技能树",
+  },
+  {
+    name: "知识文库上传权限",
+    code: "knowledge.upload",
+    module: "知识文库",
+    description: "允许上传文档到知识文库",
+  },
+  {
+    name: "知识文库管理权限",
+    code: "knowledge.manage",
+    module: "知识文库",
+    description: "允许管理知识文库分类、审核和删除文档",
+  },
 ];
 
 export const PERMISSION_CODES = PERMISSION_DEFINITIONS.map((item) => item.code);

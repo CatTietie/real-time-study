@@ -1067,3 +1067,60 @@ export const getActionRecommendations = async (userId: number): Promise<ActionRe
     ranking
   };
 };
+
+export const getStudyDurationPercentile = async (userId: number): Promise<{
+  totalHours: number;
+  percentile: number;
+}> => {
+  const user = await User.findByPk(userId);
+  const myDuration = user?.study_duration || 0;
+
+  const totalUsers = await User.count({ where: { status: 1 } }) as number;
+  const usersWithLowerDuration = await User.count({
+    where: {
+      status: 1,
+      id: { [Op.ne]: userId },
+      [Op.or]: [
+        { study_duration: { [Op.lt]: myDuration } },
+        { study_duration: { [Op.is]: null as any } }
+      ]
+    }
+  }) as number;
+
+  const percentile = totalUsers > 1
+    ? Math.round((usersWithLowerDuration / (totalUsers - 1)) * 100)
+    : 100;
+
+  return {
+    totalHours: Math.round((myDuration / 60) * 10) / 10,
+    percentile: Math.min(99, Math.max(0, percentile))
+  };
+};
+
+export interface PointsSourceBreakdown {
+  sourceType: string;
+  totalPoints: number;
+  count: number;
+}
+
+export const getPointsSourceBreakdown = async (userId: number): Promise<PointsSourceBreakdown[]> => {
+  const results = await PointsLog.findAll({
+    where: {
+      user_id: userId,
+      change: { [Op.gt]: 0 }
+    },
+    attributes: [
+      'source_type',
+      [Sequelize.fn('SUM', Sequelize.col('change')), 'totalPoints'],
+      [Sequelize.fn('COUNT', Sequelize.col('id')), 'count']
+    ],
+    group: ['source_type'],
+    raw: true
+  });
+
+  return (results as any[]).map(r => ({
+    sourceType: r.source_type,
+    totalPoints: Number(r.totalPoints) || 0,
+    count: Number(r.count) || 0
+  }));
+};

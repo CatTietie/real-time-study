@@ -191,6 +191,68 @@ export const uploadChatFile = multer({
   },
 });
 
+// 录制文件上传：允许视频文件类型
+const recordingFileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
+  const allowedMimes = ["video/webm", "video/mp4", "video/x-matroska"];
+  if (!allowedMimes.includes(file.mimetype)) {
+    return cb(new Error("仅支持 webm/mp4 视频格式"));
+  }
+  cb(null, true);
+};
+
+/**
+ * 录制文件上传中间件
+ * 支持 webm/mp4 视频文件，单个文件最大 500MB
+ */
+export const uploadRecordingFile = multer({
+  storage: getStorage(),
+  fileFilter: recordingFileFilter,
+  limits: {
+    files: 1,
+    fileSize: 500 * 1024 * 1024, // 500MB
+  },
+});
+
+/**
+ * 上传录制文件到 OSS
+ */
+export const uploadRecordingToOss = async (
+  req: Request,
+): Promise<{
+  file_url: string;
+  file_name: string;
+  file_size: number;
+} | null> => {
+  const file = (req as any).file as Express.Multer.File;
+
+  if (!file) {
+    return null;
+  }
+
+  const originalName = file.originalname;
+  const fileSize = file.size;
+
+  if (ossService.isAvailable()) {
+    if (file.buffer) {
+      const fileUrl = await ossService.uploadBuffer(file.buffer, file.originalname, ossDirectories.recording);
+      return { file_url: fileUrl, file_name: originalName, file_size: fileSize };
+    }
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    return {
+      file_url: `${baseUrl}/uploads/recordings/${file.filename}`,
+      file_name: originalName,
+      file_size: fileSize,
+    };
+  }
+
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  return {
+    file_url: `${baseUrl}/uploads/recordings/${file.filename}`,
+    file_name: originalName,
+    file_size: fileSize,
+  };
+};
+
 /**
  * 上传聊天文件到 OSS（如果 OSS 可用）
  */
@@ -202,7 +264,7 @@ export const uploadChatFileToOss = async (
   file_size: number;
 } | null> => {
   const file = (req as any).file as Express.Multer.File;
-  
+
   if (!file) {
     return null;
   }
@@ -234,6 +296,103 @@ export const uploadChatFileToOss = async (
   const baseUrl = `${req.protocol}://${req.get("host")}`;
   return {
     file_url: `${baseUrl}/uploads/chat/${file.filename}`,
+    file_name: originalName,
+    file_size: fileSize,
+  };
+};
+
+// ===== 知识文库文件上传 =====
+
+const knowledgeUploadsRoot = path.join(process.cwd(), "uploads", "knowledge");
+if (!fs.existsSync(knowledgeUploadsRoot)) {
+  fs.mkdirSync(knowledgeUploadsRoot, { recursive: true });
+}
+
+const knowledgeDiskStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, knowledgeUploadsRoot);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const basename = path.basename(file.originalname, ext).replace(/\s+/g, "-");
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+    cb(null, `${basename}-${unique}${ext}`);
+  },
+});
+
+const getKnowledgeStorage = () => {
+  if (ossService.isAvailable()) {
+    return memoryStorage;
+  }
+  return knowledgeDiskStorage;
+};
+
+const knowledgeFileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
+  const allowedMimes = [
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+  ];
+  if (!allowedMimes.includes(file.mimetype)) {
+    return cb(new Error("不支持的文件格式，仅支持 PDF、Word、PPT、图片"));
+  }
+  cb(null, true);
+};
+
+/**
+ * 知识文库文件上传中间件
+ * 支持 PDF/Word/PPT/图片，单个文件最大 100MB
+ */
+export const uploadKnowledgeFile = multer({
+  storage: getKnowledgeStorage(),
+  fileFilter: knowledgeFileFilter,
+  limits: {
+    files: 1,
+    fileSize: 100 * 1024 * 1024,
+  },
+});
+
+/**
+ * 上传知识文库文件到 OSS
+ */
+export const uploadKnowledgeFileToOss = async (
+  req: Request,
+): Promise<{
+  file_url: string;
+  file_name: string;
+  file_size: number;
+} | null> => {
+  const file = (req as any).file as Express.Multer.File;
+
+  if (!file) {
+    return null;
+  }
+
+  const originalName = file.originalname;
+  const fileSize = file.size;
+
+  if (ossService.isAvailable()) {
+    if (file.buffer) {
+      const fileUrl = await ossService.uploadBuffer(file.buffer, file.originalname, ossDirectories.knowledge);
+      return { file_url: fileUrl, file_name: originalName, file_size: fileSize };
+    }
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    return {
+      file_url: `${baseUrl}/uploads/knowledge/${file.filename}`,
+      file_name: originalName,
+      file_size: fileSize,
+    };
+  }
+
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  return {
+    file_url: `${baseUrl}/uploads/knowledge/${file.filename}`,
     file_name: originalName,
     file_size: fileSize,
   };

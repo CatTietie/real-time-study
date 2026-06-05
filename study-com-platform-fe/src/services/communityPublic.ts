@@ -35,6 +35,7 @@ export const createCommunityPost = async (
         tags?: string[];
         isDraft?: boolean;
         forwardPostId?: number;
+        questionId?: number;
       },
 ) => {
   const isFormData = payload instanceof FormData;
@@ -67,6 +68,14 @@ export const deleteCommunityPost = async (id: number, confirm?: boolean) => {
     data: { confirm },
   });
   return response.data;
+};
+
+export const checkCommunitySensitiveWords = async (text: string) => {
+  const response = await api.post("/community/check-sensitive-words", { text });
+  return response.data as {
+    success: boolean;
+    data: { blocked: string[]; warned: string[] };
+  };
 };
 
 export const togglePostLike = async (id: number) => {
@@ -513,5 +522,66 @@ export interface BadgesOverviewData {
 
 export const fetchBadgesOverview = async (): Promise<{ success: boolean; data: BadgesOverviewData }> => {
   const response = await api.get("/community/badges/overview");
+  return response.data;
+};
+
+// 每日一题
+export const fetchDailyQuestion = async () => {
+  const response = await api.get("/community/daily-question/today");
+  return response.data;
+};
+
+export const submitDailyQuestion = async (answer: string) => {
+  const response = await api.post("/community/daily-question/submit", { answer });
+  return response.data;
+};
+
+export const fetchDailyQuestionStreak = async () => {
+  const response = await api.get("/community/daily-question/streak");
+  return response.data;
+};
+
+// 个性化推荐
+export const fetchRecommendations = async () => {
+  const response = await api.get("/recommendations");
+  return response.data;
+};
+
+export const submitRecommendationFeedback = async (
+  id: number,
+  action: "click" | "favorite" | "dismiss"
+) => {
+  const response = await api.post(`/recommendations/${id}/feedback`, { action });
+  return response.data;
+};
+
+// ========================================
+// 个人学习报告 API
+// ========================================
+
+export interface LearningReportSummary {
+  totalHours: number;
+  percentile: number;
+}
+
+export interface PointsSourceItem {
+  sourceType: string;
+  totalPoints: number;
+  count: number;
+}
+
+export interface LearningReportData {
+  summary: LearningReportSummary;
+  heatmap: HeatmapData[];
+  pointsRadar: PointsSourceItem[];
+  trend30Days: Array<{ date: string; duration: number }>;
+}
+
+export const fetchLearningReport = async (): Promise<{
+  success: boolean;
+  data: LearningReportData;
+  message?: string;
+}> => {
+  const response = await api.get("/community/learning-report");
   return response.data;
 };

@@ -3,6 +3,7 @@ import { Request, Response } from "express";
 import { Op } from "sequelize";
 import * as authService from "../services/auth.service";
 import * as adminLogService from "../services/admin-log.service";
+import { recordLoginLog } from "../services/login-log.service";
 import { log, error } from "../utils/logger";
 import User from "../models/user.model";
 import Role from "../models/role.model";
@@ -37,6 +38,9 @@ export const login = async (req: Request, res: Response) => {
     );
 
     log(`管理员 ${username} 登录成功`);
+
+    const clientIp = (req.headers["x-forwarded-for"] as string)?.split(",")[0] || req.ip || "";
+    recordLoginLog(result.id, clientIp).catch(() => {});
 
     res.json({
       success: true,

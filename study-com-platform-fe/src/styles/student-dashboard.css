@@ -674,6 +674,116 @@
   font-weight: 500;
 }
 
+/* ========== 为你推荐 ========== */
+.recommendation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.recommendation-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.recommendation-card:hover {
+  border-color: rgba(147, 130, 255, 0.3);
+  box-shadow: 0 4px 12px rgba(147, 130, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+.recommendation-card.study_room {
+  border-left: 3px solid #10b981;
+}
+
+.recommendation-card.post {
+  border-left: 3px solid #6366f1;
+}
+
+.recommendation-card-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.recommendation-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 6px;
+}
+
+.recommendation-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.recommendation-stat {
+  font-size: 12px;
+  color: #94a3b8;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.recommendation-room-desc {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.recommendation-reason {
+  flex-shrink: 0;
+}
+
+.recommendation-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.recommendation-card:hover .recommendation-actions {
+  opacity: 1;
+}
+
+.recommendation-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: #f1f5f9;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s ease;
+}
+
+.recommendation-action-btn:hover {
+  background: #e2e8f0;
+  color: #6366f1;
+}
+
+.recommendation-action-btn.dismiss:hover {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
 /* ========== 底部CTA卡片 ========== */
 .cta-card {
   background: linear-gradient(135deg, #0ea5e9 0%, #3b82f6 50%, #6366f1 100%);

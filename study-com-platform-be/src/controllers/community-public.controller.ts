@@ -13,8 +13,9 @@ import Report from "../models/report.model";
 import UserRole from "../models/user-role.model";
 import RolePermission from "../models/role-permission.model";
 import Permission from "../models/permission.model";
-import { checkSensitiveWords } from "../services/sensitive-word.service";
+import { checkSensitiveWords, checkSensitiveWordsByLevel } from "../services/sensitive-word.service";
 import { verifyToken } from "../services/auth.service";
+import { getAuditConfig } from "../models/audit-config.model";
 import {
   addPoints,
   calculateLevel,
@@ -27,6 +28,7 @@ import {
   BadgeNewCategory,
   getAndUpdateBadgeCache,
 } from "../services/points.service";
+import UserStats from "../models/user-stats.model";
 import {
   addCommunityClient,
   broadcastNewPost,
@@ -39,6 +41,11 @@ import {
   getContentQualityScore,
   getMultiDimTrendData,
 } from "../services/learning-stats.service";
+import {
+  getWeeklyScoreLeaderboard,
+  getAccuracyLeaderboard,
+} from "../services/exercise-leaderboard.service";
+import { getDailyQuestionStreak as getDailyQuestionStreakForBadge } from "../services/daily-question.service";
 
 const safeToDateString = (value: any): string => {
   if (!value) return "";
@@ -395,15 +402,41 @@ export const getCommunityPostDetail = async (req: Request, res: Response) => {
     const id = Number(req.params.id);
     const userId = req.user?.id;
 
-    const post = await Post.findOne({
+    // 先尝试查找已审核通过的帖子（公开可见）
+    let post = await Post.findOne({
       where: { id, status: 1, publish_status: 1 },
       include: [
         {
           model: User,
           attributes: ["id", "username", "nickname", "avatar"],
         },
+        {
+          model: (await import("../models/question.model")).default,
+          as: "LinkedQuestion",
+          attributes: ["id", "bank_id", "type", "content", "options", "difficulty"],
+          required: false,
+        },
       ],
     });
+
+    // 如果没找到且用户已登录，查找该用户自己的帖子（允许作者查看待审/被拒帖子）
+    if (!post && userId) {
+      post = await Post.findOne({
+        where: { id, user_id: userId, publish_status: { [Op.ne]: 2 } },
+        include: [
+          {
+            model: User,
+            attributes: ["id", "username", "nickname", "avatar"],
+          },
+          {
+            model: (await import("../models/question.model")).default,
+            as: "LinkedQuestion",
+            attributes: ["id", "bank_id", "type", "content", "options", "difficulty"],
+            required: false,
+          },
+        ],
+      });
+    }
 
     if (!post) {
       return res.status(404).json({ success: false, message: "帖子不存在" });
@@ -465,13 +498,14 @@ export const createCommunityPost = async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, message: "未授权访问" });
     }
 
-    const { title, content, category, tags, isDraft, forwardPostId } = req.body as {
+    const { title, content, category, tags, isDraft, forwardPostId, questionId } = req.body as {
       title?: string;
       content?: string;
       category?: string;
       tags?: string[] | string;
       isDraft?: string | boolean;
       forwardPostId?: number;
+      questionId?: string | number;
     };
 
     if (!title || !content) {
@@ -480,10 +514,20 @@ export const createCommunityPost = async (req: Request, res: Response) => {
         .json({ success: false, message: "标题和内容不能为空" });
     }
 
-    if (title.trim().length < 2 || title.trim().length > 100) {
+    if (title.trim().length < 2 || title.trim().length > 60) {
       return res
         .status(400)
-        .json({ success: false, message: "标题长度需为2-100字符" });
+        .json({ success: false, message: "标题长度需为2-60字符" });
+    }
+
+    const plainContent = content
+      .replace(/<[^>]+>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .trim();
+    if (plainContent.length > 1000) {
+      return res
+        .status(400)
+        .json({ success: false, message: "正文内容不能超过1000字" });
     }
 
     const allowedCategories = ["学习心得", "问题求助", "经验分享", "聊天交友"];
@@ -529,22 +573,75 @@ export const createCommunityPost = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, message: "用户不存在" });
     }
 
-    const isNewUser = user.created_at >= todayStart;
     const textToCheck = [title, content, category, uniqueTags.join(" ")]
       .filter(Boolean)
       .join(" ");
-    const { hit, matches } = await checkSensitiveWords(textToCheck);
+    const sensitiveResult = await checkSensitiveWordsByLevel(textToCheck);
 
-    const status = isDraftFlag ? 0 : hit || isNewUser ? 0 : 1;
-    const auditReason = hit
-      ? `包含敏感词：${matches.slice(0, 10).join("、")}`
-      : undefined;
+    // 屏蔽级词直接拒绝
+    if (!isDraftFlag && sensitiveResult.blocked.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `内容包含违禁词汇，无法发布`,
+        errorCode: "CONTENT_BLOCKED",
+        data: { words: sensitiveResult.blocked.slice(0, 5) },
+      });
+    }
+
+    // 警告级词返回特定错误，前端应提示用户修改
+    if (!isDraftFlag && sensitiveResult.warned.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `内容包含敏感词汇，请修改后重新提交`,
+        errorCode: "CONTENT_WARNING",
+        data: { words: sensitiveResult.warned.slice(0, 5) },
+      });
+    }
+
+    // 根据数据库审核策略配置决定帖子状态
+    const auditConfig = await getAuditConfig();
+    const auditMode = auditConfig.audit_mode;
+    const thresholdDate = new Date(Date.now() - auditConfig.new_user_days_threshold * 24 * 60 * 60 * 1000);
+    const isNewUser = user.created_at >= thresholdDate;
+
+    let status: number;
+    let auditReason: string | undefined;
+
+    if (isDraftFlag) {
+      status = 0;
+    } else if (auditMode === "full") {
+      status = 0;
+      auditReason = "全量审核模式";
+    } else if (auditMode === "smart") {
+      if (sensitiveResult.reviewed.length > 0) {
+        status = 0;
+        auditReason = `包含需复审词汇：${sensitiveResult.reviewed.slice(0, 5).join("、")}`;
+      } else if (isNewUser) {
+        status = 0;
+        auditReason = "新用户发帖需审核";
+      } else {
+        status = 1;
+      }
+    } else {
+      // audit_mode === 'off'
+      status = 1;
+    }
 
     let forwardPost: any = null;
     if (forwardPostId) {
       forwardPost = await Post.findOne({
         where: { id: forwardPostId, status: 1, publish_status: 1 },
       });
+    }
+
+    let linkedQuestionId: number | null = null;
+    if (questionId) {
+      const Question = (await import("../models/question.model")).default;
+      const question = await Question.findByPk(Number(questionId));
+      if (!question) {
+        return res.status(400).json({ success: false, message: "关联题目不存在" });
+      }
+      linkedQuestionId = question.id;
     }
 
     const post = await Post.create({
@@ -562,6 +659,7 @@ export const createCommunityPost = async (req: Request, res: Response) => {
       edit_count: 0,
       forward_post_id: forwardPost ? forwardPost.id : null,
       forward_user_id: forwardPost ? forwardPost.user_id : null,
+      question_id: linkedQuestionId,
       ...(auditReason
         ? { audit_reason: auditReason, audit_at: new Date() }
         : {}),
@@ -592,11 +690,9 @@ export const createCommunityPost = async (req: Request, res: Response) => {
       success: true,
       message: isDraftFlag
         ? "草稿已保存"
-        : hit
-          ? "内容包含敏感词，已进入审核"
-          : isNewUser
-            ? "发帖成功，等待审核"
-            : "发帖成功",
+        : status === 0
+          ? "发帖成功，等待审核"
+          : "发帖成功",
       data: post,
     });
   } catch (error) {
@@ -682,7 +778,18 @@ export const updateCommunityPost = async (req: Request, res: Response) => {
     }
 
     const updateData: any = {};
-    if (content !== undefined) updateData.content = content;
+    if (content !== undefined) {
+      const plainText = content
+        .replace(/<[^>]+>/g, "")
+        .replace(/&nbsp;/g, " ")
+        .trim();
+      if (plainText.length > 1000) {
+        return res
+          .status(400)
+          .json({ success: false, message: "正文内容不能超过1000字" });
+      }
+      updateData.content = content;
+    }
     if (category !== undefined) updateData.category = category;
 
     if (tags !== undefined) {
@@ -694,6 +801,11 @@ export const updateCommunityPost = async (req: Request, res: Response) => {
     }
 
     if (title !== undefined) {
+      if (title.trim().length < 2 || title.trim().length > 60) {
+        return res
+          .status(400)
+          .json({ success: false, message: "标题长度需为2-60字符" });
+      }
       const createdAt = post.getDataValue("createdAt") as Date;
       const diffHours = (Date.now() - createdAt.getTime()) / 36e5;
       if (diffHours > 24) {
@@ -705,12 +817,52 @@ export const updateCommunityPost = async (req: Request, res: Response) => {
       updateData.title = title;
     }
 
+    // 被拒帖子重新提交：进行敏感词检查并重置状态
+    const isResubmission = post.status === 2 && post.publish_status === 1;
+    if (isResubmission) {
+      const textToCheck = [
+        updateData.title || post.title,
+        updateData.content || post.content,
+        updateData.category || post.category,
+      ]
+        .filter(Boolean)
+        .join(" ");
+      const sensitiveResult = await checkSensitiveWordsByLevel(textToCheck);
+
+      if (sensitiveResult.blocked.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: "内容包含违禁词汇，无法提交",
+          errorCode: "CONTENT_BLOCKED",
+          data: { words: sensitiveResult.blocked.slice(0, 5) },
+        });
+      }
+
+      if (sensitiveResult.warned.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: "内容包含敏感词汇，请修改后重新提交",
+          errorCode: "CONTENT_WARNING",
+          data: { words: sensitiveResult.warned.slice(0, 5) },
+        });
+      }
+
+      updateData.status = 0;
+      updateData.audit_reason = "用户修改后重新提交";
+      updateData.audit_admin_id = null;
+      updateData.audit_at = null;
+    }
+
     updateData.edit_count = (post.edit_count || 0) + 1;
     updateData.last_edited_at = new Date();
 
     await post.update(updateData);
 
-    res.json({ success: true, message: "更新成功", data: post });
+    res.json({
+      success: true,
+      message: isResubmission ? "已重新提交审核" : "更新成功",
+      data: post,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "更新失败";
     res.status(500).json({ success: false, message });
@@ -1233,6 +1385,24 @@ export const getCommunityLeaderboard = async (req: Request, res: Response) => {
             ? "评论之星榜按历史总评论数排序" 
             : "评论之星榜按近7天评论数排序，更公平地反映近期活跃度"
         }
+      });
+    }
+
+    if (type === "weekly_score") {
+      const data = await getWeeklyScoreLeaderboard();
+      return res.json({
+        success: true,
+        message: "获取本周得分榜成功",
+        data,
+      });
+    }
+
+    if (type === "accuracy_rate") {
+      const data = await getAccuracyLeaderboard();
+      return res.json({
+        success: true,
+        message: "获取正确率榜成功",
+        data,
       });
     }
 
@@ -2209,6 +2379,8 @@ export const getCommunityProfileSummary = async (
     const todayPosts = userTodayPosts.length;
     const todayComments = userTodayComments.length;
 
+    const userStats = await UserStats.findOne({ where: { user_id: req.user.id } });
+
     res.json({
       success: true,
       message: "获取成功",
@@ -2220,10 +2392,11 @@ export const getCommunityProfileSummary = async (
         points: user.points,
         level: calculateLevel(user.points),
         rank: higherCount + 1,
-        // 新增字段
         todayPosts: todayPosts || 0,
         todayComments: todayComments || 0,
-        todayLikes: totalTodayLikes
+        todayLikes: totalTodayLikes,
+        totalQuestions: userStats?.total_questions ?? 0,
+        accuracyRate: userStats?.accuracy_rate ?? 0,
       },
     });
   } catch (error) {
@@ -2782,10 +2955,11 @@ export const getPointsBadges = async (req: Request, res: Response) => {
 
     const userId = req.user.id;
 
-    const [user, loginStreak, contentQuality] = await Promise.all([
+    const [user, loginStreak, contentQuality, dailyQuestionStreak] = await Promise.all([
       User.findByPk(userId),
       getLoginStreak(userId),
       getContentQualityScore(userId),
+      getDailyQuestionStreakForBadge(userId),
     ]);
 
     if (!user) {
@@ -2893,6 +3067,14 @@ export const getPointsBadges = async (req: Request, res: Response) => {
           current = qualityScore;
           isUnlocked = qualityScore >= 500;
           break;
+        case "daily_question_7":
+          current = dailyQuestionStreak;
+          isUnlocked = dailyQuestionStreak >= 7;
+          break;
+        case "daily_question_30":
+          current = dailyQuestionStreak;
+          isUnlocked = dailyQuestionStreak >= 30;
+          break;
         default:
           current = 0;
           isUnlocked = false;
@@ -2959,10 +3141,11 @@ export const getBadgesOverview = async (req: Request, res: Response) => {
 
     const userId = req.user.id;
 
-    const [user, loginStreak, contentQuality] = await Promise.all([
+    const [user, loginStreak, contentQuality, dailyQuestionStreak] = await Promise.all([
       User.findByPk(userId),
       getLoginStreak(userId),
       getContentQualityScore(userId),
+      getDailyQuestionStreakForBadge(userId),
     ]);
 
     if (!user) {
@@ -3068,6 +3251,14 @@ export const getBadgesOverview = async (req: Request, res: Response) => {
           current = qualityScore;
           isUnlocked = qualityScore >= 500;
           break;
+        case "daily_question_7":
+          current = dailyQuestionStreak;
+          isUnlocked = dailyQuestionStreak >= 7;
+          break;
+        case "daily_question_30":
+          current = dailyQuestionStreak;
+          isUnlocked = dailyQuestionStreak >= 30;
+          break;
         default:
           current = 0;
           isUnlocked = false;
@@ -3152,6 +3343,32 @@ export const getBadgesOverview = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("getBadgesOverview error:", error);
     const message = error instanceof Error ? error.message : "获取失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+export const checkSensitiveWordsPublic = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const { text } = req.body as { text?: string };
+    if (!text || text.trim().length === 0) {
+      return res.json({ success: true, data: { blocked: [], warned: [] } });
+    }
+
+    const result = await checkSensitiveWordsByLevel(text);
+
+    res.json({
+      success: true,
+      data: {
+        blocked: result.blocked.slice(0, 5),
+        warned: result.warned.slice(0, 5),
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "检查失败";
     res.status(500).json({ success: false, message });
   }
 };

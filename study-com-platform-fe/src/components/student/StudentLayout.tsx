@@ -25,10 +25,14 @@ import {
   CalendarOutlined,
   MessageOutlined,
   EditOutlined,
+  FileTextOutlined,
   BellOutlined,
   ClockCircleOutlined,
   CheckOutlined,
-  DeleteOutlined
+  DeleteOutlined,
+  ApartmentOutlined,
+  VideoCameraOutlined,
+  ReadOutlined
 } from "@ant-design/icons";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAppSelector, useAppDispatch } from "../../app/hooks";
@@ -163,6 +167,11 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       label: <Link to="/student/study-rooms">自习室</Link>,
     },
     {
+      key: "/student/video-study-rooms",
+      icon: <VideoCameraOutlined />,
+      label: <Link to="/student/video-study-rooms">视频自习室</Link>,
+    },
+    {
       key: "/student/my-reservations",
       icon: <CalendarOutlined />,
       label: <Link to="/student/my-reservations">我的预约</Link>,
@@ -173,6 +182,11 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       label: <Link to="/student/learning-analytics">学习统计</Link>,
     },
     {
+      key: "/student/learning-report",
+      icon: <FileTextOutlined />,
+      label: <Link to="/student/learning-report">学习报告</Link>,
+    },
+    {
       key: "/student/chat",
       icon: <MessageOutlined />,
       label: <Link to="/student/chat">实时聊天</Link>,
@@ -181,6 +195,21 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       key: "/student/whiteboard",
       icon: <EditOutlined />,
       label: <Link to="/student/whiteboard">协作白板</Link>,
+    },
+    {
+      key: "/student/collaborative-notes",
+      icon: <FileTextOutlined />,
+      label: <Link to="/student/collaborative-notes">协作笔记</Link>,
+    },
+    {
+      key: "/student/skill-tree",
+      icon: <ApartmentOutlined />,
+      label: <Link to="/student/skill-tree">技能树</Link>,
+    },
+    {
+      key: "/student/knowledge-library",
+      icon: <ReadOutlined />,
+      label: <Link to="/student/knowledge-library">知识文库</Link>,
     },
     {
       key: "/student/profile",
@@ -260,12 +289,30 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
 
     newSocket.on('notification', (data: { type: string; data: any }) => {
       console.log('收到系统通知:', data);
-      
+
       if (data.type === 'chat_message' && data.data) {
         playMessageSound();
         message.info(`收到新消息: ${data.data.senderName || '有人'}`);
       }
-      
+
+      if (data.type === 'content_audit' && data.data) {
+        const isApproved = data.data.status === 1;
+        if (isApproved) {
+          message.success(`您的帖子"${data.data.postTitle}"已通过审核`);
+        } else {
+          message.warning(`您的帖子"${data.data.postTitle}"未通过审核${data.data.reason ? `，原因：${data.data.reason}` : ''}`);
+        }
+      }
+
+      if (data.type === 'exercise_review' && data.data) {
+        playMessageSound();
+        if (data.data.gradedCount) {
+          message.info(`您的 ${data.data.gradedCount} 道主观题已被批改，得分 ${data.data.earnedScore}/${data.data.totalScore}`);
+        } else {
+          message.info(`您的主观题已被批改，得分 ${data.data.score}/${data.data.maxScore}`);
+        }
+      }
+
       fetchNotifications();
     });
 
@@ -292,12 +339,12 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
   }, [fetchNotifications, fetchUnreadCount]);
 
   const handleNotificationClick = async (notification: Notification) => {
-    if (notification.notification_type === 'reservation_start' || 
+    if (notification.notification_type === 'reservation_start' ||
         notification.notification_type === 'reservation_renewal') {
       try {
         await markAsRead(notification.id);
         setUnreadCount(prev => Math.max(0, prev - 1));
-        setNotifications(prev => 
+        setNotifications(prev =>
           prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n)
         );
       } catch (error) {
@@ -307,10 +354,42 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       setNotificationVisible(false);
     } else if (notification.notification_type === 'chat_message' && notification.chat_room_id) {
       setUnreadCount(prev => Math.max(0, prev - 1));
-      setNotifications(prev => 
+      setNotifications(prev =>
         prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n)
       );
       navigate('/student/chat', { state: { roomId: notification.chat_room_id } });
+      setNotificationVisible(false);
+    } else if (notification.notification_type === 'system' && (notification.metadata as any)?.subType === 'content_audit') {
+      try {
+        await markAsRead(notification.id);
+        setUnreadCount(prev => Math.max(0, prev - 1));
+        setNotifications(prev =>
+          prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n)
+        );
+      } catch (error) {
+        console.error('标记已读失败:', error);
+      }
+      const meta = notification.metadata as any;
+      if (meta?.auditStatus === 2 && meta?.postId) {
+        navigate(`/community/publish?edit=${meta.postId}`);
+      } else if (meta?.postId) {
+        navigate(`/community?postId=${meta.postId}`);
+      }
+      setNotificationVisible(false);
+    } else if (notification.notification_type === 'system' && (notification.metadata as any)?.subType === 'exercise_review') {
+      try {
+        await markAsRead(notification.id);
+        setUnreadCount(prev => Math.max(0, prev - 1));
+        setNotifications(prev =>
+          prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n)
+        );
+      } catch (error) {
+        console.error('标记已读失败:', error);
+      }
+      const meta = notification.metadata as any;
+      if (meta?.bankId && meta?.recordId) {
+        navigate(`/community/question-bank/${meta.bankId}/result/${meta.recordId}`);
+      }
       setNotificationVisible(false);
     }
   };
@@ -422,8 +501,15 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
                     title={
                       <Space>
                         <Text strong>{item.title}</Text>
-                        <Tag color={notificationTypeLabels[item.notification_type].color} size="small">
-                          {notificationTypeLabels[item.notification_type].text}
+                        <Tag color={
+                          (item.metadata as any)?.subType === 'content_audit'
+                            ? ((item.metadata as any)?.auditStatus === 1 ? 'green' : 'red')
+                            : notificationTypeLabels[item.notification_type].color
+                        } size="small">
+                          {(item.metadata as any)?.subType === 'content_audit'
+                            ? ((item.metadata as any)?.auditStatus === 1 ? '审核通过' : '审核退回')
+                            : notificationTypeLabels[item.notification_type].text
+                          }
                         </Tag>
                       </Space>
                     }

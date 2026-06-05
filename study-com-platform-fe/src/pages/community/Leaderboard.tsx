@@ -1,5 +1,5 @@
 import { Card, Table, Typography, message, Badge, Button, Tooltip, Tag, Space, Radio } from "antd";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { fetchCommunityLeaderboardByType } from "../../services/communityPublic";
 import CommunityFooter from "../../components/community/CommunityFooter";
@@ -12,7 +12,12 @@ import {
     EyeOutlined,
     MessageOutlined,
     HomeOutlined,
-    QuestionCircleOutlined
+    QuestionCircleOutlined,
+    CaretUpOutlined,
+    CaretDownOutlined,
+    MinusOutlined,
+    CheckCircleOutlined,
+    ThunderboltOutlined,
 } from "@ant-design/icons";
 
 const { Title, Text } = Typography;
@@ -50,6 +55,12 @@ type LeaderboardRow = {
     last_comment_time?: string;
     period_type?: string;
     period_label?: string;
+    // 练题排行榜字段
+    weekly_score?: number;
+    accuracy_rate?: number;
+    total_questions?: number;
+    correct_count?: number;
+    rank_change?: number | null;
 };
 
 type HeatRules = {
@@ -79,6 +90,14 @@ type CachedData = {
             timestamp: number;
         };
     };
+    weekly_score: {
+        data: LeaderboardRow[];
+        timestamp: number;
+    };
+    accuracy: {
+        data: LeaderboardRow[];
+        timestamp: number;
+    };
 };
 
 // 缓存过期时间（5分钟）
@@ -89,6 +108,8 @@ const initialCache: CachedData = {
     posts: {},
     users: { data: [], timestamp: 0 },
     comments: {},
+    weekly_score: { data: [], timestamp: 0 },
+    accuracy: { data: [], timestamp: 0 },
 };
 
 export default function Leaderboard() {
@@ -101,6 +122,8 @@ export default function Leaderboard() {
     const [commentPeriod, setCommentPeriod] = useState<string>("7days"); // "7days" 或 "all"
     const [heatRules, setHeatRules] = useState<HeatRules | null>(null);
     const [cache, setCache] = useState<CachedData>(initialCache);
+    const cacheRef = useRef<CachedData>(cache);
+    cacheRef.current = cache;
     const [tabTransitioning, setTabTransitioning] = useState(false);
 
     // 检查缓存是否有效
@@ -126,23 +149,34 @@ export default function Leaderboard() {
 
     const loadData = useCallback(
         async () => {
+            const currentCache = cacheRef.current;
             // 检查缓存
             if (activeTab === "posts") {
-                const cached = cache.posts[timeRange];
+                const cached = currentCache.posts[timeRange];
                 if (cached && isValidCache(cached.timestamp)) {
                     setData(cached.data.slice(0, 10));
                     setHeatRules(cached.heatRules);
                     return;
                 }
             } else if (activeTab === "users") {
-                if (cache.users.data.length > 0 && isValidCache(cache.users.timestamp)) {
-                    setData(cache.users.data.slice(0, 10));
+                if (currentCache.users.data.length > 0 && isValidCache(currentCache.users.timestamp)) {
+                    setData(currentCache.users.data.slice(0, 10));
                     return;
                 }
             } else if (activeTab === "comments") {
-                const cached = cache.comments[commentPeriod];
+                const cached = currentCache.comments[commentPeriod];
                 if (cached && isValidCache(cached.timestamp)) {
                     setData(cached.data.slice(0, 10));
+                    return;
+                }
+            } else if (activeTab === "weekly_score") {
+                if (currentCache.weekly_score.data.length > 0 && isValidCache(currentCache.weekly_score.timestamp)) {
+                    setData(currentCache.weekly_score.data.slice(0, 10));
+                    return;
+                }
+            } else if (activeTab === "accuracy") {
+                if (currentCache.accuracy.data.length > 0 && isValidCache(currentCache.accuracy.timestamp)) {
+                    setData(currentCache.accuracy.data.slice(0, 10));
                     return;
                 }
             }
@@ -152,7 +186,9 @@ export default function Leaderboard() {
                 const typeMap = {
                     posts: "post_hot",
                     users: "total",
-                    comments: "comment_count"
+                    comments: "comment_count",
+                    weekly_score: "weekly_score",
+                    accuracy: "accuracy_rate",
                 };
 
                 const actualTimeRange = activeTab === "posts" ? timeRange : undefined;
@@ -212,6 +248,22 @@ export default function Leaderboard() {
                             },
                         },
                     }));
+                } else if (activeTab === "weekly_score") {
+                    setCache(prev => ({
+                        ...prev,
+                        weekly_score: {
+                            data: fullList,
+                            timestamp: now,
+                        },
+                    }));
+                } else if (activeTab === "accuracy") {
+                    setCache(prev => ({
+                        ...prev,
+                        accuracy: {
+                            data: fullList,
+                            timestamp: now,
+                        },
+                    }));
                 }
             } catch (err) {
                 message.error(err instanceof Error ? err.message : "加载失败");
@@ -219,7 +271,7 @@ export default function Leaderboard() {
                 setLoading(false);
             }
         },
-        [activeTab, timeRange, commentPeriod, cache],
+        [activeTab, timeRange, commentPeriod],
     );
 
     useEffect(() => {
@@ -330,7 +382,9 @@ export default function Leaderboard() {
     const tabs = [
         { key: "posts", label: "热门内容", icon: <FireOutlined />, description: "根据浏览量、点赞、评论综合计算" },
         { key: "users", label: "社区达人", icon: <StarOutlined />, description: "根据总积分排名" },
-        { key: "comments", label: "评论之星", icon: <MessageOutlined />, description: "根据评论数量排名" }
+        { key: "comments", label: "评论之星", icon: <MessageOutlined />, description: "根据评论数量排名" },
+        { key: "weekly_score", label: "本周得分榜", icon: <ThunderboltOutlined />, description: "本周做题积分排名，每周一重置" },
+        { key: "accuracy", label: "正确率榜", icon: <CheckCircleOutlined />, description: "做题超50道用户，按正确率排名" },
     ];
 
     // 根据活动标签生成对应列
@@ -845,6 +899,242 @@ export default function Leaderboard() {
                     width: 120,
                     align: "center",
                 }
+            ];
+        } else if (activeTab === "weekly_score") {
+            const renderRankChange = (rankChange: number | null | undefined) => {
+                if (rankChange == null) return null;
+                if (rankChange > 0) {
+                    return (
+                        <span style={{ color: "#10B981", fontSize: 12, fontWeight: 600, marginLeft: 4 }}>
+                            <CaretUpOutlined /> {rankChange}
+                        </span>
+                    );
+                }
+                if (rankChange < 0) {
+                    return (
+                        <span style={{ color: "#EF4444", fontSize: 12, fontWeight: 600, marginLeft: 4 }}>
+                            <CaretDownOutlined /> {Math.abs(rankChange)}
+                        </span>
+                    );
+                }
+                return (
+                    <span style={{ color: "#9CA3AF", fontSize: 12, marginLeft: 4 }}>
+                        <MinusOutlined />
+                    </span>
+                );
+            };
+
+            return [
+                {
+                    title: "排名",
+                    render: (value: unknown, record: LeaderboardRow, index: number) => (
+                        <div style={{ textAlign: "center" }}>
+                            {renderRank(value, record, index)}
+                            {renderRankChange(record.rank_change)}
+                        </div>
+                    ),
+                    width: 100,
+                    align: "center",
+                },
+                {
+                    title: "用户信息",
+                    render: (_value: unknown, record: LeaderboardRow) => {
+                        const avatar = record.avatar;
+                        const nickname = record.nickname || "匿名用户";
+                        const username = record.username || "-";
+
+                        return (
+                            <div
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 12,
+                                    cursor: "pointer",
+                                    padding: "4px 8px",
+                                    borderRadius: "8px",
+                                    transition: "all 0.2s ease",
+                                }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (record.id) navigate(`/community/user/${record.id}`);
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(102, 126, 234, 0.05)"; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                            >
+                                {avatar ? (
+                                    <img src={avatar} alt={nickname} style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", border: "2px solid #E5E7EB" }} />
+                                ) : (
+                                    <div style={{ width: 48, height: 48, background: "linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: "bold", fontSize: 18 }}>
+                                        {nickname.charAt(0).toUpperCase()}
+                                    </div>
+                                )}
+                                <div>
+                                    <Text style={{ fontWeight: 700, fontSize: 15, color: "#1F2937", display: "block" }}>{nickname}</Text>
+                                    <Text style={{ color: "#9CA3AF", fontSize: 12 }}>@{username}</Text>
+                                </div>
+                            </div>
+                        );
+                    },
+                },
+                {
+                    title: "本周积分",
+                    render: (_value: unknown, record: LeaderboardRow) => {
+                        const score = record.weekly_score ?? 0;
+                        return (
+                            <div style={{ textAlign: "center" }}>
+                                <Text style={{
+                                    fontSize: 28,
+                                    fontWeight: 800,
+                                    background: "linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)",
+                                    WebkitBackgroundClip: "text",
+                                    WebkitTextFillColor: "transparent",
+                                    display: "block",
+                                }}>
+                                    {score}
+                                </Text>
+                                <Text type="secondary" style={{ fontSize: 12 }}>分</Text>
+                            </div>
+                        );
+                    },
+                    width: 140,
+                    align: "center",
+                },
+            ];
+        } else if (activeTab === "accuracy") {
+            const renderRankChange = (rankChange: number | null | undefined) => {
+                if (rankChange == null) return null;
+                if (rankChange > 0) {
+                    return (
+                        <span style={{ color: "#10B981", fontSize: 12, fontWeight: 600, marginLeft: 4 }}>
+                            <CaretUpOutlined /> {rankChange}
+                        </span>
+                    );
+                }
+                if (rankChange < 0) {
+                    return (
+                        <span style={{ color: "#EF4444", fontSize: 12, fontWeight: 600, marginLeft: 4 }}>
+                            <CaretDownOutlined /> {Math.abs(rankChange)}
+                        </span>
+                    );
+                }
+                return (
+                    <span style={{ color: "#9CA3AF", fontSize: 12, marginLeft: 4 }}>
+                        <MinusOutlined />
+                    </span>
+                );
+            };
+
+            return [
+                {
+                    title: "排名",
+                    render: (value: unknown, record: LeaderboardRow, index: number) => (
+                        <div style={{ textAlign: "center" }}>
+                            {renderRank(value, record, index)}
+                            {renderRankChange(record.rank_change)}
+                        </div>
+                    ),
+                    width: 100,
+                    align: "center",
+                },
+                {
+                    title: "用户信息",
+                    render: (_value: unknown, record: LeaderboardRow) => {
+                        const avatar = record.avatar;
+                        const nickname = record.nickname || "匿名用户";
+                        const username = record.username || "-";
+
+                        return (
+                            <div
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 12,
+                                    cursor: "pointer",
+                                    padding: "4px 8px",
+                                    borderRadius: "8px",
+                                    transition: "all 0.2s ease",
+                                }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (record.id) navigate(`/community/user/${record.id}`);
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(102, 126, 234, 0.05)"; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                            >
+                                {avatar ? (
+                                    <img src={avatar} alt={nickname} style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", border: "2px solid #E5E7EB" }} />
+                                ) : (
+                                    <div style={{ width: 48, height: 48, background: "linear-gradient(135deg, #10B981 0%, #34D399 100%)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: "bold", fontSize: 18 }}>
+                                        {nickname.charAt(0).toUpperCase()}
+                                    </div>
+                                )}
+                                <div>
+                                    <Text style={{ fontWeight: 700, fontSize: 15, color: "#1F2937", display: "block" }}>{nickname}</Text>
+                                    <Text style={{ color: "#9CA3AF", fontSize: 12 }}>@{username}</Text>
+                                </div>
+                            </div>
+                        );
+                    },
+                },
+                {
+                    title: "正确率",
+                    render: (_value: unknown, record: LeaderboardRow) => {
+                        const rate = record.accuracy_rate ?? 0;
+                        const getColor = (r: number) => {
+                            if (r >= 90) return "#10B981";
+                            if (r >= 75) return "#3B82F6";
+                            if (r >= 60) return "#F59E0B";
+                            return "#EF4444";
+                        };
+                        const color = getColor(rate);
+
+                        return (
+                            <div style={{ textAlign: "center" }}>
+                                <Text style={{
+                                    fontSize: 26,
+                                    fontWeight: 800,
+                                    color,
+                                    display: "block",
+                                }}>
+                                    {rate.toFixed(1)}%
+                                </Text>
+                                <div style={{
+                                    width: 80,
+                                    height: 6,
+                                    background: "#F3F4F6",
+                                    borderRadius: 3,
+                                    margin: "4px auto 0",
+                                    overflow: "hidden",
+                                }}>
+                                    <div style={{
+                                        width: `${rate}%`,
+                                        height: "100%",
+                                        background: color,
+                                        borderRadius: 3,
+                                        transition: "width 0.3s ease",
+                                    }} />
+                                </div>
+                            </div>
+                        );
+                    },
+                    width: 140,
+                    align: "center",
+                },
+                {
+                    title: "做题数",
+                    render: (_value: unknown, record: LeaderboardRow) => {
+                        const total = record.total_questions ?? 0;
+                        const correct = record.correct_count ?? 0;
+                        return (
+                            <div style={{ textAlign: "center" }}>
+                                <Text style={{ fontSize: 16, fontWeight: 700, color: "#1F2937" }}>{total}</Text>
+                                <Text type="secondary" style={{ fontSize: 12, display: "block" }}>正确 {correct}</Text>
+                            </div>
+                        );
+                    },
+                    width: 100,
+                    align: "center",
+                },
             ];
         } else { // comments - 评论之星
             // 格式化最新评论时间
@@ -1586,7 +1876,11 @@ export default function Leaderboard() {
                             ? "热门内容根据浏览量×0.5 + 点赞数×2 + 评论数综合计算，仅展示前10名"
                             : activeTab === "comments"
                                 ? "评论之星根据用户发布的评论数量进行排名，仅展示前10名"
-                                : "社区达人根据用户在社区积累的总积分进行排名，仅展示前10名"}
+                                : activeTab === "weekly_score"
+                                    ? "本周得分榜统计每周一00:00至周日23:59内通过做题获得的总积分，每周一重置"
+                                    : activeTab === "accuracy"
+                                        ? "正确率榜仅统计累计做题数超过50道的用户，按正确率降序排列"
+                                        : "社区达人根据用户在社区积累的总积分进行排名，仅展示前10名"}
                     </p>
                 </div>
 

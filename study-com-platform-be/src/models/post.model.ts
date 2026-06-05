@@ -24,6 +24,7 @@ export class Post extends Model {
   public deleted_at?: Date;
   public forward_post_id?: number;
   public forward_user_id?: number;
+  public question_id?: number;
   public ForwardPost?: Post;
   public ForwardUser?: any;
   public createdAt!: Date;
@@ -145,6 +146,15 @@ Post.init(
         key: "id",
       },
     },
+    question_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: "关联题目ID（题库讨论帖）",
+      references: {
+        model: "questions",
+        key: "id",
+      },
+    },
   },
   {
     sequelize,
@@ -162,6 +172,7 @@ Post.init(
       { fields: ["audit_admin_id"] },
       { fields: ["forward_post_id"] },
       { fields: ["forward_user_id"] },
+      { fields: ["question_id"] },
     ],
   },
 );

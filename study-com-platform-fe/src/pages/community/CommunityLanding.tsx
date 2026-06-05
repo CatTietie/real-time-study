@@ -89,10 +89,11 @@ type ProfileSummary = {
     points: number;
     level: number;
     rank: number;
-    // 新增字段
     todayPosts?: number;
     todayComments?: number;
     todayLikes?: number;
+    totalQuestions?: number;
+    accuracyRate?: number;
 };
 
 export default function CommunityLanding() {
@@ -606,6 +607,7 @@ export default function CommunityLanding() {
                             <Button onClick={() => navigate("/community/favorites")}>我的收藏</Button>
                             <Button onClick={() => navigate("/community/leaderboard")}>排行榜</Button>
                             <Button onClick={() => navigate("/community/badges")}>成就中心</Button>
+                            <Button onClick={() => navigate("/community/question-bank")}>题库练习</Button>
                             <Button
                                 type="primary"
                                 onClick={() => navigate("/community/publish")}
@@ -1469,6 +1471,97 @@ export default function CommunityLanding() {
                                     color: '#3f8652'
                                 }}>
         今日评论
+      </span>
+                            </div>
+
+                            {/* 累计做题数 */}
+                            <div style={{
+                                background: '#f0f5ff',
+                                padding: '12px 8px',
+                                borderRadius: 8,
+                                border: '1px solid #adc6ff',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: 4,
+                                transition: 'all 0.2s ease',
+                                boxShadow: '0 2px 4px rgba(47, 84, 235, 0.1)'
+                            }}
+                                 onMouseEnter={(e) => {
+                                     e.currentTarget.style.backgroundColor = '#adc6ff';
+                                     e.currentTarget.style.boxShadow = '0 2px 8px rgba(47, 84, 235, 0.2)';
+                                     e.currentTarget.querySelector('svg').style.color = '#1d39c4';
+                                     e.currentTarget.querySelector('span:first-of-type').style.color = '#1d39c4';
+                                 }}
+                                 onMouseLeave={(e) => {
+                                     e.currentTarget.style.backgroundColor = '#f0f5ff';
+                                     e.currentTarget.style.boxShadow = '0 2px 4px rgba(47, 84, 235, 0.1)';
+                                     e.currentTarget.querySelector('svg').style.color = '#2f54eb';
+                                     e.currentTarget.querySelector('span:first-of-type').style.color = '#2f54eb';
+                                 }}
+                            >
+                                <svg width="16" height="16" viewBox="0 0 1024 1024" style={{color: '#2f54eb'}}>
+                                    <path d="M888 792H200V168c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v688c0 4.4 3.6 8 8 8h752c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8z" fill="currentColor"/>
+                                    <path d="M288 604a64 64 0 1 0 128 0 64 64 0 1 0-128 0z" fill="currentColor"/>
+                                    <path d="M480 444a64 64 0 1 0 128 0 64 64 0 1 0-128 0z" fill="currentColor"/>
+                                    <path d="M672 284a64 64 0 1 0 128 0 64 64 0 1 0-128 0z" fill="currentColor"/>
+                                </svg>
+                                <span style={{
+                                    fontSize: 16,
+                                    fontWeight: 700,
+                                    color: '#2f54eb'
+                                }}>
+        {profile?.totalQuestions ?? 0}
+      </span>
+                                <span style={{
+                                    fontSize: 12,
+                                    color: '#3d5a99'
+                                }}>
+        累计做题
+      </span>
+                            </div>
+
+                            {/* 正确率 */}
+                            <div style={{
+                                background: '#f9f0ff',
+                                padding: '12px 8px',
+                                borderRadius: 8,
+                                border: '1px solid #d3adf7',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: 4,
+                                transition: 'all 0.2s ease',
+                                boxShadow: '0 2px 4px rgba(114, 46, 209, 0.1)'
+                            }}
+                                 onMouseEnter={(e) => {
+                                     e.currentTarget.style.backgroundColor = '#d3adf7';
+                                     e.currentTarget.style.boxShadow = '0 2px 8px rgba(114, 46, 209, 0.2)';
+                                     e.currentTarget.querySelector('svg').style.color = '#531dab';
+                                     e.currentTarget.querySelector('span:first-of-type').style.color = '#531dab';
+                                 }}
+                                 onMouseLeave={(e) => {
+                                     e.currentTarget.style.backgroundColor = '#f9f0ff';
+                                     e.currentTarget.style.boxShadow = '0 2px 4px rgba(114, 46, 209, 0.1)';
+                                     e.currentTarget.querySelector('svg').style.color = '#722ed1';
+                                     e.currentTarget.querySelector('span:first-of-type').style.color = '#722ed1';
+                                 }}
+                            >
+                                <svg width="16" height="16" viewBox="0 0 1024 1024" style={{color: '#722ed1'}}>
+                                    <path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64z m193.5 301.7l-210.6 292a31.8 31.8 0 0 1-51.7 0L318.5 484.9c-3.8-5.3 0-12.7 6.5-12.7h46.9c10.2 0 19.9 4.9 25.9 13.3l71.2 98.8 157.2-218c6-8.3 15.6-13.3 25.9-13.3H699c6.5 0 10.3 7.4 6.5 12.7z" fill="currentColor"/>
+                                </svg>
+                                <span style={{
+                                    fontSize: 16,
+                                    fontWeight: 700,
+                                    color: '#722ed1'
+                                }}>
+        {profile?.totalQuestions ? `${(profile.accuracyRate ?? 0).toFixed(1)}%` : '-'}
+      </span>
+                                <span style={{
+                                    fontSize: 12,
+                                    color: '#6b3fa0'
+                                }}>
+        正确率
       </span>
                             </div>
                         </div>

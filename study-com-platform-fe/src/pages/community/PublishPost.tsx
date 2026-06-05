@@ -1,25 +1,28 @@
 import {
+  Alert,
   Button,
   Form,
   Input,
   Modal,
   Radio,
   Select,
-  Space,
   Typography,
   Upload,
   message,
 } from "antd";
 import type { UploadFile } from "antd";
-import React, { useRef, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useRef, useState, useCallback, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAppSelector } from "../../app/hooks";
 import type { RootState } from "../../app/store";
 import {
   createCommunityPost,
+  updateCommunityPost,
+  fetchCommunityPostDetail,
   fetchCommunityTagSuggestions,
-  fetchCommunityDrafts,
+  checkCommunitySensitiveWords,
 } from "../../services/communityPublic";
+import type { BusinessError } from "../../services/api";
 import CommunityFooter from "../../components/community/CommunityFooter";
 import RichTextEditor from "../../components/community/RichTextEditor";
 import {
@@ -39,6 +42,7 @@ import {
   ReloadOutlined,
   DeleteOutlined,
   ClockCircleOutlined,
+  InboxOutlined,
 } from "@ant-design/icons";
 
 const { Title, Text } = Typography;
@@ -123,6 +127,8 @@ interface DraftModalData {
 
 export default function PublishPost() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editPostId = searchParams.get("edit");
   const { token } = useAppSelector((state: RootState) => state.auth);
   const [messageApi, contextHolder] = message.useMessage();
   const [form] = Form.useForm<PublishForm>();
@@ -134,7 +140,19 @@ export default function PublishPost() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [showGuidelines, setShowGuidelines] = useState(false);
   const [editorContent, setEditorContent] = useState<string>("");
-  
+
+  // 编辑模式（被拒帖子重发）
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editPostData, setEditPostData] = useState<any>(null);
+
+  // 关联题目（从结果页跳转过来时）
+  const [linkedQuestionId, setLinkedQuestionId] = useState<number | null>(null);
+
+  // 敏感词检测状态
+  const [sensitiveBlocked, setSensitiveBlocked] = useState<string[]>([]);
+  const [sensitiveWarned, setSensitiveWarned] = useState<string[]>([]);
+  const sensitiveCheckTimerRef = useRef<number | null>(null);
+
   // 草稿相关状态
   const [draftModal, setDraftModal] = useState<DraftModalData>({ visible: false, draft: null });
   const [saveDraftLoading, setSaveDraftLoading] = useState(false);
@@ -148,6 +166,16 @@ export default function PublishPost() {
   const watchedTags = Form.useWatch("tags", form) || [];
   const watchedCategory = Form.useWatch("category", form) || "";
   const watchedTitle = Form.useWatch("title", form) || "";
+
+  // 字数统计
+  const titleLength = (watchedTitle || "").length;
+  const contentPlainText = editorContent
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .trim();
+  const contentLength = contentPlainText.length;
+  const isTitleOverLimit = titleLength > 60;
+  const isContentOverLimit = contentLength > 1000;
 
   // 监听滚动事件，改变顶部栏样式
   const handleScroll = () => {
@@ -346,20 +374,86 @@ export default function PublishPost() {
 
   // 页面初始化时检查是否有本地草稿
   React.useEffect(() => {
+    // 优先检测是否从错题页跳转过来（带 questionId 参数）
+    const questionIdParam = searchParams.get("questionId");
+
+    if (questionIdParam && !editPostId) {
+      setLinkedQuestionId(Number(questionIdParam));
+
+      // 从 sessionStorage 读取完整题目数据
+      let questionData: {
+        questionId: number;
+        type: number;
+        content: string;
+        options?: { label: string; text: string }[] | null;
+        correctAnswer?: string;
+        analysis?: string | null;
+      } | null = null;
+      try {
+        const stored = sessionStorage.getItem("discuss_question");
+        if (stored) {
+          questionData = JSON.parse(stored);
+          sessionStorage.removeItem("discuss_question");
+        }
+      } catch {}
+
+      const questionContent = questionData?.content || "";
+      const questionType = questionData?.type || 0;
+      const typeLabel = ({ 1: "单选题", 2: "多选题", 3: "判断题", 4: "填空题", 5: "主观题" }[questionType]) || "题目";
+
+      const snippet = questionContent.substring(0, 15);
+      const title = `关于「${snippet}${questionContent.length > 15 ? "..." : ""}」的疑问`;
+
+      form.setFieldsValue({ category: "问题求助", title });
+      setSelectedCategory("问题求助");
+
+      // 构建包含完整题目信息的引用内容
+      let optionsHtml = "";
+      if (questionData?.options && Array.isArray(questionData.options) && questionData.options.length > 0) {
+        optionsHtml = questionData.options
+          .map((opt) => `<p>&nbsp;&nbsp;${opt.label}. ${opt.text}</p>`)
+          .join("");
+      }
+
+      const quotedContent = [
+        `<blockquote>`,
+        `<p><strong>【${typeLabel}】</strong>${questionContent}</p>`,
+        optionsHtml,
+        `</blockquote>`,
+        `<p></p>`,
+        `<h3>我的疑问：</h3>`,
+        `<p></p>`,
+      ].join("");
+
+      setEditorContent(quotedContent);
+      lastAutoFilledTemplateRef.current = quotedContent;
+      return;
+    }
+
     const localDraft = loadLocalDraft();
     if (localDraft) {
       // 检查草稿是否有实际内容
-      const hasDraftContent = 
-        localDraft.title?.trim() || 
-        localDraft.category || 
+      const hasDraftContent =
+        localDraft.title?.trim() ||
+        localDraft.category ||
         (localDraft.content && localDraft.content.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim());
-      
+
       if (hasDraftContent) {
         // 显示草稿恢复弹窗
         setDraftModal({ visible: true, draft: localDraft });
+        return;
       }
     }
-  }, [loadLocalDraft]);
+    // 没有草稿时，默认选择第一个分类并填充模板
+    const defaultCategory = CATEGORY_OPTIONS[0].value;
+    form.setFieldsValue({ category: defaultCategory });
+    setSelectedCategory(defaultCategory);
+    const template = getTemplateByCategory(defaultCategory);
+    if (template) {
+      setEditorContent(template);
+      lastAutoFilledTemplateRef.current = template;
+    }
+  }, [loadLocalDraft, form]);
 
   // 启动自动保存
   React.useEffect(() => {
@@ -385,6 +479,9 @@ export default function PublishPost() {
 
   // 监听分类变化，更新内容模板
   React.useEffect(() => {
+    if (linkedQuestionId && watchedCategory === "问题求助") {
+      return;
+    }
     if (watchedCategory && watchedCategory !== selectedCategory) {
       setSelectedCategory(watchedCategory);
       
@@ -419,7 +516,74 @@ export default function PublishPost() {
         }
       }
     }
-  }, [watchedCategory, selectedCategory, editorContent]);
+  }, [watchedCategory, selectedCategory, editorContent, linkedQuestionId]);
+
+  // 编辑模式：加载被拒帖子数据
+  useEffect(() => {
+    if (!editPostId) return;
+    setIsEditMode(true);
+    const loadPost = async () => {
+      try {
+        const res = await fetchCommunityPostDetail(Number(editPostId));
+        const post = res?.data;
+        if (!post) {
+          messageApi.error("帖子不存在");
+          navigate("/community/posts");
+          return;
+        }
+        setEditPostData(post);
+        form.setFieldsValue({
+          title: post.title,
+          category: post.category,
+          tags: post.tags ? (typeof post.tags === "string" ? JSON.parse(post.tags) : post.tags) : undefined,
+        });
+        setEditorContent(post.content || "");
+        if (post.category) setSelectedCategory(post.category);
+        lastAutoFilledTemplateRef.current = null;
+      } catch {
+        messageApi.error("加载帖子失败");
+      }
+    };
+    loadPost();
+  }, [editPostId]);
+
+  // 敏感词实时检测（防抖 1.5 秒）
+  useEffect(() => {
+    if (sensitiveCheckTimerRef.current !== null) {
+      window.clearTimeout(sensitiveCheckTimerRef.current);
+    }
+
+    const plainTitle = watchedTitle || "";
+    const plainContent = editorContent
+      .replace(/<[^>]+>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .trim();
+    const combinedText = [plainTitle, plainContent].filter(Boolean).join(" ");
+
+    if (combinedText.length < 2) {
+      setSensitiveBlocked([]);
+      setSensitiveWarned([]);
+      return;
+    }
+
+    sensitiveCheckTimerRef.current = window.setTimeout(async () => {
+      try {
+        const res = await checkCommunitySensitiveWords(combinedText);
+        if (res?.data) {
+          setSensitiveBlocked(res.data.blocked || []);
+          setSensitiveWarned(res.data.warned || []);
+        }
+      } catch {
+        // 检测失败静默处理
+      }
+    }, 1500);
+
+    return () => {
+      if (sensitiveCheckTimerRef.current !== null) {
+        window.clearTimeout(sensitiveCheckTimerRef.current);
+      }
+    };
+  }, [watchedTitle, editorContent]);
 
   const handleSubmit = async (values: PublishForm) => {
     if (!token) {
@@ -428,68 +592,132 @@ export default function PublishPost() {
       return;
     }
 
+    // 前端敏感词阻断
+    if (sensitiveBlocked.length > 0) {
+      Modal.error({
+        title: "内容包含违禁词汇",
+        content: `请移除以下内容后再提交：${sensitiveBlocked.join("、")}`,
+      });
+      return;
+    }
+    if (sensitiveWarned.length > 0) {
+      Modal.warning({
+        title: "内容包含敏感词汇",
+        content: `请修改以下内容后再提交：${sensitiveWarned.join("、")}`,
+      });
+      return;
+    }
+
     // 明确的校验提示
     if (!values.title || !values.title.trim()) {
       messageApi.warning("请输入帖子标题");
+      return;
+    }
+    if (values.title.trim().length > 60) {
+      messageApi.warning("标题不能超过60字");
       return;
     }
     if (!values.category) {
       messageApi.warning("请选择帖子分类");
       return;
     }
-    
+
     // 校验富文本内容：去除HTML标签后检查是否有实际内容
     const plainContent = editorContent
       .replace(/<[^>]+>/g, '') // 去除HTML标签
       .replace(/&nbsp;/g, ' ') // 替换HTML空格
       .trim();
-    
+
     if (!plainContent) {
       messageApi.warning("请输入帖子内容");
       return;
     }
-
-    const formData = new FormData();
-    formData.append("title", values.title.trim());
-    formData.append("content", editorContent); // 直接使用HTML格式的内容
-    formData.append("category", values.category);
-    if (values.tags && values.tags.length) {
-      formData.append("tags", values.tags.join(","));
+    if (plainContent.length > 1000) {
+      messageApi.warning("正文内容不能超过1000字");
+      return;
     }
-
-    fileList.forEach((file) => {
-      if (file.originFileObj) {
-        formData.append("images", file.originFileObj);
-      }
-    });
 
     try {
       setSubmitting(true);
-      const result = await createCommunityPost(formData);
-      messageApi.success("发帖成功，等待审核");
-      
-      // 发布成功后清空草稿
-      stopAutoSave();
-      clearLocalDraft();
-      
-      form.resetFields();
-      setEditorContent(""); // 清空编辑器内容
-      setFileList([]);
-      lastAutoFilledTemplateRef.current = null;
-      
-      // 发布成功后跳转：优先跳转到详情页，否则跳转到社区首页
-      window.setTimeout(() => {
-        // 检查返回结果中是否有帖子ID
-        const postId = result?.data?.id || result?.id;
-        if (postId) {
-          // 跳转到社区首页并打开详情弹窗
-          navigate(`/community?postId=${postId}`);
-        } else {
-          navigate("/community");
+
+      if (isEditMode && editPostId) {
+        // 编辑模式：更新帖子
+        const payload = {
+          title: values.title.trim(),
+          content: editorContent,
+          category: values.category,
+          tags: values.tags,
+        };
+        const result = await updateCommunityPost(Number(editPostId), payload);
+        messageApi.success(result?.message || "已重新提交审核");
+
+        window.setTimeout(() => {
+          navigate("/community/posts");
+        }, 500);
+      } else {
+        // 新建模式
+        const formData = new FormData();
+        formData.append("title", values.title.trim());
+        formData.append("content", editorContent);
+        formData.append("category", values.category);
+        if (values.tags && values.tags.length) {
+          formData.append("tags", values.tags.join(","));
         }
-      }, 500);
-    } catch (err) {
-      messageApi.error(err instanceof Error ? err.message : "发帖失败");
+        if (linkedQuestionId) {
+          formData.append("questionId", String(linkedQuestionId));
+        }
+
+        fileList.forEach((file) => {
+          if (file.originFileObj) {
+            formData.append("images", file.originFileObj);
+          }
+        });
+
+        const result = await createCommunityPost(formData);
+        const postStatus = result?.data?.status;
+        const isPending = postStatus === 0;
+        messageApi.success(isPending ? "发帖成功，等待审核" : "发帖成功");
+
+        // 发布成功后清空草稿
+        stopAutoSave();
+        clearLocalDraft();
+
+        form.resetFields();
+        setEditorContent("");
+        setFileList([]);
+        lastAutoFilledTemplateRef.current = null;
+
+        // 发布成功后跳转：待审核帖跳转到帖子列表，已通过帖跳转到详情
+        window.setTimeout(() => {
+          if (isPending) {
+            navigate("/community/posts");
+          } else {
+            const postId = result?.data?.id || result?.id;
+            if (postId) {
+              navigate(`/community?postId=${postId}`);
+            } else {
+              navigate("/community");
+            }
+          }
+        }, 500);
+      }
+    } catch (err: any) {
+      const bizErr = err as BusinessError;
+      if (bizErr.errorCode === "CONTENT_BLOCKED") {
+        const words = bizErr.data?.words || bizErr.response?.data?.data?.words || [];
+        Modal.error({
+          title: "内容包含违禁词汇",
+          content: `请移除以下内容后再提交：${words.join("、")}`,
+        });
+      } else if (bizErr.errorCode === "CONTENT_WARNING") {
+        const words = bizErr.data?.words || bizErr.response?.data?.data?.words || [];
+        Modal.warning({
+          title: "内容包含敏感词汇",
+          content: `请修改以下内容后再提交：${words.join("、")}`,
+        });
+      } else {
+        messageApi.error(err instanceof Error ? err.message : "发帖失败");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -700,11 +928,12 @@ export default function PublishPost() {
               type="primary"
               htmlType="submit"
               loading={submitting}
+              disabled={isTitleOverLimit || isContentOverLimit || sensitiveBlocked.length > 0}
               onClick={() => form.submit()}
               className="bg-blue-600 hover:bg-blue-700 border-none px-6 shadow-md"
               icon={<SendOutlined />}
             >
-              发布
+              {isEditMode ? "重新提交" : "发布"}
             </Button>
           </div>
         </div>
@@ -716,6 +945,35 @@ export default function PublishPost() {
         {/* 主编辑区域 - 白色卡片，与灰色背景形成对比 */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200">
           <Form form={form} layout="vertical" onFinish={handleSubmit}>
+            {/* 编辑模式提示 */}
+            {isEditMode && editPostData?.status === 2 && (
+              <Alert
+                type="warning"
+                showIcon
+                message="此帖子已被退回，修改后将重新提交审核"
+                description={editPostData.audit_reason ? `退回原因：${editPostData.audit_reason}` : undefined}
+                className="mx-5 mt-4 mb-2"
+              />
+            )}
+            {/* 敏感词检测警告 */}
+            {sensitiveBlocked.length > 0 && (
+              <Alert
+                type="error"
+                showIcon
+                message="内容包含违禁词汇，无法发布"
+                description={`请移除以下内容：${sensitiveBlocked.join("、")}`}
+                className="mx-5 mt-4 mb-2"
+              />
+            )}
+            {sensitiveWarned.length > 0 && sensitiveBlocked.length === 0 && (
+              <Alert
+                type="warning"
+                showIcon
+                message="内容包含敏感词汇，请修改后再提交"
+                description={`涉及词汇：${sensitiveWarned.join("、")}`}
+                className="mx-5 mt-4 mb-2"
+              />
+            )}
             {/* 标题输入区域 - 压缩间距 */}
             <div className="px-5 pt-4 pb-3">
               <div className="title-input-wrapper">
@@ -723,13 +981,13 @@ export default function PublishPost() {
                   name="title"
                   rules={[
                     { required: true, message: "请输入标题" },
-                    { min: 2, max: 100, message: "标题长度为2-100字符" },
+                    { min: 2, max: 60, message: "标题长度为2-60字符" },
                   ]}
                   className="mb-0"
                 >
                   <Input
                     placeholder="请输入标题"
-                    maxLength={100}
+                    maxLength={60}
                     className="title-input-field"
                     style={{
                       fontSize: '32px',
@@ -746,6 +1004,11 @@ export default function PublishPost() {
                     }}
                   />
                 </Form.Item>
+                {/* 标题字数统计 */}
+                <div className={`text-xs text-right mt-1 ${isTitleOverLimit ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
+                  <span>{titleLength}</span>
+                  <span>/60</span>
+                </div>
                 {/* 标题输入框底部边框 - 聚焦时高亮 */}
                 <div className="title-input-border h-0.5 bg-gray-100 transition-all duration-300 mt-1" />
               </div>
@@ -810,12 +1073,18 @@ export default function PublishPost() {
               <RichTextEditor
                 value={editorContent}
                 onChange={setEditorContent}
-                placeholder={watchedCategory 
+                placeholder={watchedCategory
                   ? getPlaceholderByCategory(watchedCategory)
                   : DEFAULT_PLACEHOLDER
                 }
                 maxLength={50000}
               />
+              {/* 正文字数统计 */}
+              <div className={`text-xs text-right mt-2 ${isContentOverLimit ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
+                <span>{contentLength}</span>
+                <span>/1000</span>
+                {isContentOverLimit && <span className="ml-2">字数超出限制，请精简内容</span>}
+              </div>
               {/* 分类模板提示 */}
               {watchedCategory && (
                 <div className="mt-3 text-xs text-gray-400 flex items-center gap-1">
@@ -898,33 +1167,38 @@ export default function PublishPost() {
                 <div className="flex items-center gap-2 mb-2">
                   <PictureOutlined className="text-green-500" />
                   <span className="text-sm font-medium text-gray-700">上传图片</span>
-                  <span className="text-xs text-gray-400">（可选，最多4张）</span>
+                  <span className="text-xs text-gray-400">（可选，最多4张，支持拖拽上传）</span>
                 </div>
                 <Form.Item className="mb-0">
-                  <div className="flex flex-wrap gap-2">
-                    <Upload
-                      listType="picture-card"
-                      fileList={fileList}
-                      onChange={({ fileList: next }) => setFileList(next.slice(0, 4))}
-                      beforeUpload={(file) => {
-                        const isImage = file.type.startsWith("image/");
-                        if (!isImage) {
-                          messageApi.error("仅支持图片格式");
-                          return Upload.LIST_IGNORE;
-                        }
-                        return false;
-                      }}
-                      maxCount={4}
-                      accept="image/*"
-                    >
-                      {fileList.length >= 4 ? null : (
-                        <div className="flex flex-col items-center justify-center text-gray-400 py-2">
-                          <PictureOutlined className="text-lg mb-1" />
-                          <span className="text-xs">上传图片</span>
-                        </div>
-                      )}
-                    </Upload>
-                  </div>
+                  <Upload.Dragger
+                    listType="picture-card"
+                    fileList={fileList}
+                    onChange={({ fileList: next }) => setFileList(next.slice(0, 4))}
+                    beforeUpload={(file) => {
+                      const isImage = file.type.startsWith("image/");
+                      if (!isImage) {
+                        messageApi.error("仅支持图片格式");
+                        return Upload.LIST_IGNORE;
+                      }
+                      if (fileList.length >= 4) {
+                        messageApi.warning("最多只能上传4张图片");
+                        return Upload.LIST_IGNORE;
+                      }
+                      return false;
+                    }}
+                    maxCount={4}
+                    accept="image/*"
+                    multiple
+                    className="image-dragger-upload"
+                  >
+                    {fileList.length >= 4 ? null : (
+                      <div className="flex flex-col items-center justify-center py-4">
+                        <InboxOutlined className="text-3xl text-blue-400 mb-2" />
+                        <p className="text-sm text-gray-500 mb-1">点击或拖拽图片到此处上传</p>
+                        <p className="text-xs text-gray-400">支持 JPG、PNG 等图片格式</p>
+                      </div>
+                    )}
+                  </Upload.Dragger>
                 </Form.Item>
               </div>
             </div>
@@ -1155,12 +1429,12 @@ export default function PublishPost() {
             margin-right: 12px !important;
             margin-bottom: 12px !important;
           }
-          
+
           .ant-upload.ant-upload-select-picture-card:hover {
             border-color: #3b82f6 !important;
             background: #eff6ff !important;
           }
-          
+
           .ant-upload-list-picture-card .ant-upload-list-item {
             width: 88px !important;
             height: 88px !important;
@@ -1168,6 +1442,23 @@ export default function PublishPost() {
             margin-right: 12px !important;
             margin-bottom: 12px !important;
             border: 1px solid #e5e7eb !important;
+          }
+
+          /* 拖拽上传区域样式 */
+          .image-dragger-upload .ant-upload-drag {
+            border: 2px dashed #d1d5db !important;
+            border-radius: 12px !important;
+            background: #fafbfc !important;
+            transition: all 0.3s ease !important;
+          }
+
+          .image-dragger-upload .ant-upload-drag:hover {
+            border-color: #3b82f6 !important;
+            background: #eff6ff !important;
+          }
+
+          .image-dragger-upload .ant-upload-drag-container {
+            padding: 8px 0 !important;
           }
           
           /* 固定顶部导航栏的间距 */
@@ -1180,20 +1471,24 @@ export default function PublishPost() {
             .title-input-field {
               font-size: 24px !important;
             }
-            
+
             .category-button-group .ant-radio-button-wrapper {
               padding: 0 16px !important;
               font-size: 14px !important;
               height: 36px !important;
               line-height: 32px !important;
             }
-            
+
             .ant-upload.ant-upload-select-picture-card,
             .ant-upload-list-picture-card .ant-upload-list-item {
               width: 72px !important;
               height: 72px !important;
               margin-right: 8px !important;
               margin-bottom: 8px !important;
+            }
+
+            .image-dragger-upload .ant-upload-drag {
+              padding: 8px !important;
             }
           }
         `}
