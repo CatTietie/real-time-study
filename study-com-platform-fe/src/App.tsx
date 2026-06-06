@@ -66,6 +66,13 @@ import KnowledgeLibrary from "./pages/student/KnowledgeLibrary";
 import KnowledgeDocumentView from "./pages/student/KnowledgeDocumentView";
 import KnowledgeCategories from "./pages/admin/KnowledgeCategories";
 import KnowledgeDocuments from "./pages/admin/KnowledgeDocuments";
+import MallProducts from "./pages/admin/MallProducts";
+import MallOrdersAdmin from "./pages/admin/MallOrders";
+import MallBanners from "./pages/admin/MallBanners";
+import PointsMall from "./pages/community/PointsMall";
+import MallProductDetail from "./pages/community/MallProductDetail";
+import MallOrdersStudent from "./pages/community/MallOrders";
+import MyDecorations from "./pages/community/MyDecorations";
 import NotFound from "./pages/shared/NotFound";
 import Register from "./pages/shared/Register";
 import ComingSoon from "./pages/shared/ComingSoon";
@@ -104,6 +111,10 @@ function App() {
         <Route path="/community/question-bank/:bankId/result/:recordId" element={<QuestionBankResult />} />
         <Route path="/community/wrong-book" element={<WrongBook />} />
         <Route path="/community/exercise-history" element={<ExerciseHistory />} />
+        <Route path="/community/mall" element={<PointsMall />} />
+        <Route path="/community/mall/product/:id" element={<MallProductDetail />} />
+        <Route path="/community/mall/orders" element={<MallOrdersStudent />} />
+        <Route path="/community/mall/decorations" element={<MyDecorations />} />
         <Route path="/student/entry" element={<StudentEntry />} />
         <Route path="/register" element={<Register />} />
         <Route path="/student/coming-soon" element={<ComingSoon />} />
@@ -327,6 +338,9 @@ function App() {
           <Route path="learning-paths/:id/editor" element={<LearningPathEditor />} />
           <Route path="knowledge/categories" element={<KnowledgeCategories />} />
           <Route path="knowledge/documents" element={<KnowledgeDocuments />} />
+          <Route path="mall/products" element={<MallProducts />} />
+          <Route path="mall/orders" element={<MallOrdersAdmin />} />
+          <Route path="mall/banners" element={<MallBanners />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

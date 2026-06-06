@@ -19,6 +19,7 @@ import aiAssistantRoutes from "./ai-assistant.routes";
 import videoStudyRoomRoutes from "./video-study-room.routes";
 import codeProblemStudentRoutes from "./code-problem-student.routes";
 import knowledgeLibraryRoutes from "./knowledge-library.routes";
+import mallRoutes from "./mall.routes";
 
 const router = Router();
 
@@ -41,5 +42,6 @@ router.use("/ai-assistant", aiAssistantRoutes);  // AI 学习助手
 router.use("/video-study-rooms", videoStudyRoomRoutes);  // 视频自习室
 router.use("/code-problems", codeProblemStudentRoutes);  // 编程题库
 router.use("/knowledge-library", knowledgeLibraryRoutes);  // 知识文库
+router.use("/mall", mallRoutes);  // 积分商城
 
 export default router;

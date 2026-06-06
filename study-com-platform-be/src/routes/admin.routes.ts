@@ -318,4 +318,21 @@ router.post("/knowledge/documents/batch/move", authMiddleware, adminMiddleware, 
 router.post("/knowledge/documents/batch/delete", authMiddleware, adminMiddleware, requirePermission("knowledge.manage"), knowledgeAdminController.adminBatchDeleteDocuments);
 router.get("/knowledge/stats", authMiddleware, adminMiddleware, knowledgeAdminController.adminGetStats);
 
+// 积分商城管理
+import * as mallAdminController from "../controllers/mall-admin.controller";
+import { uploadMallImage } from "../middlewares/upload.middleware";
+router.post("/mall/upload", authMiddleware, adminMiddleware, uploadMallImage.single("file"), mallAdminController.uploadImage);
+router.get("/mall/products", authMiddleware, adminMiddleware, mallAdminController.listProducts);
+router.post("/mall/products", authMiddleware, adminMiddleware, mallAdminController.createProduct);
+router.put("/mall/products/:id", authMiddleware, adminMiddleware, mallAdminController.updateProduct);
+router.delete("/mall/products/:id", authMiddleware, adminMiddleware, mallAdminController.deleteProduct);
+router.patch("/mall/products/:id/status", authMiddleware, adminMiddleware, mallAdminController.toggleProductStatus);
+router.get("/mall/orders", authMiddleware, adminMiddleware, mallAdminController.listOrders);
+router.patch("/mall/orders/:id/ship", authMiddleware, adminMiddleware, mallAdminController.shipOrder);
+router.get("/mall/banners", authMiddleware, adminMiddleware, mallAdminController.listBanners);
+router.post("/mall/banners", authMiddleware, adminMiddleware, mallAdminController.createBanner);
+router.put("/mall/banners/:id", authMiddleware, adminMiddleware, mallAdminController.updateBanner);
+router.delete("/mall/banners/:id", authMiddleware, adminMiddleware, mallAdminController.deleteBanner);
+router.get("/mall/stats", authMiddleware, adminMiddleware, mallAdminController.getMallStats);
+
 export default router;

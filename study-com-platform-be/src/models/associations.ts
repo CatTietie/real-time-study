@@ -61,6 +61,10 @@ import KnowledgeDocument from "./knowledge-document.model";
 import DocumentVersion from "./document-version.model";
 import DocumentAnnotation from "./document-annotation.model";
 import DocumentPermission from "./document-permission.model";
+import MallProduct from "./mall-product.model";
+import MallOrder from "./mall-order.model";
+import UserDecoration from "./user-decoration.model";
+import MallBanner from "./mall-banner.model";
 
 export const initAssociations = () => {
   // 用户与登录日志
@@ -398,4 +402,20 @@ export const initAssociations = () => {
   DocumentPermission.belongsTo(KnowledgeDocument, { foreignKey: "document_id" });
   DocumentPermission.belongsTo(User, { foreignKey: "granted_by", as: "GrantedByUser" });
   DocumentPermission.belongsTo(User, { foreignKey: "target_id", as: "TargetUser", constraints: false });
+
+  // ===== 积分商城 =====
+  User.hasMany(MallOrder, { foreignKey: "user_id", as: "MallOrders" });
+  MallOrder.belongsTo(User, { foreignKey: "user_id" });
+
+  MallProduct.hasMany(MallOrder, { foreignKey: "product_id" });
+  MallOrder.belongsTo(MallProduct, { foreignKey: "product_id" });
+
+  User.hasMany(UserDecoration, { foreignKey: "user_id", as: "Decorations" });
+  UserDecoration.belongsTo(User, { foreignKey: "user_id" });
+
+  MallProduct.hasMany(UserDecoration, { foreignKey: "product_id" });
+  UserDecoration.belongsTo(MallProduct, { foreignKey: "product_id" });
+
+  User.hasMany(MallProduct, { foreignKey: "created_by", as: "CreatedProducts" });
+  MallProduct.belongsTo(User, { foreignKey: "created_by", as: "Creator" });
 };

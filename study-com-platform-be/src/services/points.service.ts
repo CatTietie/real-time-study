@@ -9,7 +9,7 @@ export const getStartOfDay = () => {
   return start;
 };
 
-export type SourceType = "post" | "comment" | "like" | "task" | "study" | "report" | "admin" | "system" | "remark";
+export type SourceType = "post" | "comment" | "like" | "task" | "study" | "report" | "admin" | "system" | "remark" | "exchange";
 
 export const addPoints = async (options: {
   userId: number;

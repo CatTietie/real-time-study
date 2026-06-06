@@ -20,6 +20,7 @@ import {
   ApartmentOutlined,
   DashboardOutlined,
   ReadOutlined,
+  ShopOutlined,
 } from "@ant-design/icons";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
@@ -252,6 +253,25 @@ const baseMenuItems = (role: string | null) => [
       {
         key: "/admin/knowledge/documents",
         label: <Link to="/admin/knowledge/documents">文档管理</Link>,
+      },
+    ],
+  },
+  {
+    key: "mall",
+    icon: <ShopOutlined />,
+    label: "积分商城",
+    children: [
+      {
+        key: "/admin/mall/products",
+        label: <Link to="/admin/mall/products">商品管理</Link>,
+      },
+      {
+        key: "/admin/mall/orders",
+        label: <Link to="/admin/mall/orders">订单管理</Link>,
+      },
+      {
+        key: "/admin/mall/banners",
+        label: <Link to="/admin/mall/banners">轮播管理</Link>,
       },
     ],
   },

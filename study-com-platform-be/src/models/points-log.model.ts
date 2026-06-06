@@ -7,7 +7,7 @@ export class PointsLog extends Model {
   public user_id!: number;
   public change!: number;
   public reason!: string;
-  public source_type!: "post" | "comment" | "like" | "task" | "study" | "report" | "admin" | "system" | "remark";
+  public source_type!: "post" | "comment" | "like" | "task" | "study" | "report" | "admin" | "system" | "remark" | "exchange";
   public source_id?: number;
   public admin_id?: number;
   public createdAt!: Date;
@@ -39,7 +39,7 @@ PointsLog.init(
       comment: "变动原因",
     },
     source_type: {
-      type: DataTypes.ENUM("post", "comment", "like", "task", "study", "report", "admin", "system", "remark"),
+      type: DataTypes.ENUM("post", "comment", "like", "task", "study", "report", "admin", "system", "remark", "exchange"),
       allowNull: false,
       comment: "来源类型",
     },

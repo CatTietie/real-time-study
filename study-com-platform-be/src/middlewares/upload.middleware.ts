@@ -53,6 +53,26 @@ export const uploadPostImages = multer({
   },
 });
 
+// 商城图片上传
+const mallUploadsRoot = path.join(process.cwd(), "uploads", "mall");
+if (!fs.existsSync(mallUploadsRoot)) {
+  fs.mkdirSync(mallUploadsRoot, { recursive: true });
+}
+const mallDiskStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, mallUploadsRoot),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const basename = path.basename(file.originalname, ext).replace(/\s+/g, "-");
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+    cb(null, `${basename}-${unique}${ext}`);
+  },
+});
+export const uploadMallImage = multer({
+  storage: ossService.isAvailable() ? memoryStorage : mallDiskStorage,
+  fileFilter,
+  limits: { files: 1, fileSize: 2 * 1024 * 1024 },
+});
+
 export const conditionalPostImages = (
   req: Request,
   res: Response,
