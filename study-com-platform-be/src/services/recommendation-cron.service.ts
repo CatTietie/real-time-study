@@ -128,7 +128,7 @@ function computePostScore(
   const rawHotness = (post.like_count || 0) * 3 + (post.comment_count || 0) * 2 + (post.view_count || 0);
   const decay = timeDecayFactor(new Date(post.created_at));
   const decayedHotness = rawHotness * decay;
-  // 用 log 压缩大值，避免极热帖子压倒一切
+  // 用 chat.log 压缩大值，避免极热帖子压倒一切
   const hotnessScore = Math.min(20, Math.log1p(decayedHotness) * 2);
 
   return interestScore + hotnessScore;
