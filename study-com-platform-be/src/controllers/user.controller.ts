@@ -11,14 +11,19 @@ import { LearningGoal } from "../models/learning-goal.model";
 import { Op, Sequelize } from "sequelize";
 import { comparePassword, hashPassword } from "../utils/password";
 import { generateToken } from "../services/auth.service";
-import { 
-  checkAccountLock, 
-  recordFailedLogin, 
-  resetFailedLoginAttempts 
+import {
+  checkAccountLock,
+  recordFailedLogin,
+  resetFailedLoginAttempts
 } from "../services/auth.service";
+import { recordLoginLog } from "../services/login-log.service";
 import { PERMISSION_CODES } from "../constants/permissions";
 import { calculateLevel, getStartOfDay, getStartOfWeek } from "../utils/helper";
 import { getUserHotPostsCount } from "../services/hot-posts.service";
+import UserStats from "../models/user-stats.model";
+import { validatePasswordStrength } from "../utils/validator";
+import type { PasswordStrengthResult } from "../utils/validator";
+import { uploadSingleFileToOss } from "../middlewares/upload.middleware";
 
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCK_DURATION_MINUTES = 15;
@@ -35,6 +40,13 @@ export const register = async (req: Request, res: Response) => {
       return res
         .status(400)
         .json({ success: false, message: "账号和密码不能为空" });
+    }
+
+    const passwordStrength = validatePasswordStrength(password);
+    if (!passwordStrength.isValid) {
+      return res
+        .status(400)
+        .json({ success: false, message: passwordStrength.message });
     }
 
     const existing = await User.findOne({ where: { username } });
@@ -146,6 +158,9 @@ export const login = async (req: Request, res: Response) => {
     await resetFailedLoginAttempts(user);
 
     await user.update({ last_login: new Date() });
+
+    const clientIp = (req.headers["x-forwarded-for"] as string)?.split(",")[0] || req.ip || "";
+    recordLoginLog(user.id, clientIp).catch(() => {});
 
     const token = generateToken({
       id: user.id,
@@ -296,7 +311,10 @@ export const getUserProfile = async (req: Request, res: Response) => {
     const higherCount = await User.count({
       where: { status: 1, points: { [Op.gt]: user.points } },
     });
-    
+
+    // 查询做题统计
+    const userStats = await UserStats.findOne({ where: { user_id: userId } });
+
     res.json({
       success: true,
       data: {
@@ -313,6 +331,9 @@ export const getUserProfile = async (req: Request, res: Response) => {
         todayLikes: totalTodayLikes,
         todayViews: todayViews || 0,
         hotPostsCount: hotPostsCount || 0,
+        // 做题统计
+        totalQuestions: userStats?.total_questions ?? 0,
+        accuracyRate: userStats?.accuracy_rate ?? 0,
         // 状态信息
         role: user.role,
         status: user.status
@@ -410,10 +431,12 @@ export const updateUserPassword = async (req: Request, res: Response) => {
       });
     }
     
-    if (newPassword.length < 6 || newPassword.length > 32) {
+    // 密码强度校验（与注册时的校验逻辑一致）
+    const passwordStrength = validatePasswordStrength(newPassword);
+    if (!passwordStrength.isValid) {
       return res.status(400).json({ 
         success: false, 
-        message: '新密码长度必须在6-32位之间' 
+        message: passwordStrength.message 
       });
     }
     
@@ -515,6 +538,45 @@ export const getMyPermissions = async (req: Request, res: Response) => {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "获取权限失败";
+    res.status(500).json({ success: false, message });
+  }
+};
+
+/**
+ * 上传用户头像
+ */
+export const uploadAvatar = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "未授权访问" });
+    }
+
+    const userId = req.user.id;
+    
+    // 上传头像到 OSS
+    const avatarUrl = await uploadSingleFileToOss(req);
+    
+    if (!avatarUrl) {
+      return res.status(400).json({ success: false, message: "请选择要上传的头像" });
+    }
+
+    // 更新用户头像
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "用户不存在" });
+    }
+
+    await user.update({ avatar: avatarUrl });
+
+    res.json({
+      success: true,
+      message: "头像上传成功",
+      data: {
+        avatar: avatarUrl,
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "头像上传失败";
     res.status(500).json({ success: false, message });
   }
 };

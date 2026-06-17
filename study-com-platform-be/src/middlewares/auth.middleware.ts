@@ -1,6 +1,9 @@
 // 认证中间件
 import { Request, Response, NextFunction } from "express";
 import { verifyToken } from "../services/auth.service";
+import UserRole from "../models/user-role.model";
+import Permission from "../models/permission.model";
+import RolePermission from "../models/role-permission.model";
 
 // 扩展 Express Request 类型
 declare global {
@@ -121,3 +124,42 @@ export const superAdminMiddleware = (
 };
 
 export default authMiddleware;
+
+/**
+ * 权限验证中间件 - 检查管理员是否拥有指定权限码
+ */
+export const requirePermission = (permissionCode: string) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: "未授权访问" });
+      }
+
+      if (req.user.role === "super_admin") {
+        return next();
+      }
+
+      const userRole = await UserRole.findOne({ where: { user_id: req.user.id } });
+      if (!userRole) {
+        return res.status(403).json({ success: false, message: "未分配角色，无权操作" });
+      }
+
+      const permission = await Permission.findOne({ where: { code: permissionCode } });
+      if (!permission) {
+        return res.status(403).json({ success: false, message: "权限未定义" });
+      }
+
+      const rolePermission = await RolePermission.findOne({
+        where: { role_id: (userRole as any).role_id, permission_id: (permission as any).id },
+      });
+
+      if (!rolePermission) {
+        return res.status(403).json({ success: false, message: "无此操作权限" });
+      }
+
+      next();
+    } catch (error) {
+      res.status(403).json({ success: false, message: "权限验证失败" });
+    }
+  };
+};

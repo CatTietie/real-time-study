@@ -1,4 +1,9 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
+
+const PostDetailRedirect = () => {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/community?postId=${id}`} replace />;
+};
 import AdminLayout from "./components/admin/AdminLayout";
 import RequireAuth from "./components/admin/RequireAuth";
 import StudentLayout from "./components/student/StudentLayout";
@@ -14,19 +19,29 @@ import RBACPermissions from "./pages/admin/RBACPermissions";
 import Admins from "./pages/admin/Admins";
 import CommunityLanding from "./pages/community/CommunityLanding";
 import PostsList from "./pages/community/PostsList";
-import PostDetail from "./pages/community/PostDetail";
 import PublishPost from "./pages/community/PublishPost";
 import Leaderboard from "./pages/community/Leaderboard";
 import Favorites from "./pages/community/Favorites";
 import PointsCenter from "./pages/community/PointsCenter";
+import BadgeCenter from "./pages/community/BadgeCenter";
+import QuestionBankPractice from "./pages/community/QuestionBankPractice";
+import QuestionBankMode from "./pages/community/QuestionBankMode";
+import QuestionBankExam from "./pages/community/QuestionBankExam";
+import QuestionBankResult from "./pages/community/QuestionBankResult";
+import WrongBook from "./pages/community/WrongBook";
+import ExerciseHistory from "./pages/community/ExerciseHistory";
 import MyLikes from "./pages/community/MyLikes";
+import UserProfile from "./pages/community/UserProfile";
 import StudentDashboard from "./pages/student/Dashboard";
 import LearningAnalytics from "./pages/student/LearningAnalytics";
+import LearningReport from "./pages/student/LearningReport";
 import ProfileEdit from "./pages/student/ProfileEdit";
 import StudyRoomList from "./pages/student/StudyRoomList";
 import MyReservations from "./pages/student/MyReservations";
 import ChatPage from "./pages/student/ChatPage";
 import WhiteboardPage from "./pages/student/WhiteboardPage";
+import CollaborativeNoteList from "./pages/student/CollaborativeNoteList";
+import CollaborativeNotePage from "./pages/student/CollaborativeNotePage";
 import CommunityPosts from "./pages/admin/community/CommunityPosts";
 import CommunityComments from "./pages/admin/community/CommunityComments";
 import CommunityStats from "./pages/admin/community/CommunityStats";
@@ -35,6 +50,29 @@ import SensitiveWords from "./pages/admin/SensitiveWords";
 import PointsRules from "./pages/admin/PointsRules";
 import PointsLogs from "./pages/admin/PointsLogs";
 import UserManagement from "./pages/admin/UserManagement";
+import QuestionBankManage from "./pages/admin/QuestionBankManage";
+import QuestionFeedbackStats from "./pages/admin/QuestionFeedbackStats";
+import ExerciseReview from "./pages/admin/ExerciseReview";
+import ContentAudit from "./pages/admin/ContentAudit";
+import AuditConfig from "./pages/admin/AuditConfig";
+import LearningPathList from "./pages/admin/LearningPathList";
+import LearningPathEditor from "./pages/admin/LearningPathEditor";
+import RealtimeDashboard from "./pages/admin/RealtimeDashboard";
+import SkillTreeBrowse from "./pages/student/SkillTreeBrowse";
+import SkillTreeView from "./pages/student/SkillTreeView";
+import VideoStudyRoomList from "./pages/student/VideoStudyRoomList";
+import VideoStudyRoomPage from "./pages/student/VideoStudyRoom";
+import KnowledgeLibrary from "./pages/student/KnowledgeLibrary";
+import KnowledgeDocumentView from "./pages/student/KnowledgeDocumentView";
+import KnowledgeCategories from "./pages/admin/KnowledgeCategories";
+import KnowledgeDocuments from "./pages/admin/KnowledgeDocuments";
+import MallProducts from "./pages/admin/MallProducts";
+import MallOrdersAdmin from "./pages/admin/MallOrders";
+import MallBanners from "./pages/admin/MallBanners";
+import PointsMall from "./pages/community/PointsMall";
+import MallProductDetail from "./pages/community/MallProductDetail";
+import MallOrdersStudent from "./pages/community/MallOrders";
+import MyDecorations from "./pages/community/MyDecorations";
 import NotFound from "./pages/shared/NotFound";
 import Register from "./pages/shared/Register";
 import ComingSoon from "./pages/shared/ComingSoon";
@@ -60,11 +98,23 @@ function App() {
         <Route path="/community" element={<CommunityLanding />} />
         <Route path="/community/posts" element={<PostsList />} />
         <Route path="/community/publish" element={<PublishPost />} />
-        <Route path="/community/posts/:id" element={<PostDetail />} />
+        <Route path="/community/posts/:id" element={<PostDetailRedirect />} />
         <Route path="/community/leaderboard" element={<Leaderboard />} />
+        <Route path="/community/user/:userId" element={<UserProfile />} />
         <Route path="/community/favorites" element={<Favorites />} />
         <Route path="/community/likes" element={<MyLikes />} />
         <Route path="/community/points" element={<PointsCenter />} />
+        <Route path="/community/badges" element={<BadgeCenter />} />
+        <Route path="/community/question-bank" element={<QuestionBankPractice />} />
+        <Route path="/community/question-bank/:bankId/mode" element={<QuestionBankMode />} />
+        <Route path="/community/question-bank/:bankId/practice" element={<QuestionBankExam />} />
+        <Route path="/community/question-bank/:bankId/result/:recordId" element={<QuestionBankResult />} />
+        <Route path="/community/wrong-book" element={<WrongBook />} />
+        <Route path="/community/exercise-history" element={<ExerciseHistory />} />
+        <Route path="/community/mall" element={<PointsMall />} />
+        <Route path="/community/mall/product/:id" element={<MallProductDetail />} />
+        <Route path="/community/mall/orders" element={<MallOrdersStudent />} />
+        <Route path="/community/mall/decorations" element={<MyDecorations />} />
         <Route path="/student/entry" element={<StudentEntry />} />
         <Route path="/register" element={<Register />} />
         <Route path="/student/coming-soon" element={<ComingSoon />} />
@@ -100,15 +150,25 @@ function App() {
             </RequireStudentAuth>
           } 
         />
-        <Route 
-          path="/student/learning-analytics" 
+        <Route
+          path="/student/learning-analytics"
           element={
             <RequireStudentAuth>
               <StudentLayout>
                 <LearningAnalytics />
               </StudentLayout>
             </RequireStudentAuth>
-          } 
+          }
+        />
+        <Route
+          path="/student/learning-report"
+          element={
+            <RequireStudentAuth>
+              <StudentLayout>
+                <LearningReport />
+              </StudentLayout>
+            </RequireStudentAuth>
+          }
         />
         <Route 
           path="/student/profile" 
@@ -151,9 +211,89 @@ function App() {
           } 
         />
         <Route path="/student/settings" element={<ComingSoon />} />
-        
-        
-        
+        <Route
+          path="/student/skill-tree"
+          element={
+            <RequireStudentAuth>
+              <StudentLayout>
+                <SkillTreeBrowse />
+              </StudentLayout>
+            </RequireStudentAuth>
+          }
+        />
+        <Route
+          path="/student/skill-tree/:pathId"
+          element={
+            <RequireStudentAuth>
+              <StudentLayout>
+                <SkillTreeView />
+              </StudentLayout>
+            </RequireStudentAuth>
+          }
+        />
+        <Route
+          path="/student/collaborative-notes"
+          element={
+            <RequireStudentAuth>
+              <StudentLayout>
+                <CollaborativeNoteList />
+              </StudentLayout>
+            </RequireStudentAuth>
+          }
+        />
+        <Route
+          path="/student/collaborative-notes/:id"
+          element={
+            <RequireStudentAuth>
+              <StudentLayout>
+                <CollaborativeNotePage />
+              </StudentLayout>
+            </RequireStudentAuth>
+          }
+        />
+        <Route
+          path="/student/video-study-rooms"
+          element={
+            <RequireStudentAuth>
+              <StudentLayout>
+                <VideoStudyRoomList />
+              </StudentLayout>
+            </RequireStudentAuth>
+          }
+        />
+        <Route
+          path="/student/video-study-room/:id"
+          element={
+            <RequireStudentAuth>
+              <StudentLayout>
+                <VideoStudyRoomPage />
+              </StudentLayout>
+            </RequireStudentAuth>
+          }
+        />
+        <Route
+          path="/student/knowledge-library"
+          element={
+            <RequireStudentAuth>
+              <StudentLayout>
+                <KnowledgeLibrary />
+              </StudentLayout>
+            </RequireStudentAuth>
+          }
+        />
+        <Route
+          path="/student/knowledge-library/:id"
+          element={
+            <RequireStudentAuth>
+              <StudentLayout>
+                <KnowledgeDocumentView />
+              </StudentLayout>
+            </RequireStudentAuth>
+          }
+        />
+
+
+
         {/* 管理端路由 */}
         <Route
           path="/admin"
@@ -165,6 +305,7 @@ function App() {
         >
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
+          <Route path="realtime" element={<RealtimeDashboard />} />
           <Route path="users" element={<Users />} />
           <Route path="audit/posts" element={<AuditPosts />} />
           <Route path="audit/comments" element={<AuditComments />} />
@@ -188,6 +329,18 @@ function App() {
           <Route path="rbac/roles" element={<RBACRoles />} />
           <Route path="rbac/permissions" element={<RBACPermissions />} />
           <Route path="user-management" element={<UserManagement />} />
+          <Route path="question-bank" element={<QuestionBankManage />} />
+          <Route path="question-feedback" element={<QuestionFeedbackStats />} />
+          <Route path="exercise-review" element={<ExerciseReview />} />
+          <Route path="audit/content" element={<ContentAudit />} />
+          <Route path="audit/config" element={<AuditConfig />} />
+          <Route path="learning-paths" element={<LearningPathList />} />
+          <Route path="learning-paths/:id/editor" element={<LearningPathEditor />} />
+          <Route path="knowledge/categories" element={<KnowledgeCategories />} />
+          <Route path="knowledge/documents" element={<KnowledgeDocuments />} />
+          <Route path="mall/products" element={<MallProducts />} />
+          <Route path="mall/orders" element={<MallOrdersAdmin />} />
+          <Route path="mall/banners" element={<MallBanners />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

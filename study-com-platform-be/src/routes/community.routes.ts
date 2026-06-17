@@ -6,9 +6,12 @@ import {
   createCommunityReport,
   deleteCommunityComment,
   deleteCommunityPost,
+  deleteCommunityDraft,
   deleteFavorite,
   deleteFavoriteFolder,
   getCommunityComments,
+  getCommunityDrafts,
+  getCommunityDraftDetail,
   getCommunityLeaderboard,
   getCommunityPostComments,
   getCommunityPostDetail,
@@ -28,11 +31,34 @@ import {
   updateFavoriteFolder,
   getPointsSummary,
   getPointsLogs,
+  getPointsOverviewPlus,
+  getPointsActions,
+  getPointsBadges,
   getCommunityProfileSummary,
   getCommunityTagSuggestions,
   streamCommunityEvents,
   getUserTodayStats,
+  getBadgesOverview,
+  checkSensitiveWordsPublic,
 } from "../controllers/community-public.controller";
+import {
+  getLearningStatsCards,
+  getStudyDurationDetail,
+  getLoginStreakDetail,
+  getContentQualityDetail,
+  getDailyStudyRecords,
+  getMultiDimTrend,
+  getWeeklyComparison,
+  getActivityHeatmap,
+  getActionRecommendationsHandler,
+  getRankingSnapshotHandler,
+  getLearningReport,
+} from "../controllers/study-stats.controller";
+import {
+  getDailyQuestionToday,
+  submitDailyQuestionAnswer,
+  getDailyQuestionStreakInfo,
+} from "../controllers/daily-question.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { conditionalPostImages } from "../middlewares/upload.middleware";
 
@@ -61,6 +87,9 @@ router.get("/leaderboard", getCommunityLeaderboard);
 // 标签联想
 router.get("/tags/suggest", getCommunityTagSuggestions);
 
+// 敏感词检测（学生端）
+router.post("/check-sensitive-words", authMiddleware, checkSensitiveWordsPublic);
+
 // 社区实时事件流
 router.get("/stream", streamCommunityEvents);
 
@@ -83,11 +112,46 @@ router.post("/visit", authMiddleware, recordCommunityVisit);
 // 积分
 router.get("/points/summary", authMiddleware, getPointsSummary);
 router.get("/points/logs", authMiddleware, getPointsLogs);
+router.get("/points/overview-plus", authMiddleware, getPointsOverviewPlus);
+router.get("/points/actions", authMiddleware, getPointsActions);
+router.get("/points/badges", authMiddleware, getPointsBadges);
+
+// 徽章/成就中心
+router.get("/badges/overview", authMiddleware, getBadgesOverview);
 
 // 个人信息汇总
 router.get("/profile/summary", authMiddleware, getCommunityProfileSummary);
 
 // 用户今日统计
 router.get("/user/today-stats", authMiddleware, getUserTodayStats);
+
+// 草稿相关路由
+router.get("/drafts", authMiddleware, getCommunityDrafts);
+router.get("/drafts/:id", authMiddleware, getCommunityDraftDetail);
+router.delete("/drafts/:id", authMiddleware, deleteCommunityDraft);
+
+// 学习统计相关路由
+router.get("/learning-stats", authMiddleware, getLearningStatsCards);
+router.get("/learning-stats/duration", authMiddleware, getStudyDurationDetail);
+router.get("/learning-stats/streak", authMiddleware, getLoginStreakDetail);
+router.get("/learning-stats/quality", authMiddleware, getContentQualityDetail);
+router.get("/learning-stats/daily", authMiddleware, getDailyStudyRecords);
+
+// 增强学习统计API - 多维趋势、对比、热力图
+router.get("/learning-stats/trend", authMiddleware, getMultiDimTrend);
+router.get("/learning-stats/comparison", authMiddleware, getWeeklyComparison);
+router.get("/learning-stats/heatmap", authMiddleware, getActivityHeatmap);
+
+// 行为驱动API - 行动推荐、排行榜快照
+router.get("/learning-stats/actions", authMiddleware, getActionRecommendationsHandler);
+router.get("/learning-stats/ranking", authMiddleware, getRankingSnapshotHandler);
+
+// 个人学习报告
+router.get("/learning-report", authMiddleware, getLearningReport);
+
+// 每日一题
+router.get("/daily-question/today", authMiddleware, getDailyQuestionToday);
+router.post("/daily-question/submit", authMiddleware, submitDailyQuestionAnswer);
+router.get("/daily-question/streak", authMiddleware, getDailyQuestionStreakInfo);
 
 export default router;

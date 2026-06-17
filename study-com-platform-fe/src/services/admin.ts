@@ -45,8 +45,31 @@ export const createRole = async (payload: {
   return response.data;
 };
 
+export const updateRole = async (
+  id: number,
+  payload: { name?: string; description?: string; status?: number },
+) => {
+  const response = await api.put(`/admin/rbac/roles/${id}`, payload);
+  return response.data;
+};
+
+export const deleteRole = async (id: number) => {
+  const response = await api.delete(`/admin/rbac/roles/${id}`);
+  return response.data;
+};
+
+export const fetchRoleUsers = async (roleId: number) => {
+  const response = await api.get(`/admin/rbac/roles/${roleId}/users`);
+  return response.data;
+};
+
 export const fetchPermissions = async () => {
   const response = await api.get("/admin/rbac/permissions");
+  return response.data;
+};
+
+export const fetchRolePermissions = async (roleId: number) => {
+  const response = await api.get(`/admin/rbac/roles/${roleId}/permissions`);
   return response.data;
 };
 

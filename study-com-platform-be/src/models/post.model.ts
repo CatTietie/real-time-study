@@ -22,6 +22,11 @@ export class Post extends Model {
   public last_edited_at?: Date;
   public images?: string;
   public deleted_at?: Date;
+  public forward_post_id?: number;
+  public forward_user_id?: number;
+  public question_id?: number;
+  public ForwardPost?: Post;
+  public ForwardUser?: any;
   public createdAt!: Date;
   public updatedAt!: Date;
 }
@@ -123,6 +128,33 @@ Post.init(
       type: DataTypes.DATE,
       comment: "删除时间（回收站）",
     },
+    forward_post_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: "转发的原帖ID",
+      references: {
+        model: "posts",
+        key: "id",
+      },
+    },
+    forward_user_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: "被转发的原作者ID",
+      references: {
+        model: "users",
+        key: "id",
+      },
+    },
+    question_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: "关联题目ID（题库讨论帖）",
+      references: {
+        model: "questions",
+        key: "id",
+      },
+    },
   },
   {
     sequelize,
@@ -138,6 +170,9 @@ Post.init(
       { fields: ["category"] },
       { fields: ["created_at"] },
       { fields: ["audit_admin_id"] },
+      { fields: ["forward_post_id"] },
+      { fields: ["forward_user_id"] },
+      { fields: ["question_id"] },
     ],
   },
 );

@@ -3,7 +3,7 @@ import api from "./api";
 type QueryParams = Record<string, string | number | boolean | null | undefined>;
 
 export const fetchCommunityPosts = async (params?: QueryParams) => {
-  const response = await api.get("/community/posts", { params });
+  const response = await api.get("/admin/community/posts", { params });
   return response.data;
 };
 
@@ -64,5 +64,22 @@ export const handleCommunityReport = async (
     `/admin/community/reports/${id}/handle`,
     payload,
   );
+  return response.data;
+};
+
+export const batchAuditPosts = async (payload: {
+  ids: number[];
+  status: number;
+  reason?: string;
+}) => {
+  const response = await api.post(
+    "/admin/community/posts/batch-audit",
+    payload,
+  );
+  return response.data;
+};
+
+export const fetchAuditStats = async () => {
+  const response = await api.get("/admin/community/audit-stats");
   return response.data;
 };

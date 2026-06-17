@@ -5,12 +5,16 @@ import {
   authMiddleware,
   adminMiddleware,
   superAdminMiddleware,
+  requirePermission,
 } from "../middlewares/auth.middleware";
 import * as rbacController from "../controllers/rbac.controller";
 import * as communityController from "../controllers/community.controller";
 import * as reportController from "../controllers/report.controller";
 import * as sensitiveWordController from "../controllers/sensitive-word.controller";
 import * as pointsRuleController from "../controllers/points-rule.controller";
+import * as questionBankController from "../controllers/question-bank.controller";
+import * as questionFeedbackController from "../controllers/question-feedback.controller";
+import * as auditConfigController from "../controllers/audit-config.controller";
 
 const router = Router();
 
@@ -84,11 +88,35 @@ router.post(
   superAdminMiddleware,
   rbacController.createRole,
 );
+router.put(
+  "/rbac/roles/:id",
+  authMiddleware,
+  superAdminMiddleware,
+  rbacController.updateRole,
+);
+router.delete(
+  "/rbac/roles/:id",
+  authMiddleware,
+  superAdminMiddleware,
+  rbacController.deleteRole,
+);
+router.get(
+  "/rbac/roles/:id/users",
+  authMiddleware,
+  adminMiddleware,
+  rbacController.getRoleUsers,
+);
 router.get(
   "/rbac/permissions",
   authMiddleware,
   adminMiddleware,
   rbacController.getPermissions,
+);
+router.get(
+  "/rbac/roles/:id/permissions",
+  authMiddleware,
+  adminMiddleware,
+  rbacController.getRolePermissions,
 );
 router.post(
   "/rbac/roles/:id/permissions",
@@ -133,6 +161,30 @@ router.get(
   authMiddleware,
   adminMiddleware,
   communityController.getCommunityStats,
+);
+router.post(
+  "/community/posts/batch-audit",
+  authMiddleware,
+  adminMiddleware,
+  communityController.batchAuditPosts,
+);
+router.get(
+  "/community/audit-stats",
+  authMiddleware,
+  adminMiddleware,
+  communityController.getAuditStats,
+);
+router.get(
+  "/community/audit-config",
+  authMiddleware,
+  adminMiddleware,
+  auditConfigController.getConfig,
+);
+router.put(
+  "/community/audit-config",
+  authMiddleware,
+  adminMiddleware,
+  auditConfigController.updateConfig,
 );
 
 // 敏感词库
@@ -230,5 +282,57 @@ router.get(
   adminMiddleware,
   pointsRuleController.getPointsRules,
 );
+
+// 题库管理
+router.get("/professionals", authMiddleware, adminMiddleware, questionBankController.getProfessionals);
+router.get("/categories", authMiddleware, adminMiddleware, questionBankController.getCategories);
+router.get("/banks", authMiddleware, adminMiddleware, questionBankController.getBanks);
+router.post("/bank", authMiddleware, adminMiddleware, questionBankController.createBank);
+router.get("/bank/:id/questions", authMiddleware, adminMiddleware, questionBankController.getBankQuestions);
+router.post("/question", authMiddleware, adminMiddleware, questionBankController.createQuestion);
+router.post("/question/batch", authMiddleware, adminMiddleware, questionBankController.batchImportQuestions);
+router.put("/question/:id", authMiddleware, adminMiddleware, questionBankController.updateQuestion);
+router.delete("/question/:id", authMiddleware, adminMiddleware, questionBankController.deleteQuestion);
+router.get("/questions/feedback-stats", authMiddleware, adminMiddleware, questionFeedbackController.getDislikedQuestions);
+
+// 主观题批改
+import * as exerciseReviewController from "../controllers/exercise-review.controller";
+import codeProblemAdminRoutes from "./code-problem-admin.routes";
+router.get("/exercise/reviews", authMiddleware, adminMiddleware, requirePermission("exercise.review.manage"), exerciseReviewController.getReviewList);
+router.get("/exercise/reviews/stats", authMiddleware, adminMiddleware, requirePermission("exercise.review.manage"), exerciseReviewController.getReviewStats);
+router.put("/exercise/review/:detailId", authMiddleware, adminMiddleware, requirePermission("exercise.review.manage"), exerciseReviewController.gradeAnswer);
+router.post("/exercise/review/batch", authMiddleware, adminMiddleware, requirePermission("exercise.review.manage"), exerciseReviewController.batchGrade);
+
+// 编程题库管理
+router.use("/code-problems", codeProblemAdminRoutes);
+
+// 知识文库管理
+import * as knowledgeAdminController from "../controllers/knowledge-admin.controller";
+router.get("/knowledge/categories", authMiddleware, adminMiddleware, knowledgeAdminController.adminListCategories);
+router.post("/knowledge/categories", authMiddleware, adminMiddleware, requirePermission("knowledge.manage"), knowledgeAdminController.adminCreateCategory);
+router.put("/knowledge/categories/:id", authMiddleware, adminMiddleware, requirePermission("knowledge.manage"), knowledgeAdminController.adminUpdateCategory);
+router.delete("/knowledge/categories/:id", authMiddleware, adminMiddleware, requirePermission("knowledge.manage"), knowledgeAdminController.adminDeleteCategory);
+router.get("/knowledge/documents", authMiddleware, adminMiddleware, knowledgeAdminController.adminListDocuments);
+router.patch("/knowledge/documents/:id/audit", authMiddleware, adminMiddleware, requirePermission("knowledge.manage"), knowledgeAdminController.adminAuditDocument);
+router.post("/knowledge/documents/batch/move", authMiddleware, adminMiddleware, requirePermission("knowledge.manage"), knowledgeAdminController.adminBatchMoveDocuments);
+router.post("/knowledge/documents/batch/delete", authMiddleware, adminMiddleware, requirePermission("knowledge.manage"), knowledgeAdminController.adminBatchDeleteDocuments);
+router.get("/knowledge/stats", authMiddleware, adminMiddleware, knowledgeAdminController.adminGetStats);
+
+// 积分商城管理
+import * as mallAdminController from "../controllers/mall-admin.controller";
+import { uploadMallImage } from "../middlewares/upload.middleware";
+router.post("/mall/upload", authMiddleware, adminMiddleware, uploadMallImage.single("file"), mallAdminController.uploadImage);
+router.get("/mall/products", authMiddleware, adminMiddleware, mallAdminController.listProducts);
+router.post("/mall/products", authMiddleware, adminMiddleware, mallAdminController.createProduct);
+router.put("/mall/products/:id", authMiddleware, adminMiddleware, mallAdminController.updateProduct);
+router.delete("/mall/products/:id", authMiddleware, adminMiddleware, mallAdminController.deleteProduct);
+router.patch("/mall/products/:id/status", authMiddleware, adminMiddleware, mallAdminController.toggleProductStatus);
+router.get("/mall/orders", authMiddleware, adminMiddleware, mallAdminController.listOrders);
+router.patch("/mall/orders/:id/ship", authMiddleware, adminMiddleware, mallAdminController.shipOrder);
+router.get("/mall/banners", authMiddleware, adminMiddleware, mallAdminController.listBanners);
+router.post("/mall/banners", authMiddleware, adminMiddleware, mallAdminController.createBanner);
+router.put("/mall/banners/:id", authMiddleware, adminMiddleware, mallAdminController.updateBanner);
+router.delete("/mall/banners/:id", authMiddleware, adminMiddleware, mallAdminController.deleteBanner);
+router.get("/mall/stats", authMiddleware, adminMiddleware, mallAdminController.getMallStats);
 
 export default router;

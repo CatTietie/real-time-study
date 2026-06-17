@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -c \"[console]::beep(800,300)\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

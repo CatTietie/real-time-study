@@ -15,6 +15,12 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   AppstoreOutlined,
+  BookOutlined,
+  FormOutlined,
+  ApartmentOutlined,
+  DashboardOutlined,
+  ReadOutlined,
+  ShopOutlined,
 } from "@ant-design/icons";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
@@ -118,6 +124,11 @@ const baseMenuItems = (role: string | null) => [
     label: <Link to="/admin/dashboard">数据看板</Link>,
   },
   {
+    key: "/admin/realtime",
+    icon: <DashboardOutlined />,
+    label: <Link to="/admin/realtime">实时监控</Link>,
+  },
+  {
     key: "/admin/users",
     icon: <UserOutlined />,
     label: <Link to="/admin/users">用户管理</Link>,
@@ -174,6 +185,11 @@ const baseMenuItems = (role: string | null) => [
     label: "社区内容审核",
     children: [
       {
+        key: "/admin/audit/content",
+        icon: <AuditOutlined />,
+        label: <Link to="/admin/audit/content">内容审核</Link>,
+      },
+      {
         key: "/admin/audit/posts",
         icon: <AuditOutlined />,
         label: <Link to="/admin/audit/posts">帖子审核</Link>,
@@ -188,6 +204,11 @@ const baseMenuItems = (role: string | null) => [
         icon: <WarningOutlined />,
         label: <Link to="/admin/audit/reports">举报处理</Link>,
       },
+      {
+        key: "/admin/audit/config",
+        icon: <SettingOutlined />,
+        label: <Link to="/admin/audit/config">审核策略</Link>,
+      },
     ],
   },
   {
@@ -199,6 +220,60 @@ const baseMenuItems = (role: string | null) => [
     key: "/admin/sensitive-words",
     icon: <SafetyOutlined />,
     label: <Link to="/admin/sensitive-words">敏感词库</Link>,
+  },
+  {
+    key: "/admin/question-bank",
+    icon: <BookOutlined />,
+    label: <Link to="/admin/question-bank">题库管理</Link>,
+  },
+  {
+    key: "/admin/question-feedback",
+    icon: <WarningOutlined />,
+    label: <Link to="/admin/question-feedback">题目反馈</Link>,
+  },
+  {
+    key: "/admin/exercise-review",
+    icon: <FormOutlined />,
+    label: <Link to="/admin/exercise-review">主观题批改</Link>,
+  },
+  {
+    key: "/admin/learning-paths",
+    icon: <ApartmentOutlined />,
+    label: <Link to="/admin/learning-paths">技能树管理</Link>,
+  },
+  {
+    key: "knowledge",
+    icon: <ReadOutlined />,
+    label: "知识文库",
+    children: [
+      {
+        key: "/admin/knowledge/categories",
+        label: <Link to="/admin/knowledge/categories">分类管理</Link>,
+      },
+      {
+        key: "/admin/knowledge/documents",
+        label: <Link to="/admin/knowledge/documents">文档管理</Link>,
+      },
+    ],
+  },
+  {
+    key: "mall",
+    icon: <ShopOutlined />,
+    label: "积分商城",
+    children: [
+      {
+        key: "/admin/mall/products",
+        label: <Link to="/admin/mall/products">商品管理</Link>,
+      },
+      {
+        key: "/admin/mall/orders",
+        label: <Link to="/admin/mall/orders">订单管理</Link>,
+      },
+      {
+        key: "/admin/mall/banners",
+        label: <Link to="/admin/mall/banners">轮播管理</Link>,
+      },
+    ],
   },
 ];
 
